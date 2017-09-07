@@ -1,2 +1,2 @@
-SUBDIRS=src
+SUBDIRS=src jar
 ACLOCAL_AMFLAGS=-I m4

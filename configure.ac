@@ -11,7 +11,7 @@ AC_CANONICAL_SYSTEM
 AC_CONFIG_MACRO_DIR([m4])
 
 dnl Initialize automake
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([subdir-objects])
 
 dnl this allows us specify individual liking flags for each target
 AM_PROG_CC_C_O 
@@ -19,10 +19,13 @@ AM_PROG_CC_C_O
 dnl Initialize Libtool
 LT_INIT
 
-dnl check for postgresql
+dnl check for PostgreSQL
 AX_LIB_POSTGRESQL(9.2.0)
 
 libdir=$POSTGRESQL_LIBDIR
 
-AC_CONFIG_FILES(Makefile src/Makefile)
+dnl check for JDK8
+AX_JDK8
+
+AC_CONFIG_FILES(Makefile src/Makefile jar/Makefile)
 AC_OUTPUT
