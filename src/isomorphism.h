@@ -314,7 +314,12 @@ inline void vf2state_undo_add_pair(VF2State *const restrict vf2state)
     vf2state->target_range_stack[undo->target_selector] = undo->target_idx;
 
     for(int i = undo->target_range_len; i < vf2state->target_range_len; i++)
-        vf2state->target_range_flag[vf2state->target_range_stack[i]] = false;
+    {
+        if(vf2state->target_range_stack[i] != -1)
+            vf2state->target_range_flag[vf2state->target_range_stack[i]] = false;
+        else
+            vf2state->target_range_flag[undo->target_idx] = false;
+    }
 
     vf2state->target_range_len = undo->target_range_len;
     vf2state->target_selector = undo->target_selector;
