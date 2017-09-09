@@ -344,13 +344,10 @@ inline void vf2state_add_pair(VF2State *const restrict vf2state)
     if(!vf2state->target_range_flag[vf2state->target_idx])
     {
         vf2state->target_range_flag[vf2state->target_idx] = true;
-        vf2state->target_selector = vf2state->target_range_len;
-        vf2state->target_range_stack[vf2state->target_range_len++] = -1;
+        vf2state->target_selector = vf2state->target_range_len++;
     }
-    else
-    {
-        vf2state->target_range_stack[vf2state->target_selector] = -1;
-    }
+
+    vf2state->target_range_stack[vf2state->target_selector] = -1;
 
     undo->target_range_len = vf2state->target_range_len;
     undo->target_selector = vf2state->target_selector;
