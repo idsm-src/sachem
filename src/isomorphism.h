@@ -155,10 +155,10 @@ inline bool vf2state_next_target(VF2State *const restrict vf2state)
         {
             if(vf2state->core_target[vf2state->target_idx] == INT32_MIN)
             {
+                vf2state->target_selector = vf2state->target_range_len;
+
                 if(vf2state->target_range_flag[vf2state->target_idx])
                 {
-                    vf2state->target_selector = -1;
-
                     for(int i = 0; i < vf2state->target_range_len; i++)
                     {
                         if(vf2state->target_range_stack[i] == vf2state->target_idx)
@@ -341,6 +341,10 @@ inline void vf2state_add_pair(VF2State *const restrict vf2state)
     vf2state->core_query[vf2state->query_idx] = vf2state->target_idx;
     vf2state->core_target[vf2state->target_idx] = vf2state->query_idx;
 
+    undo->target_range_len = vf2state->target_range_len;
+    undo->target_selector = vf2state->target_selector;
+    undo->target_idx = vf2state->target_idx;
+
     if(!vf2state->target_range_flag[vf2state->target_idx])
     {
         vf2state->target_range_flag[vf2state->target_idx] = true;
@@ -349,9 +353,6 @@ inline void vf2state_add_pair(VF2State *const restrict vf2state)
 
     vf2state->target_range_stack[vf2state->target_selector] = -1;
 
-    undo->target_range_len = vf2state->target_range_len;
-    undo->target_selector = vf2state->target_selector;
-    undo->target_idx = vf2state->target_idx;
 
     int *restrict targetBondList = molecule_get_bond_list(vf2state->target, vf2state->target_idx);
     int targetBondListSize = molecule_get_bond_list_size(vf2state->target, vf2state->target_idx);
