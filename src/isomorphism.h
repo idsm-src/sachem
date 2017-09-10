@@ -5,6 +5,11 @@
 #include <stdbool.h>
 #include "molecule.h"
 
+#define UNDEFINED_CORE              -1
+#define MASKED_TARGET               -1
+#define is_core_defined(value)      ((value) >= 0)
+#define is_target_masked(value)     ((value) < 0)
+
 
 typedef struct
 {
@@ -61,7 +66,7 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
     vf2state->core_query = palloc(queryAtomCount * sizeof(int));
 
     for(int i = 0; i < queryAtomCount; i++)
-        vf2state->core_query[i] = INT32_MIN;
+        vf2state->core_query[i] = UNDEFINED_CORE;
 
 
     vf2state->query_range_flags = palloc((queryAtomCount + 1) * queryAtomCount * sizeof(bool));
@@ -79,12 +84,12 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
 
         if(vf2state->query_range_len > core)
         {
-            while(idx < queryAtomCount && (vf2state->core_query[idx] != INT32_MIN || !vf2state->query_range_flag[idx]))
+            while(idx < queryAtomCount && (is_core_defined(vf2state->core_query[idx]) || !vf2state->query_range_flag[idx]))
                 idx++;
         }
         else
         {
-            while(idx < queryAtomCount && vf2state->core_query[idx] != INT32_MIN)
+            while(idx < queryAtomCount && is_core_defined(vf2state->core_query[idx]))
                 idx++;
         }
 
@@ -138,7 +143,7 @@ inline bool vf2state_next_target(VF2State *const restrict vf2state)
 
         while(vf2state->target_selector < vf2state->target_range_len)
         {
-            if(vf2state->target_range_stack[vf2state->target_selector] >= 0)
+            if(!is_target_masked(vf2state->target_range_stack[vf2state->target_selector]))
             {
                 vf2state->target_idx = vf2state->target_range_stack[vf2state->target_selector];
                 return true;
@@ -153,7 +158,7 @@ inline bool vf2state_next_target(VF2State *const restrict vf2state)
 
         while(vf2state->target_idx < vf2state->targetAtomCount)
         {
-            if(vf2state->core_target[vf2state->target_idx] == INT32_MIN)
+            if(!is_core_defined(vf2state->core_target[vf2state->target_idx]))
             {
                 vf2state->target_selector = vf2state->target_range_len;
 
@@ -266,7 +271,7 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
     {
         int other1 = queryBondList[i];
 
-        if(vf2state->core_query[other1] != INT32_MIN)
+        if(is_core_defined(vf2state->core_query[other1]))
         {
             int other2 = vf2state->core_query[other1];
 
@@ -289,7 +294,7 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
     {
         int other2 = targetBondList[i];
 
-        if(vf2state->core_target[other2] == INT32_MIN)
+        if(!is_core_defined(vf2state->core_target[other2]))
         {
             if(vf2state->target_range_flag[other2])
                 terminTarget++;
@@ -308,14 +313,14 @@ inline void vf2state_undo_add_pair(VF2State *const restrict vf2state)
 
     vf2state->query_idx = vf2state->query_order[vf2state->core_len];
 
-    vf2state->core_query[vf2state->query_idx] = INT32_MIN;
-    vf2state->core_target[undo->target_idx] = INT32_MIN;
+    vf2state->core_query[vf2state->query_idx] = UNDEFINED_CORE;
+    vf2state->core_target[undo->target_idx] = UNDEFINED_CORE;
 
     vf2state->target_range_stack[undo->target_selector] = undo->target_idx;
 
     for(int i = undo->target_range_len; i < vf2state->target_range_len; i++)
     {
-        if(vf2state->target_range_stack[i] != -1)
+        if(is_core_defined(vf2state->target_range_stack[i]))
             vf2state->target_range_flag[vf2state->target_range_stack[i]] = false;
         else
             vf2state->target_range_flag[undo->target_idx] = false;
@@ -351,7 +356,7 @@ inline void vf2state_add_pair(VF2State *const restrict vf2state)
         vf2state->target_selector = vf2state->target_range_len++;
     }
 
-    vf2state->target_range_stack[vf2state->target_selector] = -1;
+    vf2state->target_range_stack[vf2state->target_selector] = MASKED_TARGET;
 
 
     int *restrict targetBondList = molecule_get_bond_list(vf2state->target, vf2state->target_idx);
@@ -475,8 +480,7 @@ inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *co
     vf2state->query_range_flag = vf2state->query_range_flags;
     vf2state->query_range_len = 0;
     vf2state->target_range_len = 0;
-    vf2state->target_selector = -1;
-    vf2state->target_idx = INT32_MIN;
+
 
     vf2state->target_range_flag = palloc0(targetAtomCount * sizeof(bool));
     vf2state->target_range_stack = palloc(targetAtomCount * sizeof(int));
@@ -484,10 +488,10 @@ inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *co
     vf2state->core_target = palloc(targetAtomCount * sizeof(int));
 
     for(int i = 0; i < targetAtomCount; i++)
-        vf2state->core_target[i] = INT32_MIN;
+        vf2state->core_target[i] = UNDEFINED_CORE;
 
     for(int i = 0; i < vf2state->queryAtomCount; i++)
-        vf2state->core_query[i] = INT32_MIN;
+        vf2state->core_query[i] = UNDEFINED_CORE;
 
 
     return vf2state_match_core(vf2state);
