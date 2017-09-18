@@ -13,6 +13,10 @@
 #define ATOM_BLOCK_SIZE      3
 #define BOND_BLOCK_SIZE      4
 
+#define STEREO_MASK       0x03
+#define NONE_STEREO       0x00
+#define UNDEF_STEREO      0x03
+
 
 typedef struct
 {
@@ -119,7 +123,7 @@ inline int8_t molecule_get_formal_charge(const Molecule *const restrict molecule
 {
     int offset = ATOM_BLOCK_SIZE * i + 2;
 
-    return molecule->atoms[offset];
+    return ((int8_t) molecule->atoms[offset]) / 4;
 }
 
 
@@ -141,6 +145,12 @@ inline bool molecule_get_atom_restH_flag(const Molecule *const restrict molecule
         return false;
 
     return molecule->restH[i];
+}
+
+
+inline int *molecule_bond_atoms(const Molecule *const restrict molecule, int b)
+{
+    return molecule->contains[b];
 }
 
 
@@ -170,7 +180,70 @@ inline uint8_t molecule_get_bond_data(const Molecule *const restrict molecule, i
 {
     int offset = BOND_BLOCK_SIZE * b + 3;
 
-    return molecule->bonds[offset];
+    return molecule->bonds[offset] & 0xFC;
+}
+
+
+inline uint8_t molecule_get_atom_stereo(const Molecule *const restrict molecule, int i)
+{
+    int offset = ATOM_BLOCK_SIZE * i + 2;
+
+    return molecule->atoms[offset] & STEREO_MASK;
+}
+
+
+inline uint8_t molecule_get_bond_stereo(const Molecule *const restrict molecule, int b)
+{
+    int offset = BOND_BLOCK_SIZE * b + 3;
+
+    return molecule->bonds[offset] & STEREO_MASK;
+}
+
+
+inline uint8_t normalize_atom_stereo(int indexes[4], uint8_t stereo)
+{
+    uint16_t order = 0;
+
+    for(int i = 0; i < 4; i++)
+    {
+        int value = 0;
+
+        for(int j = 0; j < 4; j++)
+            if(indexes[j] <= indexes[i])
+                value++;
+
+        order = (order << 4) + value;
+    }
+
+    bool reverse = true;
+
+    const uint16_t validReorder[] = {0x1234, 0x1423, 0x1342, 0x2314, 0x2431, 0x2143, 0x3124, 0x3412, 0x3241, 0x4213, 0x4321, 0x4132};
+
+    for(int i = 0; i < 12; i++)
+        if(validReorder[i] == order)
+            reverse = false;
+
+    if(reverse)
+        return ~stereo;
+
+    return stereo;
+}
+
+
+inline uint8_t normalize_bond_stereo(int indexes[4], uint8_t conformation)
+{
+    bool reverse = false;
+
+    if(indexes[0] > indexes[1])
+        reverse = !reverse;
+
+    if(indexes[2] > indexes[3])
+        reverse = !reverse;
+
+    if(reverse)
+        return ~conformation;
+
+    return conformation;
 }
 
 #endif /* MOLECULE_H_ */

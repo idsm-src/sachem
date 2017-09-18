@@ -21,6 +21,7 @@ typedef struct
 
 typedef struct
 {
+    bool strictStereo;
     bool exact;
 
     const Molecule *restrict query;
@@ -52,10 +53,38 @@ typedef struct
 } VF2State;
 
 
-inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *const restrict query, bool exact)
+inline void swap_int(int *a, int *b)
+{
+    int t = *a;
+    *a = *b;
+    *b = t;
+}
+
+
+inline void sort_stereo_atoms(int array[4])
+{
+    for(int n = 4; n > 0; n--)
+        for(int i = 1; i < n; i++)
+            if(array[i-1] > array[i])
+                swap_int(array + i, array + i - 1);
+}
+
+
+inline void sort_bond_atoms(int array[4])
+{
+    if(array[0] > array[1])
+        swap_int(array + 0, array + 1);
+
+    if(array[2] > array[3])
+        swap_int(array + 2, array + 3);
+}
+
+
+inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *const restrict query, bool strictStereo, bool exact)
 {
     int queryAtomCount = query->atomCount;
 
+    vf2state->strictStereo = strictStereo;
     vf2state->exact = exact;
     vf2state->query = query;
     vf2state->queryAtomCount = queryAtomCount;
@@ -409,6 +438,128 @@ inline void vf2state_add_pair(VF2State *const restrict vf2state)
 }
 
 
+bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
+{
+    const Molecule *const restrict query = vf2state->query;
+    const Molecule *const restrict target = vf2state->target;
+
+    int queryAtomCount = query->atomCount;
+    int targetAtomCount = target->atomCount;
+
+    int queryBondCount = query->bondCount;
+    int targetBondCount = target->bondCount;
+
+
+    for(int queryAtomIdx = 0; queryAtomIdx < queryAtomCount; queryAtomIdx++)
+    {
+        int queryStereo = molecule_get_atom_stereo(query, queryAtomIdx);
+
+        int targetAtomIdx = vf2state->core_query[queryAtomIdx];
+        int targetStereo = molecule_get_atom_stereo(target, targetAtomIdx);
+
+        if(queryStereo != NONE_STEREO && queryStereo != UNDEF_STEREO)
+        {
+            if(targetStereo == NONE_STEREO)
+                continue;
+
+            if(targetStereo == UNDEF_STEREO)
+                return false;
+
+
+            int queryAtoms[4];
+            int listSize = molecule_get_bond_list_size(query, queryAtomIdx);
+
+            for(int i = 0; i < listSize; i++)
+                queryAtoms[i] = molecule_get_bond_list(query, queryAtomIdx)[i];
+
+            if(listSize == 3)
+                queryAtoms[3] = queryAtomIdx;
+
+            sort_stereo_atoms(queryAtoms);
+
+
+            int targetAtoms[4];
+
+            for(int i = 0; i < 4; i++)
+                targetAtoms[i] = vf2state->core_query[queryAtoms[i]];
+
+            if(normalize_atom_stereo(targetAtoms, targetStereo) != queryStereo)
+                return false;
+        }
+        else if(vf2state->exact)
+        {
+            if(queryStereo != targetStereo)
+                return false;
+        }
+    }
+
+
+    for(int queryBondIdx = 0; queryBondIdx < queryBondCount; queryBondIdx++)
+    {
+        int queryStereo = molecule_get_bond_stereo(query, queryBondIdx);
+
+        int *queryBondAtoms = molecule_bond_atoms(query, queryBondIdx);
+        int targetBondAtom0 = vf2state->core_query[queryBondAtoms[0]];
+        int targetBondAtom1 = vf2state->core_query[queryBondAtoms[1]];
+        int targetBondIdx = molecule_get_bond(target, targetBondAtom0, targetBondAtom1);
+        int targetStereo = molecule_get_bond_stereo(target, targetBondIdx);
+
+        if(queryStereo != NONE_STEREO && queryStereo != UNDEF_STEREO)
+        {
+            if(targetStereo == NONE_STEREO)
+                continue;
+
+            if(targetStereo == UNDEF_STEREO)
+                return false;
+
+
+            int queryAtoms[4];
+
+            int *bondList0 = molecule_get_bond_list(query, queryBondAtoms[0]);
+            int listSize0 = molecule_get_bond_list_size(query, queryBondAtoms[0]);
+
+            int idx = 0;
+
+            for(int i = 0; i < listSize0; i++)
+                if(bondList0[i] != queryBondAtoms[1])
+                    queryAtoms[idx++] = bondList0[i];
+
+            if(listSize0 == 2)
+                queryAtoms[idx++] = queryBondAtoms[0];
+
+            int *bondList1 = molecule_get_bond_list(query, queryBondAtoms[1]);
+            int listSize1 = molecule_get_bond_list_size(query, queryBondAtoms[1]);
+
+            for(int i = 0; i < listSize1; i++)
+                if(bondList1[i] != queryBondAtoms[0])
+                    queryAtoms[idx++] = bondList1[i];
+
+            if(listSize1 == 2)
+                queryAtoms[idx] = queryBondAtoms[1];
+
+            sort_bond_atoms(queryAtoms);
+
+
+            int targetAtoms[4];
+
+            for(int i = 0; i < 4; i++)
+                targetAtoms[i] = vf2state->core_query[queryAtoms[i]];
+
+            if(normalize_bond_stereo(targetAtoms, targetStereo) != queryStereo)
+                return false;
+        }
+        else if(vf2state->exact)
+        {
+            if(queryStereo != targetStereo)
+                return false;
+        }
+    }
+
+
+    return true;
+}
+
+
 bool vf2state_is_match_valid(const VF2State *const restrict vf2state)
 {
     const Molecule *const restrict query = vf2state->query;
@@ -458,6 +609,11 @@ bool vf2state_is_match_valid(const VF2State *const restrict vf2state)
                 return false;
         }
     }
+
+
+    if(unlikely(vf2state->strictStereo) && !vf2state_is_stereo_valid(vf2state))
+            return false;
+
 
     return true;
 }

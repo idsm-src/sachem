@@ -16,6 +16,7 @@
 
 typedef struct
 {
+    bool strictStereo;
     bool exact;
 
     BitSet resultMask;
@@ -191,8 +192,9 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
         VarChar *query = PG_GETARG_VARCHAR_P(0);
         text *type = PG_GETARG_TEXT_P(1);
-        bool exact = PG_GETARG_BOOL(2);
-        bool tautomers = PG_GETARG_BOOL(3);
+        bool strictStereo = PG_GETARG_BOOL(2);
+        bool exact = PG_GETARG_BOOL(3);
+        bool tautomers = PG_GETARG_BOOL(4);
         char *typeStr = text_to_cstring(type);
 
         FuncCallContext *funcctx = SRF_FIRSTCALL_INIT();
@@ -201,6 +203,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
         SubstructureSearchData *info = palloc(sizeof(SubstructureSearchData));
         funcctx->user_fctx = info;
 
+        info->strictStereo = strictStereo;
         info->exact = exact;
 
         info->queryDataCount = java_parse_query(&info->queryData, VARDATA(query), VARSIZE(query) - VARHDRSZ, typeStr, tautomers);
@@ -274,7 +277,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
                 PG_MEMCONTEXT_BEGIN(info->isomorphismContext);
                 molecule_init(&info->queryMolecule, data->atomLength, data->atoms, data->bondLength, data->bonds, data->restH, !info->exact);
-                vf2state_init(&info->vf2state, &info->queryMolecule, info->exact);
+                vf2state_init(&info->vf2state, &info->queryMolecule, info->strictStereo, info->exact);
                 PG_MEMCONTEXT_END();
 
                 info->candidatePosition = bitset_next_set_bit(&info->candidates, 0);
