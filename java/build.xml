@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<project basedir="." default="build-jar">
+  <path id="master-classpath">
+    <fileset dir="${src.dir}/lib">
+      <include name="*.jar"/>
+    </fileset>
+    <pathelement path="${build.dir}/classes"/>
+  </path>
+
+  <target name="build">
+    <mkdir dir="${build.dir}/classes"/>
+  	<javac destdir="${build.dir}/classes" includeantruntime="false" source="1.8" target="1.8">
+      <src path="${src.dir}/src"/>
+      <classpath refid="master-classpath"/>
+    </javac>
+  </target>
+ 
+  <target name="clean">
+    <delete>
+      <fileset dir="${build.dir}/classes">
+        <include name="**/*.class"/>
+      </fileset>
+    </delete>
+    <delete file="${build.dir}/orchem.jar"/>
+  </target>
+
+  <target name="build-jar" depends="build">
+    <jar destfile="${build.dir}/orchem.jar" basedir="${build.dir}/classes" includes="**" excludes="**/load/*.class"/>
+  </target>
+
+</project>

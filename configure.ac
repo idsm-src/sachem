@@ -19,6 +19,12 @@ AM_PROG_CC_C_O
 dnl Initialize Libtool
 LT_INIT
 
+dnl check for ant
+AC_PATH_PROG([ANT], [ant], [])
+if test "no$ANT" = no ; then
+    AC_MSG_ERROR([ant not found])
+fi
+
 dnl check for PostgreSQL
 AX_LIB_POSTGRESQL(9.2.0)
 
@@ -27,5 +33,5 @@ libdir=$POSTGRESQL_LIBDIR
 dnl check for JDK8
 AX_JDK8
 
-AC_CONFIG_FILES(Makefile src/Makefile jar/Makefile)
+AC_CONFIG_FILES(Makefile src/Makefile java/Makefile)
 AC_OUTPUT

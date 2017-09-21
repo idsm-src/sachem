@@ -45,7 +45,8 @@
 static bool initialised = false;
 static JavaVM* jvm = NULL;
 static JNIEnv* env = NULL;
-static jclass queryDataClass = NULL;
+static jclass substructureSearchClass = NULL;
+static jclass substructureQueryDataClass = NULL;
 static jmethodID queryDataMethod = NULL;
 static jfieldID countsField = NULL;
 static jfieldID fpField = NULL;
@@ -84,9 +85,11 @@ void java_module_init(void)
 {
     JavaVMInitArgs args = (JavaVMInitArgs) {
         .version = JNI_VERSION_1_8,
-        .nOptions = 1,
-        .options = (JavaVMOption []) {(JavaVMOption)
-            { .optionString = "-Djava.class.path=" JARDIR "/orchem.jar:" JARDIR "/cdk-2.0.jar"}},
+        .nOptions = 2,
+        .options = (JavaVMOption []) {
+            (JavaVMOption) { .optionString = "-Djava.class.path=" JARDIR "/orchem.jar:" JARDIR "/cdk-2.0.jar"},
+            (JavaVMOption) { .optionString = "-Dinchi.path=" BINDIR "/inchi-1"}
+        },
         .ignoreUnrecognized = JNI_FALSE
     };
 
@@ -96,25 +99,28 @@ void java_module_init(void)
         elog(ERROR, "cannot initialize JVM");
 
 
-    queryDataClass = (*env)->FindClass(env, "cz/iocb/orchem/postgres/QueryData");
+    substructureSearchClass = (*env)->FindClass(env, "cz/iocb/orchem/search/SubstructureSearch");
     java_check_exception("java_module_init()");
 
-    queryDataMethod = (*env)->GetStaticMethodID(env, queryDataClass, "getQueryData", "([BLjava/lang/String;Z)[Lcz/iocb/orchem/postgres/QueryData;");
+    substructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/SubstructureSearch$SubstructureQueryData");
     java_check_exception("java_module_init()");
 
-    countsField = (*env)->GetFieldID(env, queryDataClass, "counts", "[S");
+    queryDataMethod = (*env)->GetStaticMethodID(env, substructureSearchClass, "getQueryData", "([BLjava/lang/String;Z)[Lcz/iocb/orchem/search/SubstructureSearch$SubstructureQueryData;");
     java_check_exception("java_module_init()");
 
-    fpField = (*env)->GetFieldID(env, queryDataClass, "fp", "[S");
+    countsField = (*env)->GetFieldID(env, substructureQueryDataClass, "counts", "[S");
     java_check_exception("java_module_init()");
 
-    atomsField = (*env)->GetFieldID(env, queryDataClass, "atoms", "[B");
+    fpField = (*env)->GetFieldID(env, substructureQueryDataClass, "fp", "[S");
     java_check_exception("java_module_init()");
 
-    bondsField = (*env)->GetFieldID(env, queryDataClass, "bonds", "[B");
+    atomsField = (*env)->GetFieldID(env, substructureQueryDataClass, "atoms", "[B");
     java_check_exception("java_module_init()");
 
-    restHField = (*env)->GetFieldID(env, queryDataClass, "restH", "[Z");
+    bondsField = (*env)->GetFieldID(env, substructureQueryDataClass, "bonds", "[B");
+    java_check_exception("java_module_init()");
+
+    restHField = (*env)->GetFieldID(env, substructureQueryDataClass, "restH", "[Z");
     java_check_exception("java_module_init()");
 
     exceptionClass = (*env)->FindClass(env, "java/lang/Throwable");
@@ -170,7 +176,7 @@ int java_parse_query(QueryData **data, char* query, size_t queryLength, char *ty
         java_check_exception("java_parse_query()");
 
 
-        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, queryDataClass, queryDataMethod, queryArg, typeArg, (jboolean) tautomers);
+        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, substructureQueryDataClass, queryDataMethod, queryArg, typeArg, (jboolean) tautomers);
         java_check_exception("java_parse_query()");
 
         JavaDeleteRef(queryArg);
