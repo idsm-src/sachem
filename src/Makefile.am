@@ -7,3 +7,11 @@ libpgchem_la_SOURCES = \
 		pgchem.c \
 		java.c \
 		orchem.c
+
+EXTRA_DIST = \
+		bitset.h \
+        isomorphism.h \
+        java.h \
+        molecule.h \
+        orchem.h \
+        pgchem.h
