@@ -155,6 +155,7 @@ int java_parse_query(QueryData **data, char* query, size_t queryLength, char *ty
     jbyte *atoms = NULL;
     jbyte *bonds = NULL;
     jboolean *restH = NULL;
+    jsize length = -1;
 
 
     PG_TRY();
@@ -176,7 +177,7 @@ int java_parse_query(QueryData **data, char* query, size_t queryLength, char *ty
         JavaDeleteRef(typeArg);
 
 
-        jsize length = (*env)->GetArrayLength(env, result);
+        length = (*env)->GetArrayLength(env, result);
         QueryData *results = palloc(length * sizeof(QueryData));
 
         for(int i = 0; i < length; i++)
@@ -249,9 +250,7 @@ int java_parse_query(QueryData **data, char* query, size_t queryLength, char *ty
 
         JavaDeleteRef(result);
 
-
         *data = results;
-        return length;
     }
     PG_CATCH();
     {
@@ -268,4 +267,6 @@ int java_parse_query(QueryData **data, char* query, size_t queryLength, char *ty
         PG_RE_THROW();
     }
     PG_END_TRY();
+
+    return length;
 }
