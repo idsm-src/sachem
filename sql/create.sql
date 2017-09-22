@@ -41,4 +41,4 @@ CREATE TABLE fingerprint_orchem_index (
 );
 
 
-CREATE FUNCTION "orchem_substructure_search"(varchar, varchar, boolean, boolean, boolean) RETURNS SETOF int AS 'libpgchem.so','orchem_substructure_search' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION "orchem_substructure_search"(varchar, varchar, int, boolean, boolean, boolean) RETURNS SETOF int AS 'libpgchem.so','orchem_substructure_search' LANGUAGE C IMMUTABLE STRICT;
