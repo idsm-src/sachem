@@ -8,7 +8,7 @@
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)
 
-#define PG_MEMCONTEXT_BEGIN(context)    do { MemoryContext old = MemoryContextSwitchTo(mcxt)
+#define PG_MEMCONTEXT_BEGIN(context)    do { MemoryContext old = MemoryContextSwitchTo(context)
 #define PG_MEMCONTEXT_END()             MemoryContextSwitchTo(old);} while(0)
 
 #endif /* PGCHEM_H_ */
