@@ -42,7 +42,6 @@ typedef struct
     MemoryContext targetContext;
 
 #if SHOW_STATS
-    int resultCount;
     int candidateCount;
     struct timeval begin;
 #endif
@@ -237,7 +236,6 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 #if SHOW_STATS
         info->begin = begin;
         info->candidateCount = 0;
-        info->resultCount = 0;
 #endif
 
         PG_MEMCONTEXT_END();
@@ -402,10 +400,6 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
             if(match)
             {
-    #if SHOW_STATS
-                info->resultCount++;
-    #endif
-
                 bitset_unset(&info->resultMask, seqid);
                 info->foundResults++;
                 result = id;
@@ -425,7 +419,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
         struct timeval end;
         gettimeofday(&end, NULL);
         int32_t time_spent = ((int64_t) end.tv_sec - (int64_t) begin.tv_sec) * 1000000 + ((int64_t) end.tv_usec - (int64_t) begin.tv_usec);
-        elog(NOTICE, "stat: %i %i %i.%i ms", info->candidateCount, info->resultCount, time_spent / 1000, time_spent % 1000);
+        elog(NOTICE, "stat: %i %i %i.%i ms", info->candidateCount, info->foundResults, time_spent / 1000, time_spent % 1000);
 #endif
 
         SRF_RETURN_DONE(funcctx);
