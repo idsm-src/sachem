@@ -42,6 +42,15 @@
     } while(0)
 
 
+#define JavaDeleteLongArray(array, buffer, mode) \
+    do { \
+        if(likely(array != NULL && buffer != NULL)) (*env)->ReleaseLongArrayElements(env, array, buffer, mode); \
+        if(likely(array != NULL)) (*env)->DeleteLocalRef(env, array); \
+        array = NULL; \
+        buffer = NULL; \
+    } while(0)
+
+
 static bool initialised = false;
 static JavaVM* jvm = NULL;
 static JNIEnv* env = NULL;
@@ -55,6 +64,8 @@ static jfieldID bondsField = NULL;
 static jfieldID restHField = NULL;
 static jclass exceptionClass = NULL;
 static jmethodID toStringMethod = NULL;
+static jclass similaritySearchClass = NULL;
+static jmethodID similarityQueryDataMethod = NULL;
 
 
 static inline void java_check_exception(const char *str)
@@ -127,6 +138,13 @@ void java_module_init(void)
     java_check_exception("java_module_init()");
 
     toStringMethod = (*env)->GetMethodID(env, exceptionClass, "toString", "()Ljava/lang/String;");
+    java_check_exception("java_module_init()");
+
+
+    similaritySearchClass = (*env)->FindClass(env, "cz/iocb/orchem/search/SimilaritySearch");
+    java_check_exception("java_module_init()");
+
+    similarityQueryDataMethod = (*env)->GetStaticMethodID(env, similaritySearchClass, "getQueryData", "([BLjava/lang/String;)[J");
     java_check_exception("java_module_init()");
 
 
@@ -269,6 +287,64 @@ int java_parse_query(QueryData **data, char* query, size_t queryLength, char *ty
         JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
         JavaDeleteByteArray(bondsArray, bonds, JNI_ABORT);
         JavaDeleteBooleanArray(restHArray, restH, JNI_ABORT);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
+
+    return length;
+}
+
+
+int java_parse_similarity_query(uint64_t **data, char* query, size_t queryLength, char *type)
+{
+    if(initialised == false)
+        elog(ERROR, "java module is not properly initialized");
+
+    jbyteArray queryArg = NULL;
+    jstring typeArg = NULL;
+    jlongArray result = NULL;
+    jlong *words = NULL;
+    jsize length = -1;
+
+
+    PG_TRY();
+    {
+        queryArg = (*env)->NewByteArray(env, queryLength);
+        java_check_exception("java_parse_similarity_query()");
+
+        (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte*) query);
+
+        typeArg = (*env)->NewStringUTF(env, type);
+        java_check_exception("java_parse_similarity_query()");
+
+        result = (jlongArray) (*env)->CallStaticObjectMethod(env, similaritySearchClass, similarityQueryDataMethod, queryArg, typeArg);
+        java_check_exception("java_parse_similarity_query()");
+
+        JavaDeleteRef(queryArg);
+        JavaDeleteRef(typeArg);
+
+        if(result != NULL)
+        {
+            length = (*env)->GetArrayLength(env, result);
+            words = (*env)->GetLongArrayElements(env, result, NULL);
+            java_check_exception("java_parse_similarity_query()");
+
+            *data = palloc(length * sizeof(jlong));
+            memcpy(*data, words, length * sizeof(jlong));
+
+            JavaDeleteLongArray(result, words, JNI_ABORT);
+        }
+        else
+        {
+            *data = NULL;
+        }
+    }
+    PG_CATCH();
+    {
+        JavaDeleteRef(queryArg);
+        JavaDeleteRef(typeArg);
+        JavaDeleteLongArray(result, words, JNI_ABORT);
 
         PG_RE_THROW();
     }

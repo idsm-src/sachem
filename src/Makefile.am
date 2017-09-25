@@ -6,7 +6,8 @@ libpgchem_la_LDFLAGS = $(JDK8_LDFLAGS)
 libpgchem_la_SOURCES = \
 		pgchem.c \
 		java.c \
-		orchem.c
+		orchem.c \
+		simsearch.c
 
 EXTRA_DIST = \
 		bitset.h \
@@ -14,4 +15,5 @@ EXTRA_DIST = \
         java.h \
         molecule.h \
         orchem.h \
-        pgchem.h
+        pgchem.h \
+        simsearch.h

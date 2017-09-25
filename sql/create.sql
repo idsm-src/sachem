@@ -40,5 +40,15 @@ CREATE TABLE fingerprint_orchem_index (
     PRIMARY KEY (idx)
 );
 
+CREATE TABLE similarity_fingerprint_orchem (
+    id                    INT NOT NULL,
+    bit_count             SMALLINT NOT NULL,
+    fp                    BIGINT[] NOT NULL,
+    PRIMARY KEY (id)
+);
+
+CREATE INDEX similarity_fingerprint_orchem__bit_count ON similarity_fingerprint_orchem(bit_count);
+
 
 CREATE FUNCTION "orchem_substructure_search"(varchar, varchar, int, boolean, boolean, boolean) RETURNS SETOF int AS 'libpgchem.so','orchem_substructure_search' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION "orchem_similarity_search"(varchar, varchar, float4, int) RETURNS TABLE (id int, score float4) AS 'libpgchem.so','orchem_similarity_search' LANGUAGE C IMMUTABLE STRICT;

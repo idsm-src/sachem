@@ -24,6 +24,14 @@ typedef struct
 } BitSet;
 
 
+void inline bitset_init(BitSet *restrict const bitset, uint64_t *words, int size)
+{
+    bitset->words = words;
+    bitset->length = size;
+    bitset->wordsInUse = size;
+}
+
+
 void inline bitset_init_alloc(BitSet *restrict const bitset, int size)
 {
     int length = (size >> ADDRESS_BITS_PER_WORD) + 1;
@@ -218,6 +226,48 @@ inline int bitset_next_set_bit(const BitSet *restrict const bitset, int fromInde
 
         word = bitset->words[wordIndex];
     }
+}
+
+
+inline int bitset_word_cardinality(uint64_t i)
+{
+    /* based on the Long.java code */
+
+    i = i - ((i >> 1) & 0x5555555555555555L);
+    i = (i & 0x3333333333333333L) + ((i >> 2) & 0x3333333333333333L);
+    i = (i + (i >> 4)) & 0x0f0f0f0f0f0f0f0fL;
+    i = i + (i >> 8);
+    i = i + (i >> 16);
+    i = i + (i >> 32);
+
+    return (int) i & 0x7f;
+}
+
+
+inline int bitset_cardinality(BitSet *restrict const bitset)
+{
+    int cardinality = 0;
+
+    for(int i = 0; i < bitset->wordsInUse; i++)
+        cardinality += bitset_word_cardinality(bitset->words[i]);
+
+    return cardinality;
+}
+
+
+inline int bitset_and_cardinality(BitSet *restrict const bitset, const BitSet *restrict const other)
+{
+    int wordsInUse = bitset->wordsInUse;
+
+    if(wordsInUse > other->wordsInUse)
+        wordsInUse = other->wordsInUse;
+
+    int cardinality = 0;
+
+    for(int i = 0; i < wordsInUse; i++)
+        cardinality += bitset_word_cardinality(bitset->words[i] & other->words[i]);
+
+    return cardinality;
 }
 
 #endif /* BITSET_H_ */

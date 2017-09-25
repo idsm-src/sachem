@@ -20,6 +20,7 @@ typedef struct
 
 
 int java_parse_query(QueryData **data, char* query, size_t queryLength, char *type, bool tautomers);
+int java_parse_similarity_query(uint64_t **data, char* query, size_t queryLength, char *type);
 void java_module_init(void);
 void java_module_finish(void);
 
