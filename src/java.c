@@ -194,7 +194,7 @@ int java_parse_query(QueryData **data, char* query, size_t queryLength, char *ty
         java_check_exception("java_parse_query()");
 
 
-        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, substructureQueryDataClass, queryDataMethod, queryArg, typeArg, (jboolean) tautomers);
+        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, substructureSearchClass, queryDataMethod, queryArg, typeArg, (jboolean) tautomers);
         java_check_exception("java_parse_query()");
 
         JavaDeleteRef(queryArg);
