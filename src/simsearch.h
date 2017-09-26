@@ -3,7 +3,7 @@
 
 #define EXTFP_SIZE            907
 
-#define SIMILARITY_FINGERPRINT_TABLE    "similarity_fingerprint_orchem"
+#define FINGERPRINT_TABLE        "fingerprint_orchem"
 
 
 void simsearch_module_init(void);

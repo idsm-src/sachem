@@ -58,7 +58,7 @@ void simsearch_module_init(void)
 
 
     /* load count of molecule records */
-    if(unlikely(SPI_execute("select count(*) from " SIMILARITY_FINGERPRINT_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
+    if(unlikely(SPI_execute("select count(*) from " FINGERPRINT_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
         elog(ERROR, "simsearch module: SPI_execute() failed");
 
     if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
@@ -74,7 +74,7 @@ void simsearch_module_init(void)
 
 
     /* prepare query plan */
-    mainQueryPlan = SPI_prepare("select id, fp from " SIMILARITY_FINGERPRINT_TABLE " where bit_count = $1", 1, (Oid[]) { INT4OID });
+    mainQueryPlan = SPI_prepare("select id, fp from " FINGERPRINT_TABLE " where bit_count = $1", 1, (Oid[]) { INT4OID });
 
     if(unlikely(mainQueryPlan == NULL))
         elog(ERROR, "simsearch module: SPI_prepare_cursor() failed");

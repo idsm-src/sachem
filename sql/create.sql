@@ -1,14 +1,14 @@
 CREATE TABLE compounds (
-    seqid                 INT NOT NULL,
     id                    INT NOT NULL,
     molfile               TEXT NOT NULL,
-    PRIMARY KEY (seqid)
+    PRIMARY KEY (id)
 );
 
 CREATE TABLE fingerprint_orchem (
-    seqid                 INT NOT NULL,
-    fp                    BYTEA NOT NULL,
-    PRIMARY KEY (seqid)
+    id                    INT NOT NULL,
+    bit_count             SMALLINT NOT NULL,
+    fp                    BIGINT[] NOT NULL,
+    PRIMARY KEY (id)
 );
 
 CREATE TABLE molecule_counts (
@@ -40,14 +40,8 @@ CREATE TABLE fingerprint_orchem_index (
     PRIMARY KEY (idx)
 );
 
-CREATE TABLE similarity_fingerprint_orchem (
-    id                    INT NOT NULL,
-    bit_count             SMALLINT NOT NULL,
-    fp                    BIGINT[] NOT NULL,
-    PRIMARY KEY (id)
-);
 
-CREATE INDEX similarity_fingerprint_orchem__bit_count ON similarity_fingerprint_orchem(bit_count);
+CREATE INDEX fingerprint_orchem__bit_count ON fingerprint_orchem(bit_count);
 
 
 CREATE FUNCTION "orchem_substructure_search"(varchar, varchar, int, boolean, boolean, boolean) RETURNS SETOF int AS 'libpgchem.so','orchem_substructure_search' LANGUAGE C IMMUTABLE STRICT;

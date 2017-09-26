@@ -17,7 +17,6 @@ import java.util.zip.GZIPInputStream;
 public class CompoundLoader
 {
     private static String idTag = "> <PUBCHEM_COMPOUND_CID>";
-    private static int seqid = 0;
 
 
     private static void parse(InputStream inputStream) throws Exception
@@ -30,7 +29,7 @@ public class CompoundLoader
         try (Connection connection = ConnectionPool.getConnection())
         {
             try (PreparedStatement insertStatement = connection
-                    .prepareStatement("insert into compounds (seqid, id, molfile) values (?,?,?)"))
+                    .prepareStatement("insert into compounds (id, molfile) values (?,?)"))
             {
 
                 while((line = reader.readLine()) != null)
@@ -98,9 +97,8 @@ public class CompoundLoader
                         }
                     }
 
-                    insertStatement.setInt(1, seqid++);
-                    insertStatement.setInt(2, id);
-                    insertStatement.setString(3, sdf);
+                    insertStatement.setInt(1, id);
+                    insertStatement.setString(2, sdf);
                     insertStatement.addBatch();
                 }
 
