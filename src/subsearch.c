@@ -200,7 +200,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
         char *typeStr = text_to_cstring(type);
 
         FuncCallContext *funcctx = SRF_FIRSTCALL_INIT();
-        PG_MEMCONTEXT_BEGIN(MemoryContextSwitchTo(funcctx->multi_call_memory_ctx));
+        PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
 
         SubstructureSearchData *info = palloc(sizeof(SubstructureSearchData));
         funcctx->user_fctx = info;
