@@ -4,16 +4,16 @@ libpgchem_la_CPPFLAGS = -std=gnu99 -Ofast -march=native $(POSTGRESQL_CPPFLAGS) $
 libpgchem_la_LDFLAGS = $(JDK8_LDFLAGS)
 
 libpgchem_la_SOURCES = \
-		pgchem.c \
 		java.c \
-		orchem.c \
-		simsearch.c
+		pgchem.c \
+		simsearch.c \
+		subsearch.c
 
 EXTRA_DIST = \
 		bitset.h \
         isomorphism.h \
         java.h \
         molecule.h \
-        orchem.h \
         pgchem.h \
-        simsearch.h
+        simsearch.h \
+        subsearch.h

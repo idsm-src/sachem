@@ -10,8 +10,8 @@
 #include "isomorphism.h"
 #include "java.h"
 #include "molecule.h"
-#include "orchem.h"
 #include "pgchem.h"
+#include "subsearch.h"
 
 
 typedef struct
@@ -60,28 +60,28 @@ static int16 *counts[COUNTS_SIZE];
 #endif
 
 
-void orchem_module_init(void)
+void subsearch_module_init(void)
 {
-    mcxt = AllocSetContextCreate(TopMemoryContext, "OrChem memory context", ALLOCSET_DEFAULT_SIZES);
+    mcxt = AllocSetContextCreate(TopMemoryContext, "subsearch memory context", ALLOCSET_DEFAULT_SIZES);
 
     char isNullFlag;
 
 
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-        elog(ERROR, "orchem module: SPI_connect() failed");
+        elog(ERROR, "subsearch module: SPI_connect() failed");
 
 
     /* load count of molecule records */
     if(unlikely(SPI_execute("select count(*) from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
-        elog(ERROR, "orchem module: SPI_execute() failed");
+        elog(ERROR, "subsearch module: SPI_execute() failed");
 
     if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
-        elog(ERROR, "orchem module: SPI_execute() failed");
+        elog(ERROR, "subsearch module: SPI_execute() failed");
 
     moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
 
     if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-        elog(ERROR, "orchem module: SPI_getbinval() failed");
+        elog(ERROR, "subsearch module: SPI_getbinval() failed");
 
     SPI_freetuptable(SPI_tuptable);
 
@@ -90,10 +90,10 @@ void orchem_module_init(void)
     /* load count fingerprint */
     if(unlikely(SPI_execute("select seqid, molTripleBondCount, molSCount, molOCount, molNCount, molFCount, molClCount, molBrCount, "
             "molICount, molCCount, molPCount from " MOLECULE_COUNTS_TABLE " order by seqid", true, FETCH_ALL) != SPI_OK_SELECT))
-        elog(ERROR, "orchem module: SPI_execute() failed");
+        elog(ERROR, "subsearch module: SPI_execute() failed");
 
     if(unlikely(SPI_processed != moleculeCount || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != COUNTS_SIZE + 1))
-        elog(ERROR, "orchem module: SPI_execute() failed");
+        elog(ERROR, "subsearch module: SPI_execute() failed");
 
     PG_MEMCONTEXT_BEGIN(mcxt);
 
@@ -107,14 +107,14 @@ void orchem_module_init(void)
         int32 seqid = DatumGetInt32(SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag));
 
         if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-            elog(ERROR, "orchem module: SPI_getbinval() failed");
+            elog(ERROR, "subsearch module: SPI_getbinval() failed");
 
         for(int j = 0; j < COUNTS_SIZE; j++)
         {
             int16 value = DatumGetInt16(SPI_getbinval(tuple, SPI_tuptable->tupdesc, j + 2, &isNullFlag));
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "orchem module: SPI_getbinval() failed");
+                elog(ERROR, "subsearch module: SPI_getbinval() failed");
 
             counts[j][seqid] = value;
         }
@@ -128,10 +128,10 @@ void orchem_module_init(void)
 
     /* load bit fingerprint */
     if(unlikely(SPI_execute("select bitmap from " FINGERPRINT_INDEX_TABLE " order by idx", true, FETCH_ALL) != SPI_OK_SELECT))
-        elog(ERROR, "orchem module: SPI_execute() failed");
+        elog(ERROR, "subsearch module: SPI_execute() failed");
 
     if(unlikely(SPI_processed != FP_SIZE || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-        elog(ERROR, "orchem module: SPI_execute() failed");
+        elog(ERROR, "subsearch module: SPI_execute() failed");
 
     PG_MEMCONTEXT_BEGIN(mcxt);
 
@@ -142,7 +142,7 @@ void orchem_module_init(void)
         bytea *fp = DatumGetByteaP(SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag));
 
         if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-            elog(ERROR, "orchem module: SPI_getbinval() failed");
+            elog(ERROR, "subsearch module: SPI_getbinval() failed");
 
         size_t length = (VARSIZE(fp) - VARHDRSZ);
         BitSet line;
@@ -158,10 +158,10 @@ void orchem_module_init(void)
     mainQueryPlan = SPI_prepare("select id, seqid, atoms, bonds from " MOLECULES_TABLE " where seqid = any($1)", 1, (Oid[]) { INT4ARRAYOID });
 
     if(unlikely(mainQueryPlan == NULL))
-        elog(ERROR, "orchem module: SPI_prepare_cursor() failed");
+        elog(ERROR, "subsearch module: SPI_prepare_cursor() failed");
 
     if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
-        elog(ERROR, "orchem module: SPI_keepplan() failed");
+        elog(ERROR, "subsearch module: SPI_keepplan() failed");
 
 
     SPI_finish();
@@ -169,7 +169,7 @@ void orchem_module_init(void)
 }
 
 
-void orchem_module_finish(void)
+void subsearch_module_finish(void)
 {
     initialised = false;
 
@@ -189,7 +189,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 #endif
 
         if(unlikely(!initialised))
-            elog(ERROR, "orchem module is not properly initialized");
+            elog(ERROR, "subsearch module is not properly initialized");
 
         VarChar *query = PG_GETARG_VARCHAR_P(0);
         text *type = PG_GETARG_TEXT_P(1);
@@ -225,8 +225,8 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
         bitset_init_alloc(&info->candidates, moleculeCount);
         bitset_init_setted(&info->resultMask, moleculeCount);
 
-        info->isomorphismContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx, "orchem isomorphism context", ALLOCSET_DEFAULT_SIZES);
-        info->targetContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx, "orchem targetContext context", ALLOCSET_DEFAULT_SIZES);
+        info->isomorphismContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx, "subsearch isomorphism context", ALLOCSET_DEFAULT_SIZES);
+        info->targetContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx, "subsearch target context", ALLOCSET_DEFAULT_SIZES);
 
         info->arrayBuffer = (ArrayType *) palloc(FETCH_SIZE * sizeof(int32) + ARR_OVERHEAD_NONULLS(1));
         info->arrayBuffer->ndim = 1;
@@ -296,7 +296,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
                 while(count < FETCH_SIZE && info->candidatePosition >= 0)
                 {
-    #if USE_COUNT_FINGERPRINT
+#if USE_COUNT_FINGERPRINT
                     bool isValid = true;
 
                     for(int j = 0; j < COUNTS_SIZE; j++)
@@ -309,7 +309,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                     }
 
                     if(isValid)
-    #endif
+#endif
                         arrayAata[count++] = Int32GetDatum(info->candidatePosition);
 
                     info->candidatePosition = bitset_next_set_bit(&info->candidates, info->candidatePosition + 1);
@@ -326,16 +326,16 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
 
                 if(unlikely(!connected && SPI_connect() != SPI_OK_CONNECT))
-                     elog(ERROR, "orchem module: SPI_connect() failed");
+                     elog(ERROR, "subsearch module: SPI_connect() failed");
 
                 connected = true;
 
 
                 if(unlikely(SPI_execute_plan(mainQueryPlan, values, NULL, true, 0) != SPI_OK_SELECT))
-                    elog(ERROR, "orchem module: SPI_execute_plan() failed");
+                    elog(ERROR, "subsearch module: SPI_execute_plan() failed");
 
                 if(unlikely(SPI_processed != count || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 4))
-                    elog(ERROR, "orchem module: SPI_execute_plan() failed");
+                    elog(ERROR, "subsearch module: SPI_execute_plan() failed");
 
                 info->table = SPI_tuptable;
                 info->tableRowCount = SPI_processed;
@@ -352,25 +352,25 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
             Datum id = SPI_getbinval(tuple, tupdesc, 1, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "orchem module: SPI_getbinval() failed");
+                elog(ERROR, "subsearch module: SPI_getbinval() failed");
 
 
             Datum seqid = SPI_getbinval(tuple, tupdesc, 2, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "orchem module: SPI_getbinval() failed");
+                elog(ERROR, "subsearch module: SPI_getbinval() failed");
 
 
             Datum atoms = SPI_getbinval(tuple, tupdesc, 3, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "orchem module: SPI_getbinval() failed");
+                elog(ERROR, "subsearch module: SPI_getbinval() failed");
 
 
             Datum bonds = SPI_getbinval(tuple, tupdesc, 4, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "orchem module: SPI_getbinval() failed");
+                elog(ERROR, "subsearch module: SPI_getbinval() failed");
 
     #if SHOW_STATS
             info->candidateCount++;
