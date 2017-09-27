@@ -1,11 +1,13 @@
 package cz.iocb.orchem.load;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.BitSet;
-import org.openscience.cdk.fingerprint.IFingerprinter;
+import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import cz.iocb.orchem.fingerprint.OrchemExtendedFingerprinter;
 import cz.iocb.orchem.fingerprint.OrchemFingerprinter;
@@ -17,12 +19,22 @@ import cz.iocb.orchem.shared.MoleculeCreator;
 
 public class OrChemLoader
 {
-    // bitmap index parameters
-    private static final int fpSize = new OrchemFingerprinter().getSize();
-    private static final int fpOffset = 1;
+    static class Item
+    {
+        int id;
+        String molfile;
 
-    // fingerprinter
-    private static final IFingerprinter fingerprinter = new OrchemExtendedFingerprinter();
+        int seqid;
+
+        MoleculeCounts counts;
+
+        Object[] fp;
+        int cardinality;
+
+        byte[] atoms;
+        byte[] bonds;
+    }
+
 
     // table names
     private static final String compoundsTable = "compounds";
@@ -31,13 +43,25 @@ public class OrChemLoader
     private static final String moleculesTable = "molecules";
     private static final String indexTable = "fingerprint_orchem_index";
 
+    // bitmap index parameters
+    private static final int fpSize = new OrchemFingerprinter().getSize();
+    private static final int fpOffset = 1;
+
+    // fingerprinter
+    private static final ThreadLocal<OrchemExtendedFingerprinter> fingerPrinter = new ThreadLocal<OrchemExtendedFingerprinter>()
+    {
+        @Override
+        protected OrchemExtendedFingerprinter initialValue()
+        {
+            return new OrchemExtendedFingerprinter();
+        }
+    };
+
     private static final int batchSize = 10000;
 
 
     public static void main(String[] args) throws Exception
     {
-        int insertCount = 0;
-
         try (Connection insertConnection = ConnectionPool.getConnection())
         {
             try (PreparedStatement fingerprintInsert = insertConnection
@@ -83,69 +107,64 @@ public class OrChemLoader
 
                                 try (ResultSet rs = selectStatement.executeQuery())
                                 {
-                                    while(rs.next())
+                                    int seqid = 0;
+
+                                    while(true)
                                     {
-                                        int id = rs.getInt(1);
-                                        String molfile = rs.getString(2);
-                                        IAtomContainer readMolecule = MoleculeCreator.getMoleculeFromMolfile(molfile);
-                                        MoleculeCreator.configureMolecule(readMolecule);
+                                        ArrayList<Item> items = new ArrayList<Item>(batchSize);
 
-                                        // insert fingerprint
-                                        BitSet fp = fingerprinter.getBitFingerprint(readMolecule).asBitSet();
-                                        long[] words = fp.toLongArray();
-                                        Object[] array = new Object[words.length];
-
-                                        for(int i = 0; i < words.length; i++)
-                                            array[i] = new Long(words[i]);
-
-                                        fingerprintInsert.setInt(1, id);
-                                        fingerprintInsert.setInt(2, fp.cardinality());
-                                        fingerprintInsert.setArray(3, insertConnection.createArrayOf("bigint", array));
-                                        fingerprintInsert.addBatch();
-
-                                        // set bitmap indexes
-                                        for(int idx = fp.nextSetBit(fpOffset); idx >= 0
-                                                && idx < fpSize; idx = fp.nextSetBit(idx + 1))
-                                            bitmasks[idx - fpOffset].set(insertCount);
-
-                                        // insert molecule couts
-                                        MoleculeCounts counts = new MoleculeCounts(readMolecule);
-                                        countsInsert.setInt(1, insertCount);
-                                        countsInsert.setShort(2, counts.molTripleBondCount);
-                                        countsInsert.setShort(3, counts.molSCount);
-                                        countsInsert.setShort(4, counts.molOCount);
-                                        countsInsert.setShort(5, counts.molNCount);
-                                        countsInsert.setShort(6, counts.molFCount);
-                                        countsInsert.setShort(7, counts.molClCount);
-                                        countsInsert.setShort(8, counts.molBrCount);
-                                        countsInsert.setShort(9, counts.molICount);
-                                        countsInsert.setShort(10, counts.molCCount);
-                                        countsInsert.setShort(11, counts.molPCount);
-                                        countsInsert.addBatch();
-
-                                        // insert molecule binary representation
-                                        OrchemMoleculeBuilder builder = new OrchemMoleculeBuilder(readMolecule);
-                                        moleculeInsert.setInt(1, insertCount);
-                                        moleculeInsert.setInt(2, id);
-                                        moleculeInsert.setBytes(3, builder.atomsAsBytes());
-                                        moleculeInsert.setBytes(4, builder.bondsAsBytes());
-                                        moleculeInsert.addBatch();
-
-
-                                        if(++insertCount % batchSize == 0)
+                                        while(items.size() < batchSize && rs.next())
                                         {
-                                            fingerprintInsert.executeBatch();
-                                            countsInsert.executeBatch();
-                                            moleculeInsert.executeBatch();
-                                        }
-                                    }
+                                            Item item = new Item();
 
-                                    if(insertCount % batchSize != 0)
-                                    {
+                                            item.id = rs.getInt(1);
+                                            item.molfile = rs.getString(2);
+                                            item.seqid = seqid++;
+
+                                            items.add(item);
+                                        }
+
+                                        if(items.size() == 0)
+                                            break;
+
+                                        process(items, bitmasks);
+
+                                        for(Item item : items)
+                                        {
+                                            // insert fingerprint
+                                            fingerprintInsert.setInt(1, item.id);
+                                            fingerprintInsert.setInt(2, item.cardinality);
+                                            fingerprintInsert.setArray(3,
+                                                    insertConnection.createArrayOf("bigint", item.fp));
+                                            fingerprintInsert.addBatch();
+
+                                            // insert molecule couts
+                                            countsInsert.setInt(1, item.seqid);
+                                            countsInsert.setShort(2, item.counts.molTripleBondCount);
+                                            countsInsert.setShort(3, item.counts.molSCount);
+                                            countsInsert.setShort(4, item.counts.molOCount);
+                                            countsInsert.setShort(5, item.counts.molNCount);
+                                            countsInsert.setShort(6, item.counts.molFCount);
+                                            countsInsert.setShort(7, item.counts.molClCount);
+                                            countsInsert.setShort(8, item.counts.molBrCount);
+                                            countsInsert.setShort(9, item.counts.molICount);
+                                            countsInsert.setShort(10, item.counts.molCCount);
+                                            countsInsert.setShort(11, item.counts.molPCount);
+                                            countsInsert.addBatch();
+
+                                            // insert molecule binary representation
+                                            moleculeInsert.setInt(1, item.seqid);
+                                            moleculeInsert.setInt(2, item.id);
+                                            moleculeInsert.setBytes(3, item.atoms);
+                                            moleculeInsert.setBytes(4, item.bonds);
+                                            moleculeInsert.addBatch();
+                                        }
+
                                         fingerprintInsert.executeBatch();
                                         countsInsert.executeBatch();
                                         moleculeInsert.executeBatch();
                                     }
+
                                 }
                             }
 
@@ -168,5 +187,44 @@ public class OrChemLoader
                 }
             }
         }
+    }
+
+
+    private static void process(ArrayList<Item> items, BitSet[] bitmasks) throws CDKException, IOException
+    {
+        items.stream().parallel().forEach(item -> {
+            try
+            {
+                IAtomContainer readMolecule = MoleculeCreator.getMoleculeFromMolfile(item.molfile);
+                MoleculeCreator.configureMolecule(readMolecule);
+
+                // insert fingerprint
+                BitSet fp = fingerPrinter.get().getBitFingerprint(readMolecule).asBitSet();
+                long[] words = fp.toLongArray();
+                Object[] array = new Object[words.length];
+
+                for(int i = 0; i < words.length; i++)
+                    array[i] = new Long(words[i]);
+
+                item.fp = array;
+                item.cardinality = fp.cardinality();
+
+                // set bitmap indexes
+                for(int idx = fp.nextSetBit(fpOffset); idx >= 0 && idx < fpSize; idx = fp.nextSetBit(idx + 1))
+                    bitmasks[idx - fpOffset].set(item.seqid);
+
+                // insert molecule couts
+                item.counts = new MoleculeCounts(readMolecule);
+
+                // insert molecule binary representation
+                OrchemMoleculeBuilder builder = new OrchemMoleculeBuilder(readMolecule);
+                item.atoms = builder.atomsAsBytes();
+                item.bonds = builder.bondsAsBytes();
+            }
+            catch (Throwable e)
+            {
+                e.printStackTrace();
+            }
+        });
     }
 }
