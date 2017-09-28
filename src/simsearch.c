@@ -1,5 +1,5 @@
 #include <postgres.h>
-#include <access/htup_details.h>
+#include <access/htup.h>
 #include <catalog/pg_type.h>
 #include <executor/spi.h>
 #include <fmgr.h>
@@ -7,6 +7,11 @@
 #include <utils/array.h>
 #include <utils/builtins.h>
 #include <utils/memutils.h>
+
+#if PG_VERSION_NUM >= 90300
+#include <access/htup_details.h>
+#endif
+
 #include "bitset.h"
 #include "heap.h"
 #include "java.h"
@@ -50,7 +55,8 @@ static TupleDesc tupdesc = NULL;
 
 void simsearch_module_init(void)
 {
-    mcxt = AllocSetContextCreate(TopMemoryContext, "simsearch memory context", ALLOCSET_DEFAULT_SIZES);
+    mcxt = AllocSetContextCreate(TopMemoryContext, "simsearch memory context",
+            ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
 
 
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))

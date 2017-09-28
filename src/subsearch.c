@@ -62,7 +62,8 @@ static int16 *counts[COUNTS_SIZE];
 
 void subsearch_module_init(void)
 {
-    mcxt = AllocSetContextCreate(TopMemoryContext, "subsearch memory context", ALLOCSET_DEFAULT_SIZES);
+    mcxt = AllocSetContextCreate(TopMemoryContext, "subsearch memory context",
+            ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
 
     char isNullFlag;
 
@@ -225,8 +226,10 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
         bitset_init_alloc(&info->candidates, moleculeCount);
         bitset_init_setted(&info->resultMask, moleculeCount);
 
-        info->isomorphismContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx, "subsearch isomorphism context", ALLOCSET_DEFAULT_SIZES);
-        info->targetContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx, "subsearch target context", ALLOCSET_DEFAULT_SIZES);
+        info->isomorphismContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx, "subsearch isomorphism context",
+                ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
+        info->targetContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx, "subsearch target context",
+                ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
 
         info->arrayBuffer = (ArrayType *) palloc(FETCH_SIZE * sizeof(int32) + ARR_OVERHEAD_NONULLS(1));
         info->arrayBuffer->ndim = 1;
