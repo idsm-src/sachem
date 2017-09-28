@@ -89,41 +89,53 @@ void subsearch_module_init(void)
 
 #if USE_COUNT_FINGERPRINT
     /* load count fingerprint */
-    if(unlikely(SPI_execute("select seqid, molTripleBondCount, molSCount, molOCount, molNCount, molFCount, molClCount, molBrCount, "
-            "molICount, molCCount, molPCount from " MOLECULE_COUNTS_TABLE " order by seqid", true, FETCH_ALL) != SPI_OK_SELECT))
-        elog(ERROR, "subsearch module: SPI_execute() failed");
-
-    if(unlikely(SPI_processed != moleculeCount || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != COUNTS_SIZE + 1))
-        elog(ERROR, "subsearch module: SPI_execute() failed");
-
     PG_MEMCONTEXT_BEGIN(mcxt);
 
     for(int j = 0; j < COUNTS_SIZE; j++)
         counts[j] = palloc0(moleculeCount * sizeof(int16));
 
-    for(int i = 0; i < SPI_processed; i++)
+    PG_MEMCONTEXT_END();
+
+
+    Portal cursor = SPI_cursor_open_with_args(NULL, "select seqid, molTripleBondCount, molSCount, molOCount, molNCount, molFCount, molClCount, molBrCount, "
+            "molICount, molCCount, molPCount from " MOLECULE_COUNTS_TABLE " order by seqid",
+            0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
+
+    if(unlikely(cursor == NULL))
+            elog(ERROR, "subsearch module: SPI_cursor_open_with_args() failed");
+
+    while(true)
     {
-        HeapTuple tuple = SPI_tuptable->vals[i];
+        SPI_cursor_fetch(cursor, true, 100000);
 
-        int32 seqid = DatumGetInt32(SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag));
+        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != COUNTS_SIZE + 1))
+            elog(ERROR, "subsearch module: SPI_cursor_fetch() failed");
 
-        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-            elog(ERROR, "subsearch module: SPI_getbinval() failed");
+        if(SPI_processed == 0)
+            break;
 
-        for(int j = 0; j < COUNTS_SIZE; j++)
+        for(int i = 0; i < SPI_processed; i++)
         {
-            int16 value = DatumGetInt16(SPI_getbinval(tuple, SPI_tuptable->tupdesc, j + 2, &isNullFlag));
+            HeapTuple tuple = SPI_tuptable->vals[i];
+
+            int32 seqid = DatumGetInt32(SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag));
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                 elog(ERROR, "subsearch module: SPI_getbinval() failed");
 
-            counts[j][seqid] = value;
+            for(int j = 0; j < COUNTS_SIZE; j++)
+            {
+                int16 value = DatumGetInt16(SPI_getbinval(tuple, SPI_tuptable->tupdesc, j + 2, &isNullFlag));
+
+                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                    elog(ERROR, "subsearch module: SPI_getbinval() failed");
+
+                counts[j][seqid] = value;
+            }
         }
+
+        SPI_freetuptable(SPI_tuptable);
     }
-
-    PG_MEMCONTEXT_END();
-
-    SPI_freetuptable(SPI_tuptable);
 #endif
 
 
