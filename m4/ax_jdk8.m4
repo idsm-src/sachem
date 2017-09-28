@@ -42,7 +42,7 @@ AC_DEFUN([AX_JDK8],
     fi
     
 
-    JDK8_CPPFLAGS="-I${JDK8_HOME}/include"
+    JDK8_CPPFLAGS="-I${JDK8_HOME}/include -I${JDK8_HOME}/include/linux"
     JDK8_LDFLAGS="-Wl,-rpath,${JDK8_HOME}/jre/lib/amd64/server -L${JDK8_HOME}/jre/lib/amd64/server -ljvm"
 
     AC_SUBST([JDK8_LDFLAGS])
