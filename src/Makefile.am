@@ -11,6 +11,7 @@ libpgchem_la_SOURCES = \
 
 EXTRA_DIST = \
 		bitset.h \
+		heap.h \
         isomorphism.h \
         java.h \
         molecule.h \

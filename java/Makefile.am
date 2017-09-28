@@ -13,5 +13,6 @@ clean-local:
 
 EXTRA_DIST = \
 	build.xml \
+	inchi \
 	lib \
 	src
