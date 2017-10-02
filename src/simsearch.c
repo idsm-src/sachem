@@ -47,7 +47,6 @@ typedef struct
 
 
 static bool initialised = false;
-static int moleculeCount;
 static SPIPlanPtr mainQueryPlan;
 static MemoryContext mcxt = NULL;
 static TupleDesc tupdesc = NULL;
@@ -55,31 +54,10 @@ static TupleDesc tupdesc = NULL;
 
 void simsearch_module_init(void)
 {
-    mcxt = AllocSetContextCreate(TopMemoryContext, "simsearch memory context",
-            ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
-
-
+    /* prepare query plan */
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
         elog(ERROR, "simsearch module: SPI_connect() failed");
 
-
-    /* load count of molecule records */
-    if(unlikely(SPI_execute("select count(*) from " FINGERPRINT_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
-        elog(ERROR, "simsearch module: SPI_execute() failed");
-
-    if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
-        elog(ERROR, "simsearch module: SPI_execute() failed");
-
-    char isNullFlag;
-    moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
-
-    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-        elog(ERROR, "simsearch module: SPI_getbinval() failed");
-
-    SPI_freetuptable(SPI_tuptable);
-
-
-    /* prepare query plan */
     mainQueryPlan = SPI_prepare("select id, fp from " FINGERPRINT_TABLE " where bit_count = $1", 1, (Oid[]) { INT4OID });
 
     if(unlikely(mainQueryPlan == NULL))
@@ -88,18 +66,22 @@ void simsearch_module_init(void)
     if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
         elog(ERROR, "simsearch module: SPI_keepplan() failed");
 
-
     SPI_finish();
-    initialised = true;
 
 
     /* create tuple description */
+    mcxt = AllocSetContextCreate(TopMemoryContext, "simsearch memory context",
+            ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
+
     PG_MEMCONTEXT_BEGIN(mcxt);
     tupdesc = CreateTemplateTupleDesc(2, false);
     TupleDescInitEntry(tupdesc, (AttrNumber) 1, "id", INT4OID, -1, 0);
     TupleDescInitEntry(tupdesc, (AttrNumber) 2, "score", FLOAT4OID, -1, 0);
     tupdesc = BlessTupleDesc(tupdesc);
     PG_MEMCONTEXT_END();
+
+
+    initialised = true;
 }
 
 
@@ -150,7 +132,7 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
         if(likely(length >= 0))
         {
             bitset_init(&info->fp, words, length);
-            heap_init(&info->heap, moleculeCount);
+            heap_init(&info->heap);
 
             info->queryBitCount = bitset_cardinality(&info->fp);
             info->lowBucketNum = info->queryBitCount - 1;

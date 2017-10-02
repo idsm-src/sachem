@@ -1,3 +1,4 @@
+#define HEAP_ROW_COUNT          128
 #define HEAP_ROW_SIZE           (1024*1024)
 #define HEAP_ITEM(heap, idx)    ((heap)->data[(idx) / HEAP_ROW_SIZE][(idx) % HEAP_ROW_SIZE])
 #define HEAP_PARENT_IDX(idx)    (((idx) - 1) / 2)
@@ -14,16 +15,16 @@ typedef struct
 typedef struct
 {
     HeapItem **data;
+    uint32_t rows;
     uint32_t size;
     MemoryContext context;
 } Heap;
 
 
-static inline void heap_init(Heap *const heap, int capacity)
+static inline void heap_init(Heap *const heap)
 {
-    int rowCount = ((capacity - 1) / HEAP_ROW_SIZE) + 1;
-
-    heap->data = palloc0(rowCount * sizeof(HeapItem *));
+    heap->rows = HEAP_ROW_COUNT;
+    heap->data = palloc0(HEAP_ROW_COUNT * sizeof(HeapItem *));
     heap->size = 0;
     heap->context = CurrentMemoryContext;
 }
@@ -53,6 +54,18 @@ static inline void heap_add(Heap *const heap, HeapItem const item)
 {
     uint32_t idx = heap->size++;
     uint32_t parent = HEAP_PARENT_IDX(idx);
+
+    if(idx / HEAP_ROW_SIZE >= heap->rows)
+    {
+        PG_MEMCONTEXT_BEGIN(heap->context);
+        heap->data = repalloc(heap->data, 2 * heap->rows * sizeof(HeapItem *));
+        PG_MEMCONTEXT_END();
+
+        for(int i = heap->rows; i < 2 * heap->rows; i++)
+            heap->data[i] = NULL;
+
+        heap->rows *= 2;
+    }
 
     if(unlikely(heap->data[idx / HEAP_ROW_SIZE] == NULL))
     {
