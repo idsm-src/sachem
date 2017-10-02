@@ -46,3 +46,5 @@ CREATE INDEX fingerprint_orchem__bit_count ON fingerprint_orchem(bit_count);
 
 CREATE FUNCTION "orchem_substructure_search"(varchar, varchar, int, boolean, boolean, boolean) RETURNS SETOF int AS 'libpgchem.so','orchem_substructure_search' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "orchem_similarity_search"(varchar, varchar, float4, int) RETURNS TABLE (id int, score float4) AS 'libpgchem.so','orchem_similarity_search' LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION "orchem_substructure_write_indexes"() RETURNS bool AS 'libpgchem.so','orchem_substructure_write_indexes' LANGUAGE C IMMUTABLE STRICT;

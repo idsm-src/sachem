@@ -9,6 +9,9 @@
 #define MOLECULE_COUNTS_TABLE    "molecule_counts"
 #define FINGERPRINT_INDEX_TABLE  "fingerprint_orchem_index"
 
+#define COUNT_INDEX_FILE        "molecule_counts.idx"
+#define FINGERPRINT_INDEX_FILE  "fingerprint_orchem_index.idx"
+
 void subsearch_module_init(void);
 void subsearch_module_finish(void);
 

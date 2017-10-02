@@ -6,6 +6,9 @@
 #include <utils/array.h>
 #include <utils/builtins.h>
 #include <utils/memutils.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "bitset.h"
 #include "isomorphism.h"
 #include "java.h"
@@ -53,7 +56,6 @@ static bool initialised = false;
 static int moleculeCount;
 static BitSet bitmap[FP_SIZE];
 static SPIPlanPtr mainQueryPlan;
-static MemoryContext mcxt = NULL;
 
 #if USE_COUNT_FINGERPRINT
 static int16 *counts[COUNTS_SIZE];
@@ -62,112 +64,59 @@ static int16 *counts[COUNTS_SIZE];
 
 void subsearch_module_init(void)
 {
-    mcxt = AllocSetContextCreate(TopMemoryContext, "subsearch memory context",
-            ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
+    /* load bit fingerprint */
+    char *fingerprintIndexFilePath = getFilePath(FINGERPRINT_INDEX_FILE);
 
-    char isNullFlag;
+    if(access(fingerprintIndexFilePath, R_OK) != -1)
+    {
+        int fd = open(fingerprintIndexFilePath, O_RDONLY, 0);
 
+        struct stat st;
+        fstat(fd, &st);
+        size_t length = st.st_size;
 
-    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-        elog(ERROR, "subsearch module: SPI_connect() failed");
+        uint64_t *addr = mmap(NULL, length, PROT_READ, MAP_SHARED, fd, 0);
+        moleculeCount = *(addr++);
 
+        for(int i = 0; i < FP_SIZE; i++)
+        {
+            int length = *addr;
 
-    /* load count of molecule records */
-    if(unlikely(SPI_execute("select count(*) from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
-        elog(ERROR, "subsearch module: SPI_execute() failed");
-
-    if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
-        elog(ERROR, "subsearch module: SPI_execute() failed");
-
-    moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
-
-    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-        elog(ERROR, "subsearch module: SPI_getbinval() failed");
-
-    SPI_freetuptable(SPI_tuptable);
+            bitset_init(bitmap + i, addr + 1, length);
+            addr += length + 1;
+        }
+    }
 
 
 #if USE_COUNT_FINGERPRINT
     /* load count fingerprint */
-    PG_MEMCONTEXT_BEGIN(mcxt);
+    char *countIndexFilePath = getFilePath(COUNT_INDEX_FILE);
 
-    for(int j = 0; j < COUNTS_SIZE; j++)
-        counts[j] = palloc0(moleculeCount * sizeof(int16));
-
-    PG_MEMCONTEXT_END();
-
-
-    Portal cursor = SPI_cursor_open_with_args(NULL, "select seqid, molTripleBondCount, molSCount, molOCount, molNCount, molFCount, molClCount, molBrCount, "
-            "molICount, molCCount, molPCount from " MOLECULE_COUNTS_TABLE " order by seqid",
-            0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
-
-    if(unlikely(cursor == NULL))
-            elog(ERROR, "subsearch module: SPI_cursor_open_with_args() failed");
-
-    while(true)
+    if(access(countIndexFilePath, R_OK) != -1)
     {
-        SPI_cursor_fetch(cursor, true, 100000);
+        int fd = open(countIndexFilePath, O_RDONLY, 0);
 
-        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != COUNTS_SIZE + 1))
-            elog(ERROR, "subsearch module: SPI_cursor_fetch() failed");
+        struct stat st;
+        fstat(fd, &st);
+        size_t length = st.st_size;
 
-        if(SPI_processed == 0)
-            break;
+        void *addr = mmap(NULL, length, PROT_READ, MAP_SHARED, fd, 0);
 
-        for(int i = 0; i < SPI_processed; i++)
-        {
-            HeapTuple tuple = SPI_tuptable->vals[i];
+        if(*((uint64_t *) addr) != moleculeCount)
+            elog(ERROR, "subsearch module: wrong index size");
 
-            int32 seqid = DatumGetInt32(SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag));
+        addr += sizeof(uint64_t);
 
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "subsearch module: SPI_getbinval() failed");
-
-            for(int j = 0; j < COUNTS_SIZE; j++)
-            {
-                int16 value = DatumGetInt16(SPI_getbinval(tuple, SPI_tuptable->tupdesc, j + 2, &isNullFlag));
-
-                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                    elog(ERROR, "subsearch module: SPI_getbinval() failed");
-
-                counts[j][seqid] = value;
-            }
-        }
-
-        SPI_freetuptable(SPI_tuptable);
+        for(int j = 0; j < COUNTS_SIZE; j++)
+            counts[j] =  ((int16 *) addr) + j * moleculeCount;
     }
 #endif
 
 
-    /* load bit fingerprint */
-    if(unlikely(SPI_execute("select bitmap from " FINGERPRINT_INDEX_TABLE " order by idx", true, FETCH_ALL) != SPI_OK_SELECT))
-        elog(ERROR, "subsearch module: SPI_execute() failed");
-
-    if(unlikely(SPI_processed != FP_SIZE || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-        elog(ERROR, "subsearch module: SPI_execute() failed");
-
-    PG_MEMCONTEXT_BEGIN(mcxt);
-
-    for(int i = 0; i < SPI_processed; i++)
-    {
-        HeapTuple tuple = SPI_tuptable->vals[i];
-
-        bytea *fp = DatumGetByteaP(SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag));
-
-        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-            elog(ERROR, "subsearch module: SPI_getbinval() failed");
-
-        size_t length = (VARSIZE(fp) - VARHDRSZ);
-        BitSet line;
-        bitset_init_from_array(bitmap + i, VARDATA(fp), length);
-    }
-
-    PG_MEMCONTEXT_END();
-
-    SPI_freetuptable(SPI_tuptable);
-
-
     /* prepare query plan */
+    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+        elog(ERROR, "subsearch module: SPI_connect() failed");
+
     mainQueryPlan = SPI_prepare("select id, seqid, atoms, bonds from " MOLECULES_TABLE " where seqid = any($1)", 1, (Oid[]) { INT4ARRAYOID });
 
     if(unlikely(mainQueryPlan == NULL))
@@ -185,9 +134,6 @@ void subsearch_module_init(void)
 void subsearch_module_finish(void)
 {
     initialised = false;
-
-    if(mcxt != NULL)
-        MemoryContextDelete(mcxt);
 }
 
 
@@ -443,4 +389,184 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
     {
         SRF_RETURN_NEXT(funcctx, result);
     }
+}
+
+
+#if USE_COUNT_FINGERPRINT
+void orchem_substructure_write_count_index()
+{
+    char *indexFilePath = getFilePath(COUNT_INDEX_FILE);
+    int fd = open(indexFilePath, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+
+    if(fd == -1)
+        elog(ERROR, "orchem_substructure_write_count_index: open() failed");
+
+
+    char isNullFlag;
+    MemoryContext context = CurrentMemoryContext;
+
+    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+        elog(ERROR, "orchem_substructure_write_count_index: SPI_connect() failed");
+
+
+    if(unlikely(SPI_execute("select max(seqid)+1 from " MOLECULE_COUNTS_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
+        elog(ERROR, "orchem_substructure_write_count_index: SPI_execute() failed");
+
+    if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
+        elog(ERROR, "orchem_substructure_write_count_index: SPI_execute() failed");
+
+    int64_t moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
+
+    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+        elog(ERROR, "orchem_substructure_write_count_index: SPI_getbinval() failed");
+
+    if(write(fd, &moleculeCount, sizeof(int64_t)) != sizeof(int64_t))
+        elog(ERROR, "orchem_substructure_write_count_index: write() failed");
+
+
+    int16 *counts[COUNTS_SIZE];
+    PG_MEMCONTEXT_BEGIN(context);
+
+    for(int j = 0; j < COUNTS_SIZE; j++)
+        counts[j] = palloc0(moleculeCount * sizeof(int16));
+
+    PG_MEMCONTEXT_END();
+
+
+    Portal cursor = SPI_cursor_open_with_args(NULL, "select seqid, molTripleBondCount, molSCount, molOCount, molNCount, molFCount, molClCount, molBrCount, "
+            "molICount, molCCount, molPCount from " MOLECULE_COUNTS_TABLE " order by seqid",
+            0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
+
+    if(unlikely(cursor == NULL))
+            elog(ERROR, "orchem_substructure_write_count_index: SPI_cursor_open_with_args() failed");
+
+    while(true)
+    {
+        SPI_cursor_fetch(cursor, true, 100000);
+
+        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != COUNTS_SIZE + 1))
+            elog(ERROR, "orchem_substructure_write_count_index: SPI_cursor_fetch() failed");
+
+        if(SPI_processed == 0)
+            break;
+
+        for(int i = 0; i < SPI_processed; i++)
+        {
+            HeapTuple tuple = SPI_tuptable->vals[i];
+
+            int32 seqid = DatumGetInt32(SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag));
+
+            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                elog(ERROR, "orchem_substructure_write_count_index: SPI_getbinval() failed");
+
+            for(int j = 0; j < COUNTS_SIZE; j++)
+            {
+                int16 value = DatumGetInt16(SPI_getbinval(tuple, SPI_tuptable->tupdesc, j + 2, &isNullFlag));
+
+                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                    elog(ERROR, "orchem_substructure_write_count_index: SPI_getbinval() failed");
+
+                counts[j][seqid] = value;
+            }
+        }
+
+        SPI_freetuptable(SPI_tuptable);
+    }
+
+
+    for(int j = 0; j < COUNTS_SIZE; j++)
+    {
+        ssize_t writen = write(fd, counts[j], moleculeCount * sizeof(int16));
+
+        if(writen != moleculeCount * sizeof(int16))
+            elog(ERROR, "orchem_substructure_write_count_index: write() failed");
+    }
+
+
+    SPI_finish();
+
+    if(close(fd) != 0)
+        elog(ERROR, "orchem_substructure_write_count_index: close() failed");
+}
+#endif
+
+
+void orchem_substructure_write_fp_index()
+{
+    char *indexFilePath = getFilePath(FINGERPRINT_INDEX_FILE);
+    int fd = open(indexFilePath, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+
+    if(fd == -1)
+        elog(ERROR, "orchem_substructure_write_fp_index: open() failed");
+
+
+    char isNullFlag;
+
+    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+        elog(ERROR, "orchem_substructure_write_fp_index: SPI_connect() failed");
+
+
+    if(unlikely(SPI_execute("select max(seqid)+1 from " MOLECULE_COUNTS_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
+        elog(ERROR, "orchem_substructure_write_fp_index: SPI_execute() failed");
+
+    if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
+        elog(ERROR, "orchem_substructure_write_fp_index: SPI_execute() failed");
+
+    int64_t moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
+
+    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+        elog(ERROR, "orchem_substructure_write_fp_index: SPI_getbinval() failed");
+
+    if(write(fd, &moleculeCount, sizeof(int64_t)) != sizeof(int64_t))
+        elog(ERROR, "orchem_substructure_write_fp_index: write() failed");
+
+
+    if(unlikely(SPI_execute("select bitmap from " FINGERPRINT_INDEX_TABLE " order by idx", true, FETCH_ALL) != SPI_OK_SELECT))
+        elog(ERROR, "orchem_substructure_write_fp_index: SPI_execute() failed");
+
+    if(unlikely(SPI_processed != FP_SIZE || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
+        elog(ERROR, "orchem_substructure_write_fp_index: SPI_execute() failed");
+
+    for(int i = 0; i < SPI_processed; i++)
+    {
+        HeapTuple tuple = SPI_tuptable->vals[i];
+
+        bytea *fp = DatumGetByteaP(SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag));
+
+        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+            elog(ERROR, "orchem_substructure_write_fp_index: SPI_getbinval() failed");
+
+        BitSet bitmap;
+        bitset_init_from_array(&bitmap, VARDATA(fp), VARSIZE(fp) - VARHDRSZ);
+
+        uint64_t wordsInUse = bitmap.wordsInUse;
+
+        if(write(fd, &wordsInUse, sizeof(uint64_t)) != sizeof(uint64_t))
+            elog(ERROR, "orchem_substructure_write_count_index: write() failed");
+
+        if(write(fd, bitmap.words, wordsInUse * sizeof(uint64_t)) != wordsInUse * sizeof(uint64_t))
+            elog(ERROR, "orchem_substructure_write_count_index: write() failed");
+    }
+
+
+    SPI_freetuptable(SPI_tuptable);
+    SPI_finish();
+
+    if(close(fd) != 0)
+        elog(ERROR, "orchem_substructure_write_fp_index: close() failed");
+}
+
+
+PG_FUNCTION_INFO_V1(write_indexes);
+Datum orchem_substructure_write_indexes(PG_FUNCTION_ARGS)
+{
+    createBasePath();
+
+    orchem_substructure_write_fp_index();
+
+#if USE_COUNT_FINGERPRINT
+    orchem_substructure_write_count_index();
+#endif
+
+    PG_RETURN_BOOL(true);
 }
