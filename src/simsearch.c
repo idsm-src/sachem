@@ -75,7 +75,7 @@ void simsearch_module_init(void)
 
     PG_MEMCONTEXT_BEGIN(mcxt);
     tupdesc = CreateTemplateTupleDesc(2, false);
-    TupleDescInitEntry(tupdesc, (AttrNumber) 1, "id", INT4OID, -1, 0);
+    TupleDescInitEntry(tupdesc, (AttrNumber) 1, "compound", INT4OID, -1, 0);
     TupleDescInitEntry(tupdesc, (AttrNumber) 2, "score", FLOAT4OID, -1, 0);
     tupdesc = BlessTupleDesc(tupdesc);
     PG_MEMCONTEXT_END();
