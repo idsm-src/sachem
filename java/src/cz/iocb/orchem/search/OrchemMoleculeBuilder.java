@@ -231,11 +231,11 @@ public class OrchemMoleculeBuilder
                 int idx0 = molecule.indexOf(bond.getAtom(0));
                 int idx1 = molecule.indexOf(bond.getAtom(1));
 
-                if(centers.elementType(idx0) != Type.Tricoordinate || centers.elementType(idx1) != Type.Tricoordinate)
-                    continue;
-
-                int flag = getDoubleBondStereoValue(bond, stereo.getBonds(), stereochemistry[idx].getStereo());
-                array[offset + 3] |= flag;
+                if(centers.elementType(idx0) == Type.Tricoordinate && centers.elementType(idx1) == Type.Tricoordinate)
+                {
+                    int flag = getDoubleBondStereoValue(bond, stereo.getBonds(), stereochemistry[idx].getStereo());
+                    array[offset + 3] |= flag;
+                }
             }
             else if(isDoubleBondStereochemistry(idx))
             {
