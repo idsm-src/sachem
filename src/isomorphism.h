@@ -438,7 +438,7 @@ inline void vf2state_add_pair(VF2State *const restrict vf2state)
 }
 
 
-bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
+inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
 {
     const Molecule *const restrict query = vf2state->query;
     const Molecule *const restrict target = vf2state->target;
@@ -560,7 +560,7 @@ bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
 }
 
 
-bool vf2state_is_match_valid(const VF2State *const restrict vf2state)
+inline bool vf2state_is_match_valid(const VF2State *const restrict vf2state)
 {
     const Molecule *const restrict query = vf2state->query;
     const Molecule *const restrict target = vf2state->target;
@@ -619,7 +619,7 @@ bool vf2state_is_match_valid(const VF2State *const restrict vf2state)
 }
 
 
-bool vf2state_match_core(VF2State *const restrict vf2state)
+inline bool vf2state_match_core(VF2State *const restrict vf2state)
 {
     while(true)
     {
