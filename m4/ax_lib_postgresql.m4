@@ -113,6 +113,11 @@ AC_DEFUN([AX_LIB_POSTGRESQL],
         postgresql_version_major=`expr $POSTGRESQL_VERSION : '\([[0-9]]*\)'`
         postgresql_version_minor=`expr $POSTGRESQL_VERSION : '[[0-9]]*\.\([[0-9]]*\)'`
         postgresql_version_micro=`expr $POSTGRESQL_VERSION : '[[0-9]]*\.[[0-9]]*\.\([[0-9]]*\)'`
+
+        if test "x$postgresql_version_minor" = "x"; then
+            postgresql_version_minor="0"
+        fi
+
         if test "x$postgresql_version_micro" = "x"; then
             postgresql_version_micro="0"
         fi
