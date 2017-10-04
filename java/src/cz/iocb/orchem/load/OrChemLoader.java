@@ -246,8 +246,11 @@ public class OrChemLoader
 
 
                 // set bitmap indexes
-                for(int idx = fp.nextSetBit(fpOffset); idx >= 0 && idx < fpSize; idx = fp.nextSetBit(idx + 1))
-                    bitmasks[idx - fpOffset].set(item.seqid);
+                synchronized(OrChemLoader.class)
+                {
+                    for(int idx = fp.nextSetBit(fpOffset); idx >= 0 && idx < fpSize; idx = fp.nextSetBit(idx + 1))
+                        bitmasks[idx - fpOffset].set(item.seqid);
+                }
             }
             catch (Throwable e)
             {
