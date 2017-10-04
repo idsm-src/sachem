@@ -10,10 +10,6 @@
 #include <sys/types.h>
 
 
-#define SHOW_STATS              0
-#define USE_COUNT_FINGERPRINT   1
-#define BITSET_ASSERT           0
-
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)
 

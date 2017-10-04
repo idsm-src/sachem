@@ -19,6 +19,11 @@
 #include "simsearch.h"
 
 
+#define SHOW_STATS          0
+#define EXTFP_SIZE          907
+#define FINGERPRINT_TABLE   "fingerprint_orchem"
+
+
 typedef struct
 {
     int32_t topN;

@@ -17,6 +17,18 @@
 #include "subsearch.h"
 
 
+#define SHOW_STATS                0
+#define USE_COUNT_FINGERPRINT     1
+#define FETCH_SIZE                1000
+#define FP_SIZE                   788
+#define COUNTS_SIZE               10
+#define MOLECULES_TABLE           "molecules"
+#define MOLECULE_COUNTS_TABLE     "molecule_counts"
+#define FINGERPRINT_INDEX_TABLE   "fingerprint_orchem_index"
+#define COUNT_INDEX_FILE          "molecule_counts.idx"
+#define FINGERPRINT_INDEX_FILE    "fingerprint_orchem_index.idx"
+
+
 typedef struct
 {
     int32_t topN;
