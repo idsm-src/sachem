@@ -7,7 +7,8 @@ libpgchem_la_SOURCES = \
 		java.c \
 		pgchem.c \
 		simsearch.c \
-		subsearch.c
+		subsearch.c \
+		subsearch-gin.c
 
 EXTRA_DIST = \
 		bitset.h \
@@ -17,4 +18,5 @@ EXTRA_DIST = \
         molecule.h \
         pgchem.h \
         simsearch.h \
-        subsearch.h
+        subsearch.h \
+        subsearch-gin.h

@@ -42,6 +42,17 @@ void inline bitset_init_alloc(BitSet *restrict const bitset, int size)
 }
 
 
+void inline bitset_init_empty(BitSet *restrict const bitset, int size)
+{
+    int length = (size >> ADDRESS_BITS_PER_WORD) + 1;
+    uint64_t *words = palloc0(length * sizeof(uint64_t));
+
+    bitset->words = words;
+    bitset->length = length;
+    bitset->wordsInUse = 0;
+}
+
+
 void inline bitset_init_setted(BitSet *restrict const bitset, int length)
 {
     int endWordIndex = length >> ADDRESS_BITS_PER_WORD;
@@ -102,6 +113,19 @@ void inline bitset_copy(BitSet *restrict const bitset, const BitSet *restrict co
 
     memcpy(bitset->words, source->words, source->length * sizeof(uint64_t));
     bitset->wordsInUse = source->wordsInUse;
+}
+
+
+inline bool bitset_get(BitSet *restrict const bitset, int bitIndex)
+{
+    int wordIndex = bitIndex >> ADDRESS_BITS_PER_WORD;
+
+#if BITSET_ASSERT
+    if(wordIndex >= bitset->length)
+        elog(ERROR, "bitset_set(): wrong bitset value");
+#endif
+
+    return (bitset->words[wordIndex] & (1L << (bitIndex % BITS_PER_WORD))) != 0;
 }
 
 
