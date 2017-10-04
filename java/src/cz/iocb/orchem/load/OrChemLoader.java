@@ -22,14 +22,14 @@ public class OrChemLoader
     static class Item
     {
         int id;
-        String molfile;
-
         int seqid;
+        String molfile;
 
         MoleculeCounts counts;
 
-        Object[] fp;
-        int cardinality;
+        Object[] similarityFingerprint;
+        Object[] substructureFingerprint;
+        int similarityFingerprintCardinality;
 
         byte[] atoms;
         byte[] bonds;
@@ -38,10 +38,11 @@ public class OrChemLoader
 
     // table names
     private static final String compoundsTable = "compounds";
-    private static final String fingerprintTable = "fingerprint_orchem";
-    private static final String countsTable = "molecule_counts";
-    private static final String moleculesTable = "molecules";
-    private static final String indexTable = "fingerprint_orchem_index";
+    private static final String moleculesTable = "orchem_molecules";
+    private static final String moleculeCountsTable = "orchem_molecule_counts";
+    private static final String similarityFingerprintTable = "orchem_similarity_fingerprint";
+    private static final String substructureFingerprintTable = "orchem_substructure_fingerprint";
+    private static final String substructureFingerprintIndexTable = "orchem_substructure_fingerprint_index";
 
     // bitmap index parameters
     private static final int fpSize = new OrchemFingerprinter().getSize();
@@ -64,123 +65,135 @@ public class OrChemLoader
     {
         try (Connection insertConnection = ConnectionPool.getConnection())
         {
-            try (PreparedStatement fingerprintInsert = insertConnection
-                    .prepareStatement("insert into " + fingerprintTable + " (id, bit_count, fp) values (?,?,?)"))
+            try (PreparedStatement moleculesStatement = insertConnection
+                    .prepareStatement("insert into " + moleculesTable + " (seqid, id, atoms, bonds) values (?,?,?,?)"))
             {
-                try (PreparedStatement countsInsert = insertConnection.prepareStatement("insert into " + countsTable
+                try (PreparedStatement moleculeCountsStatement = insertConnection.prepareStatement("insert into "
+                        + moleculeCountsTable
                         + " (seqid, molTripleBondCount, molSCount, molOCount, molNCount, molFCount, molClCount, molBrCount, molICount, molCCount, molPCount) values (?,?,?,?,?,?,?,?,?,?,?)"))
                 {
-                    try (PreparedStatement moleculeInsert = insertConnection.prepareStatement(
-                            "insert into " + moleculesTable + " (seqid, id, atoms, bonds) values (?,?,?,?)"))
+                    try (PreparedStatement similarityFingerprintStatement = insertConnection.prepareStatement(
+                            "insert into " + similarityFingerprintTable + " (id, bit_count, fp) values (?,?,?)"))
                     {
-
-                        try (Connection selectConnection = ConnectionPool.getConnection())
+                        try (PreparedStatement substructureFingerprintStatement = insertConnection.prepareStatement(
+                                "insert into " + substructureFingerprintTable + " (seqid, fp) values (?,?)"))
                         {
-                            selectConnection.setAutoCommit(false);
-
-                            // create empty bitmap index
-                            int moleculeCount = 0;
-
-                            try (Statement statement = selectConnection.createStatement(ResultSet.TYPE_FORWARD_ONLY,
-                                    ResultSet.CONCUR_READ_ONLY))
+                            try (Connection selectConnection = ConnectionPool.getConnection())
                             {
-                                try (ResultSet result = statement
-                                        .executeQuery("select count(*) from " + compoundsTable))
+                                selectConnection.setAutoCommit(false);
+
+                                // create empty bitmap index
+                                int moleculeCount = 0;
+
+                                try (Statement statement = selectConnection.createStatement(ResultSet.TYPE_FORWARD_ONLY,
+                                        ResultSet.CONCUR_READ_ONLY))
                                 {
-                                    result.next();
-                                    moleculeCount = result.getInt(1);
-                                }
-                            }
-
-                            BitSet[] bitmasks = new BitSet[fpSize - fpOffset];
-
-                            for(int i = 0; i < fpSize - fpOffset; i++)
-                                bitmasks[i] = new BitSet(moleculeCount);
-
-
-                            // load compounds
-                            try (PreparedStatement selectStatement = selectConnection.prepareStatement(
-                                    "SELECT id, molfile FROM " + compoundsTable + " ORDER BY id",
-                                    ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY))
-                            {
-                                selectStatement.setFetchSize(batchSize);
-
-                                try (ResultSet rs = selectStatement.executeQuery())
-                                {
-                                    int seqid = 0;
-
-                                    while(true)
+                                    try (ResultSet result = statement
+                                            .executeQuery("select count(*) from " + compoundsTable))
                                     {
-                                        ArrayList<Item> items = new ArrayList<Item>(batchSize);
+                                        result.next();
+                                        moleculeCount = result.getInt(1);
+                                    }
+                                }
 
-                                        while(items.size() < batchSize && rs.next())
+                                BitSet[] bitmasks = new BitSet[fpSize - fpOffset];
+
+                                for(int i = 0; i < fpSize - fpOffset; i++)
+                                    bitmasks[i] = new BitSet(moleculeCount);
+
+
+                                // load compounds
+                                try (PreparedStatement selectStatement = selectConnection.prepareStatement(
+                                        "SELECT id, molfile FROM " + compoundsTable + " ORDER BY id",
+                                        ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY))
+                                {
+                                    selectStatement.setFetchSize(batchSize);
+
+                                    try (ResultSet rs = selectStatement.executeQuery())
+                                    {
+                                        int seqid = 0;
+
+                                        while(true)
                                         {
-                                            Item item = new Item();
+                                            ArrayList<Item> items = new ArrayList<Item>(batchSize);
 
-                                            item.id = rs.getInt(1);
-                                            item.molfile = rs.getString(2);
-                                            item.seqid = seqid++;
+                                            while(items.size() < batchSize && rs.next())
+                                            {
+                                                Item item = new Item();
 
-                                            items.add(item);
+                                                item.id = rs.getInt(1);
+                                                item.molfile = rs.getString(2);
+                                                item.seqid = seqid++;
+
+                                                items.add(item);
+                                            }
+
+                                            if(items.size() == 0)
+                                                break;
+
+                                            process(items, bitmasks);
+
+                                            for(Item item : items)
+                                            {
+                                                // insert molecule binary representation
+                                                moleculesStatement.setInt(1, item.seqid);
+                                                moleculesStatement.setInt(2, item.id);
+                                                moleculesStatement.setBytes(3, item.atoms);
+                                                moleculesStatement.setBytes(4, item.bonds);
+                                                moleculesStatement.addBatch();
+
+                                                // insert molecule couts
+                                                moleculeCountsStatement.setInt(1, item.seqid);
+                                                moleculeCountsStatement.setShort(2, item.counts.molTripleBondCount);
+                                                moleculeCountsStatement.setShort(3, item.counts.molSCount);
+                                                moleculeCountsStatement.setShort(4, item.counts.molOCount);
+                                                moleculeCountsStatement.setShort(5, item.counts.molNCount);
+                                                moleculeCountsStatement.setShort(6, item.counts.molFCount);
+                                                moleculeCountsStatement.setShort(7, item.counts.molClCount);
+                                                moleculeCountsStatement.setShort(8, item.counts.molBrCount);
+                                                moleculeCountsStatement.setShort(9, item.counts.molICount);
+                                                moleculeCountsStatement.setShort(10, item.counts.molCCount);
+                                                moleculeCountsStatement.setShort(11, item.counts.molPCount);
+                                                moleculeCountsStatement.addBatch();
+
+                                                // insert similarity fingerprint
+                                                similarityFingerprintStatement.setInt(1, item.id);
+                                                similarityFingerprintStatement.setInt(2,
+                                                        item.similarityFingerprintCardinality);
+                                                similarityFingerprintStatement.setArray(3, insertConnection
+                                                        .createArrayOf("bigint", item.similarityFingerprint));
+                                                similarityFingerprintStatement.addBatch();
+
+                                                // insert substructure fingerprint
+                                                substructureFingerprintStatement.setInt(1, item.seqid);
+                                                substructureFingerprintStatement.setArray(2, insertConnection
+                                                        .createArrayOf("smallint", item.substructureFingerprint));
+                                                substructureFingerprintStatement.addBatch();
+                                            }
+
+                                            moleculesStatement.executeBatch();
+                                            moleculeCountsStatement.executeBatch();
+                                            similarityFingerprintStatement.executeBatch();
+                                            substructureFingerprintStatement.executeBatch();
                                         }
+                                    }
+                                }
 
-                                        if(items.size() == 0)
-                                            break;
 
-                                        process(items, bitmasks);
-
-                                        for(Item item : items)
-                                        {
-                                            // insert fingerprint
-                                            fingerprintInsert.setInt(1, item.id);
-                                            fingerprintInsert.setInt(2, item.cardinality);
-                                            fingerprintInsert.setArray(3,
-                                                    insertConnection.createArrayOf("bigint", item.fp));
-                                            fingerprintInsert.addBatch();
-
-                                            // insert molecule couts
-                                            countsInsert.setInt(1, item.seqid);
-                                            countsInsert.setShort(2, item.counts.molTripleBondCount);
-                                            countsInsert.setShort(3, item.counts.molSCount);
-                                            countsInsert.setShort(4, item.counts.molOCount);
-                                            countsInsert.setShort(5, item.counts.molNCount);
-                                            countsInsert.setShort(6, item.counts.molFCount);
-                                            countsInsert.setShort(7, item.counts.molClCount);
-                                            countsInsert.setShort(8, item.counts.molBrCount);
-                                            countsInsert.setShort(9, item.counts.molICount);
-                                            countsInsert.setShort(10, item.counts.molCCount);
-                                            countsInsert.setShort(11, item.counts.molPCount);
-                                            countsInsert.addBatch();
-
-                                            // insert molecule binary representation
-                                            moleculeInsert.setInt(1, item.seqid);
-                                            moleculeInsert.setInt(2, item.id);
-                                            moleculeInsert.setBytes(3, item.atoms);
-                                            moleculeInsert.setBytes(4, item.bonds);
-                                            moleculeInsert.addBatch();
-                                        }
-
-                                        fingerprintInsert.executeBatch();
-                                        countsInsert.executeBatch();
-                                        moleculeInsert.executeBatch();
+                                // insert bitmap indexes
+                                try (PreparedStatement substructureFingerprintInsexStatement = insertConnection
+                                        .prepareStatement("insert into " + substructureFingerprintIndexTable
+                                                + " (idx, bitmap) values (?,?)"))
+                                {
+                                    for(int idx = 0; idx < bitmasks.length; idx++)
+                                    {
+                                        substructureFingerprintInsexStatement.setShort(1, (short) idx);
+                                        substructureFingerprintInsexStatement.setBytes(2, bitmasks[idx].toByteArray());
+                                        substructureFingerprintInsexStatement.addBatch();
                                     }
 
+                                    substructureFingerprintInsexStatement.executeBatch();
                                 }
-                            }
-
-
-                            // insert bitmap indexes
-                            try (PreparedStatement insertStatement = insertConnection
-                                    .prepareStatement("insert into " + indexTable + " (idx, bitmap) values (?,?)"))
-                            {
-                                for(int idx = 0; idx < bitmasks.length; idx++)
-                                {
-                                    insertStatement.setShort(1, (short) idx);
-                                    insertStatement.setBytes(2, bitmasks[idx].toByteArray());
-                                    insertStatement.addBatch();
-                                }
-
-                                insertStatement.executeBatch();
                             }
                         }
                     }
@@ -198,7 +211,17 @@ public class OrChemLoader
                 IAtomContainer readMolecule = MoleculeCreator.getMoleculeFromMolfile(item.molfile);
                 MoleculeCreator.configureMolecule(readMolecule);
 
-                // insert fingerprint
+                // calculate molecule binary representation
+                OrchemMoleculeBuilder builder = new OrchemMoleculeBuilder(readMolecule);
+                item.atoms = builder.atomsAsBytes();
+                item.bonds = builder.bondsAsBytes();
+
+
+                // calculate molecule couts
+                item.counts = new MoleculeCounts(readMolecule);
+
+
+                // calculate similarity fingerprint
                 BitSet fp = fingerPrinter.get().getBitFingerprint(readMolecule).asBitSet();
                 long[] words = fp.toLongArray();
                 Object[] array = new Object[words.length];
@@ -206,20 +229,25 @@ public class OrChemLoader
                 for(int i = 0; i < words.length; i++)
                     array[i] = new Long(words[i]);
 
-                item.fp = array;
-                item.cardinality = fp.cardinality();
+                item.similarityFingerprint = array;
+                item.similarityFingerprintCardinality = fp.cardinality();
+
+
+                // calculate substructure fingerprint
+                int size = 0;
+                for(int i = fp.nextSetBit(fpOffset); i > 0 && i < fpSize; i = fp.nextSetBit(i + 1))
+                    size++;
+
+                item.substructureFingerprint = new Object[size];
+
+                int position = 0;
+                for(int i = fp.nextSetBit(fpOffset); i > 0 && i < fpSize; i = fp.nextSetBit(i + 1))
+                    item.substructureFingerprint[position++] = i - fpOffset;
+
 
                 // set bitmap indexes
                 for(int idx = fp.nextSetBit(fpOffset); idx >= 0 && idx < fpSize; idx = fp.nextSetBit(idx + 1))
                     bitmasks[idx - fpOffset].set(item.seqid);
-
-                // insert molecule couts
-                item.counts = new MoleculeCounts(readMolecule);
-
-                // insert molecule binary representation
-                OrchemMoleculeBuilder builder = new OrchemMoleculeBuilder(readMolecule);
-                item.atoms = builder.atomsAsBytes();
-                item.bonds = builder.bondsAsBytes();
             }
             catch (Throwable e)
             {

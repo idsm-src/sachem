@@ -22,11 +22,11 @@
 #define FETCH_SIZE                1000
 #define FP_SIZE                   788
 #define COUNTS_SIZE               10
-#define MOLECULES_TABLE           "molecules"
-#define MOLECULE_COUNTS_TABLE     "molecule_counts"
-#define FINGERPRINT_INDEX_TABLE   "fingerprint_orchem_index"
-#define COUNT_INDEX_FILE          "molecule_counts.idx"
-#define FINGERPRINT_INDEX_FILE    "fingerprint_orchem_index.idx"
+#define MOLECULES_TABLE           "orchem_molecules"
+#define MOLECULE_COUNTS_TABLE     "orchem_molecule_counts"
+#define FINGERPRINT_INDEX_TABLE   "orchem_fingerprint_index"
+#define COUNT_INDEX_FILE          "orchem_molecule_counts.idx"
+#define FINGERPRINT_INDEX_FILE    "orchem_fingerprint_index.idx"
 
 
 typedef struct
