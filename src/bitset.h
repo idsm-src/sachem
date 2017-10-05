@@ -24,27 +24,28 @@ typedef struct
 } BitSet;
 
 
-void inline bitset_init(BitSet *restrict const bitset, uint64_t *words, int size)
+inline void bitset_init(BitSet *restrict const bitset, uint64_t *words, int length)
 {
     bitset->words = words;
-    bitset->length = size;
-    bitset->wordsInUse = size;
+    bitset->length = length;
+    bitset->wordsInUse = length;
 }
 
 
-void inline bitset_init_alloc(BitSet *restrict const bitset, int size)
+inline void bitset_init_alloc(BitSet *restrict const bitset, int size)
 {
-    int length = (size >> ADDRESS_BITS_PER_WORD) + 1;
+    int length = (size + BITS_PER_WORD - 1) >> ADDRESS_BITS_PER_WORD;
     uint64_t *words = palloc(length * sizeof(uint64_t));
 
     bitset->words = words;
     bitset->length = length;
+    bitset->wordsInUse = 0;
 }
 
 
-void inline bitset_init_empty(BitSet *restrict const bitset, int size)
+inline void bitset_init_empty(BitSet *restrict const bitset, int size)
 {
-    int length = (size >> ADDRESS_BITS_PER_WORD) + 1;
+    int length = (size + BITS_PER_WORD - 1) >> ADDRESS_BITS_PER_WORD;
     uint64_t *words = palloc0(length * sizeof(uint64_t));
 
     bitset->words = words;
@@ -53,24 +54,23 @@ void inline bitset_init_empty(BitSet *restrict const bitset, int size)
 }
 
 
-void inline bitset_init_setted(BitSet *restrict const bitset, int length)
+inline void bitset_init_setted(BitSet *restrict const bitset, int size)
 {
-    int endWordIndex = length >> ADDRESS_BITS_PER_WORD;
-    int wordsInUse = endWordIndex + 1;
-    uint64_t *words = palloc(wordsInUse * sizeof(uint64_t));
+    int length = (size + BITS_PER_WORD - 1) >> ADDRESS_BITS_PER_WORD;
+    uint64_t *words = palloc(length * sizeof(uint64_t));
 
-    for(int i = 0; i < endWordIndex; i++)
+    for(int i = 0; i < length - 1; i++)
         words[i] = WORD_MASK;
 
-    words[endWordIndex] = WORD_MASK >> (-((int) length) & 0x3f);
+    words[length - 1] = WORD_MASK >> (-((int) size) & 0x3f);
 
     bitset->words = words;
-    bitset->length = wordsInUse;
-    bitset->wordsInUse = wordsInUse;
+    bitset->length = length;
+    bitset->wordsInUse = length;
 }
 
 
-void inline bitset_init_from_array(BitSet *restrict const bitset, uint8_t *data, int length)
+inline void bitset_init_from_array(BitSet *restrict const bitset, uint8_t *data, int length)
 {
     int idx = length;
 
@@ -104,7 +104,7 @@ void inline bitset_init_from_array(BitSet *restrict const bitset, uint8_t *data,
 }
 
 
-void inline bitset_copy(BitSet *restrict const bitset, const BitSet *restrict const source)
+inline void bitset_copy(BitSet *restrict const bitset, const BitSet *restrict const source)
 {
 #if BITSET_ASSERT
     if(bitset->length != source->length)
@@ -139,6 +139,9 @@ inline void bitset_set(BitSet *restrict const bitset, int bitIndex)
 #endif
 
     bitset->words[wordIndex] |= (1L << (bitIndex % BITS_PER_WORD));
+
+    if(bitset->wordsInUse <= wordIndex)
+        bitset->wordsInUse = wordIndex + 1;
 }
 
 
@@ -153,7 +156,7 @@ inline void bitset_unset(BitSet *restrict const bitset, int bitIndex)
 
     bitset->words[wordIndex] &= ~(1L << (bitIndex % BITS_PER_WORD));
 
-    if(bitset->wordsInUse > 0 && bitset->words[bitset->wordsInUse - 1] == 0)
+    while(bitset->wordsInUse > 0 && bitset->words[bitset->wordsInUse - 1] == 0)
         bitset->wordsInUse--;
 }
 
