@@ -24,9 +24,9 @@
 #define COUNTS_SIZE               10
 #define MOLECULES_TABLE           "orchem_molecules"
 #define MOLECULE_COUNTS_TABLE     "orchem_molecule_counts"
-#define FINGERPRINT_INDEX_TABLE   "orchem_fingerprint_index"
+#define FINGERPRINT_INDEX_TABLE   "orchem_substructure_fingerprint_index"
 #define COUNT_INDEX_FILE          "orchem_molecule_counts.idx"
-#define FINGERPRINT_INDEX_FILE    "orchem_fingerprint_index.idx"
+#define FINGERPRINT_INDEX_FILE    "orchem_substructure_fingerprint_index.idx"
 
 
 typedef struct
