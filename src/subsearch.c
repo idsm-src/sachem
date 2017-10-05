@@ -373,7 +373,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
             if(match)
             {
-                bitset_unset(&info->resultMask, seqid);
+                bitset_unset(&info->resultMask, DatumGetInt32(seqid));
                 info->foundResults++;
                 result = id;
                 isNull = false;
