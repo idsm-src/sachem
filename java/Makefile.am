@@ -13,6 +13,25 @@ clean-local:
 
 EXTRA_DIST = \
 	build.xml \
-	inchi \
-	lib \
-	src
+	inchi/inchi-1 \
+    lib/cdk-2.0.jar \
+    lib/jdbc-postgresql.jar \
+    src/cz/iocb/orchem/convert/ConvertMolecule.java \
+    src/cz/iocb/orchem/fingerprint/bitpos/BitPosApi.java \
+    src/cz/iocb/orchem/fingerprint/bitpos/BitPositions.java \
+    src/cz/iocb/orchem/fingerprint/bitpos/ExtendedBitPositions.java \
+    src/cz/iocb/orchem/fingerprint/bitpos/Neighbour.java \
+    src/cz/iocb/orchem/fingerprint/OrchemExtendedFingerprinter.java \
+    src/cz/iocb/orchem/fingerprint/OrchemFingerprinter.java \
+    src/cz/iocb/orchem/isomorphism/IsomorphismSort.java \
+    src/cz/iocb/orchem/load/CompoundLoader.java \
+    src/cz/iocb/orchem/load/ConnectionPool.java \
+    src/cz/iocb/orchem/load/OrChemLoader.java \
+    src/cz/iocb/orchem/search/OrchemMoleculeBuilder.java \
+    src/cz/iocb/orchem/search/SimilaritySearch.java \
+    src/cz/iocb/orchem/search/SubstructureSearch.java \
+    src/cz/iocb/orchem/shared/MoleculeCounts.java \
+    src/cz/iocb/orchem/shared/MoleculeCreator.java \
+    src/cz/iocb/orchem/tautomers/CombinationCountException.java \
+    src/cz/iocb/orchem/tautomers/InChI.java \
+    src/cz/iocb/orchem/tautomers/InchiTautomerGenerator.java
