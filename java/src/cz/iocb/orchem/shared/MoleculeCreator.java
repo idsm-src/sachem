@@ -52,7 +52,7 @@ public class MoleculeCreator
         @Override
         protected Aromaticity initialValue()
         {
-            return new Aromaticity(ElectronDonation.daylight(), Cycles.cdkAromaticSet());
+            return new Aromaticity(ElectronDonation.cdkAllowingExocyclic(), Cycles.cdkAromaticSet());
         }
     };
 
