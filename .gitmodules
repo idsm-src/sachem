@@ -1,0 +1,12 @@
+[submodule "lib/lucy"]
+	path = lib/lucy
+	url = https://git-wip-us.apache.org/repos/asf/lucy.git
+	branch = 0.6
+[submodule "lib/clownfish"]
+	path = lib/clownfish
+	url = https://git-wip-us.apache.org/repos/asf/lucy-clownfish.git
+	branch = 0.6
+[submodule "lib/rdkit"]
+	path = lib/rdkit
+	url = ssh://git@took28.ics.muni.cz:2222/kratochvil/rdkit
+	branch = iocb
