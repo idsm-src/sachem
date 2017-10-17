@@ -1,0 +1,396 @@
+
+#include "fpsearch-lucy.h"
+
+#include <iostream>
+#include <fstream>
+#include <string>
+
+#define CFISH_USE_SHORT_NAMES
+#define LUCY_USE_SHORT_NAMES
+#include <Clownfish/String.h>
+
+#include <Lucy/Analysis/RegexTokenizer.h>
+#include <Lucy/Document/Doc.h>
+#include <Lucy/Document/HitDoc.h>
+#include <Lucy/Index/Indexer.h>
+#include <Lucy/Plan/FullTextType.h>
+#include <Lucy/Plan/Schema.h>
+#include <Lucy/Plan/StringType.h>
+#include <Lucy/Search/ANDQuery.h>
+#include <Lucy/Search/Hits.h>
+#include <Lucy/Search/IndexSearcher.h>
+#include <Lucy/Search/QueryParser.h>
+#include <Lucy/Search/TermQuery.h>
+
+#include <GraphMol/AtomIterators.h>
+#include <GraphMol/Fingerprints/IOCBFingerprint.h>
+#include <GraphMol/MolOps.h>
+#include <GraphMol/ROMol.h>
+#include <GraphMol/RWMol.h>
+
+/*
+ * tools
+ */
+
+static const unsigned char b64str[65] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static std::string fp2str (uint32_t fp)
+{
+	std::string r (6, '_');
+	for (int i = 0; i < 6; ++i)
+		r[i] = b64str[ (fp >> (6 * i)) & 0x3f];
+	return r;
+}
+
+static Schema* create_schema (String*guidF, String*fpF)
+{
+	Schema*schema = Schema_new();
+
+	{
+		StringType *type = StringType_new();
+		StringType_Set_Indexed (type, false);
+		Schema_Spec_Field (schema, guidF, (FieldType*) type);
+		DECREF (type);
+	}
+
+	{
+		String* re = Str_newf ("[a-zA-Z0-9+/]+");
+		RegexTokenizer *rt = RegexTokenizer_new (re);
+		FullTextType *type = FullTextType_new ( (Analyzer*) rt);
+		FullTextType_Set_Indexed (type, true);
+		FullTextType_Set_Highlightable (type, false);
+		FullTextType_Set_Stored (type, false);
+		Schema_Spec_Field (schema, fpF, (FieldType*) type);
+		DECREF (rt);
+		DECREF (re);
+		DECREF (type);
+	}
+
+	return schema;
+}
+
+/*
+ * internal stuffs
+ */
+
+struct fpsearch_data {
+	String *folder, *guidF, *fpF, *boolop;
+	Schema *schema;
+
+	Indexer *indexer;
+	size_t docs_added;
+
+	IndexSearcher *searcher;
+	QueryParser *qparser;
+
+	int graphSize;
+	int circSize;
+	int maxLogFeats;
+
+	int searchAtomCoverage;
+	int searchMaxFps;
+	std::map<std::string, int> fporder;
+};
+
+static void close_indexer (fpsearch_data&d)
+{
+	Indexer_Commit (d.indexer);
+	DECREF (d.indexer); //TODO any strict unlocking needed?
+	d.indexer = nullptr;
+	d.docs_added = 0;
+}
+
+static void close_searcher (fpsearch_data&d)
+{
+	DECREF (d.searcher);
+	d.searcher = nullptr;
+}
+
+static void open_indexer (fpsearch_data&d)
+{
+	if (d.indexer) return; //already indexing!
+	close_searcher (d);
+	d.indexer = Indexer_new (d.schema, (Obj*) (d.folder), nullptr, Indexer_CREATE);
+}
+
+static void open_searcher (fpsearch_data&d)
+{
+	if (d.searcher) return; //already searching!
+	close_indexer (d);
+	d.searcher = IxSearcher_new ( (Obj*) (d.folder));
+}
+
+static inline RDKit::Bond::BondType bondtype_jg2rd (int multiplicity, bool isAromatic)
+{
+	if (isAromatic) return RDKit::Bond::AROMATIC;
+	switch (multiplicity) {
+	case 1:
+		return RDKit::Bond::SINGLE;
+	case 2:
+		return RDKit::Bond::DOUBLE;
+	case 3:
+		return RDKit::Bond::TRIPLE;
+	case 4:
+		return RDKit::Bond::QUADRUPLE;
+	case 5:
+		return RDKit::Bond::QUINTUPLE;
+	case 6:
+		return RDKit::Bond::HEXTUPLE;
+	default:
+		return RDKit::Bond::UNSPECIFIED;
+	}
+}
+
+//caller responsible for deallocating the ROMol
+static RDKit::ROMol* JGMol2RDMol (const Molecule*m)
+{
+	RDKit::RWMol rwm;
+	std::map<int, int> atomMap;
+
+	for (int i = 0; i < m->atomCount; ++i) {
+		RDKit::Atom* a = new RDKit::Atom();
+		a->setAtomicNum (molecule_get_atom_number (m, i));
+		a->setFormalCharge (molecule_get_formal_charge (m, i));
+		a->setNumExplicitHs (molecule_get_hydrogen_count (m, i));
+		a->setNoImplicit (true); //no implicit Hs
+		//TODO: pseudoAtom?
+		atomMap[i] = rwm.addAtom (a, false, true);
+	}
+
+	for (int i = 0; i < m->atomCount; ++i) {
+		int nbs = molecule_get_bond_list_size (m, i);
+		for (int j = 0; j < nbs; ++j) {
+			int otherAtom = molecule_get_bond_list (m, i) [j];
+			if (otherAtom <= i) continue;
+			int bondData = molecule_get_bond_data
+			               (m, molecule_get_bond (m, i, otherAtom));
+			bool isAromatic = bondData & 0xc0;
+			int multiplicity = (bondData & 0x7c) >> 3;
+			rwm.addBond (atomMap[i], atomMap[otherAtom],
+			             bondtype_jg2rd (multiplicity, isAromatic));
+		}
+	}
+
+	return new RDKit::ROMol (rwm);
+}
+
+void index_commit (fpsearch_data&d)
+{
+	Indexer_Commit (d.indexer);
+	d.docs_added = 0;
+}
+
+void index_add (fpsearch_data&d, int guid, RDKit::ROMol*m)
+{
+	RDKit::SparseIntVect<uint32_t> *res
+	    = RDKit::IOCBFingerprints::getFingerprint (*m, d.graphSize, d.circSize, d.maxLogFeats);
+	std::string fp;
+	fp.reserve (res->size() * 7);
+	for (auto&&i : res->getNonzeroElements()) fp.append (fp2str (i.first) + " ");
+
+	std::string guids = std::to_string (guid);
+	Doc*doc = Doc_new (nullptr, 0);
+
+	{
+		String *value = Str_newf (guids.c_str());
+		Doc_Store (doc, d.guidF, (Obj*) value);
+		DECREF (value);
+	}
+	{
+		String *value = Str_newf (fp.c_str());
+		Doc_Store (doc, d.fpF, (Obj*) value);
+		DECREF (value);
+	}
+
+	Indexer_Add_Doc (d.indexer, doc, 1.0);
+	DECREF (doc);
+
+	++d.docs_added;
+	if (d.docs_added >= 10000) index_commit (d);
+}
+
+void index_remove (fpsearch_data&d, int guid)
+{
+	std::string guids = std::to_string (guid);
+	String *value = Str_newf (guids.c_str());
+	Indexer_Delete_By_Term (d.indexer, d.guidF, (Obj*) value);
+	DECREF (value);
+}
+
+Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
+{
+	auto* molh = JGMol2RDMol (m);
+	auto *mol = RDKit::MolOps::removeHs (*molh, false, false, false);
+	delete molh;
+
+	RDKit::IOCBFingerprints::BitInfo bits;
+	RDKit::SparseIntVect<uint32_t> *res =
+	    RDKit::IOCBFingerprints::getFingerprint
+	    (*mol, d.graphSize, d.circSize, d.maxLogFeats, true, &bits);
+	delete mol;
+
+	//convert and pre-sort the fingerprints
+	std::map<int, std::pair<uint32_t, std::string> > fpi;
+	for (auto&&i : res->getNonzeroElements()) {
+		std::string fp = fp2str (i.first);
+		auto o = d.fporder.find (fp);
+		if (o == d.fporder.end()) continue; //TODO complain?
+		fpi[o->second] = std::make_pair (i.first, fp);
+	}
+	delete res;
+
+	//find a decent coverage
+	std::set<std::string> fps;
+	{
+		std::vector<int> coverage;
+		int uncovered = mol->getNumAtoms(), nfps = 0;
+		coverage.resize (uncovered, 0);
+
+		for (auto&i : fpi) {
+			if (uncovered <= 0) break;
+			if (nfps >= d.searchMaxFps) break;
+			bool found = false;
+			for (auto&a : bits[i.second.first]) {
+				if (coverage[a] < d.searchAtomCoverage) {
+					found = true;
+					++coverage[a];
+					if (coverage[a]
+					    == d.searchAtomCoverage)
+						--uncovered;
+				}
+			}
+			if (found) {
+				fps.insert (i.second.second);
+				++nfps;
+			}
+		}
+	}
+
+	//convert the coverage to actual query
+	std::string q;
+	{
+		bool first = true;
+		q.reserve (fps.size() * 10);
+		for (auto&i : fps) {
+			if (!first) {
+				q.append (" ");
+			} else first = false;
+			q.append ("\"" + i + "\"");
+		}
+	}
+
+	//query -> lucy query
+	String*query_str = Str_newf (q.c_str());
+	Query *query = QParser_Parse (d.qparser, query_str);
+	Hits*hits = IxSearcher_Hits (d.searcher, (Obj*) query, 0, max_results, nullptr);
+
+	DECREF (query);
+	DECREF (query_str);
+
+	return hits;
+}
+
+/*
+ * "interface"
+ */
+
+void FPSEARCH_API (initialize) (void**ddp, const char*index_dir, const char*fp_ordering_file)
+{
+	*ddp = new fpsearch_data;
+	fpsearch_data&d = * (fpsearch_data*) *ddp;
+	d.folder = Str_newf (index_dir);
+	d.guidF = Str_newf ("guid");
+	d.fpF = Str_newf ("fp");
+	d.boolop = Str_newf ("AND");
+	d.schema = create_schema (d.guidF, d.fpF);
+	d.qparser = QParser_new (d.schema, nullptr, d.boolop, nullptr);
+
+	d.indexer = nullptr;
+	d.docs_added = 0;
+	d.searcher = nullptr;
+
+	d.graphSize = 7;
+	d.circSize = 3;
+	d.maxLogFeats = 5;
+	d.searchAtomCoverage = 2;
+	d.searchMaxFps = 32;
+
+	d.fporder.clear();
+	{
+		std::ifstream sdf (fp_ordering_file);
+		std::string fp;
+		int fpn = 0;
+		while (std::getline (sdf, fp)) d.fporder[fp] = fpn++;
+	}
+}
+
+void FPSEARCH_API (close) (void*dd)
+{
+	fpsearch_data&d = * (fpsearch_data*) dd;
+	close_indexer (d);
+	close_searcher (d);
+	DECREF (d.folder);
+	DECREF (d.guidF);
+	DECREF (d.fpF);
+	DECREF (d.boolop);
+	DECREF (d.schema);
+	DECREF (d.qparser);
+	delete (fpsearch_data*) dd;
+}
+
+//returns a new search object
+void* FPSEARCH_API (search) (void*dd, const Molecule*mol, int max_results)
+{
+	fpsearch_data&d = * (fpsearch_data*) dd;
+	open_searcher (d);
+
+	return (void*) search_query (d, mol, max_results);
+}
+
+//gets data from search object to array, max n, returns retrieved count
+int FPSEARCH_API (search_fillbuf) (void*dd, void*ss, int*results, int n)
+{
+	fpsearch_data&d = * (fpsearch_data*) dd;
+	Hits*hits = (Hits*) ss;
+	int ret = 0;
+	while (n > 0) {
+		HitDoc*hit = Hits_Next (hits);
+		if (!hit) break;
+		String*guid = (String*) HitDoc_Extract (hit, d.guidF);
+		* (results++) = std::atoi (Str_To_Utf8 (guid));
+		++ret;
+		--n;
+		DECREF (guid);
+		DECREF (hit);
+	}
+	return ret;
+}
+
+//remove the search result
+void FPSEARCH_API (search_finish) (void*dd, void*ss)
+{
+	DECREF ( (Hits*) ss);
+}
+
+void FPSEARCH_API (add_mol) (void*dd, int guid, const Molecule*mol)
+{
+	fpsearch_data&d = * (fpsearch_data*) dd;
+	open_indexer (d);
+	auto*m = JGMol2RDMol (mol);
+	index_add (d, guid, m);
+	delete m;
+}
+
+void FPSEARCH_API (remove_mol) (void*dd, int guid)
+{
+	fpsearch_data&d = * (fpsearch_data*) dd;
+	open_indexer (d);
+	index_remove (d, guid);
+}
+
+#if JUST_A_TEST
+int main()
+{
+	return 0;
+}
+#endif
