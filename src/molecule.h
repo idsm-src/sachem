@@ -3,7 +3,10 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+
+#ifndef MOLECULE_H_NO_POSTGRES
 #include "pgchem.h"
+#endif
 
 #define Q_ATOM_NUMBER   (-'Q')
 #define H_ATOM_NUMBER        1
@@ -34,6 +37,7 @@ typedef struct
 } Molecule;
 
 
+#ifndef MOLECULE_H_NO_POSTGRES
 inline void molecule_init(Molecule *const molecule, int atomsLength, uint8_t *atoms, int bondsLength, uint8_t *bonds, bool *restH, bool explitHonly)
 {
     const int atomCount = atomsLength / ATOM_BLOCK_SIZE;
@@ -93,6 +97,7 @@ inline void molecule_init(Molecule *const molecule, int atomsLength, uint8_t *at
         molecule->contains[i][1] = y;
     }
 }
+#endif
 
 
 inline bool molecule_is_pseudo_atom(const Molecule *const restrict molecule, int i)

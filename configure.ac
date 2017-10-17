@@ -34,5 +34,9 @@ libdir=$POSTGRESQL_LIBDIR
 dnl check for JDK8
 AX_JDK8
 
-AC_CONFIG_FILES(Makefile src/Makefile java/Makefile)
+dnl process optional options for fpsearch libs
+AX_LUCY
+AX_RDKIT
+
+AC_CONFIG_FILES(Makefile src/Makefile src/fpsearch/Makefile java/Makefile)
 AC_OUTPUT
