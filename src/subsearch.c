@@ -361,14 +361,13 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
             if(bondsize < info->queryMolecule.bondCount)
                 continue;
 
-            MemoryContext old = MemoryContextSwitchTo(info->targetContext);
+            bool match;
 
+            PG_MEMCONTEXT_BEGIN(info->targetContext);
             Molecule target;
             molecule_init(&target, VARSIZE(atomsData) - VARHDRSZ, VARDATA(atomsData), VARSIZE(bondsData) - VARHDRSZ, VARDATA(bondsData), NULL, false);
-
-            bool match = vf2state_match(&info->vf2state, &target);
-
-            MemoryContextSwitchTo(old);
+            match = vf2state_match(&info->vf2state, &target);
+            PG_MEMCONTEXT_END();
             MemoryContextReset(info->targetContext);
 
             if(match)
