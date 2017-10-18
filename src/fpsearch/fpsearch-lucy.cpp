@@ -1,9 +1,10 @@
 
 #include "fpsearch-lucy.h"
 
-#include <iostream>
 #include <fstream>
 #include <string>
+#include <map>
+#include <set>
 
 #define CFISH_USE_SHORT_NAMES
 #define LUCY_USE_SHORT_NAMES
@@ -94,6 +95,7 @@ struct fpsearch_data {
 
 static void close_indexer (fpsearch_data&d)
 {
+	if (!d.indexer) return;
 	Indexer_Commit (d.indexer);
 	DECREF (d.indexer); //TODO any strict unlocking needed?
 	d.indexer = nullptr;
@@ -102,6 +104,7 @@ static void close_indexer (fpsearch_data&d)
 
 static void close_searcher (fpsearch_data&d)
 {
+	if (!d.searcher) return;
 	DECREF (d.searcher);
 	d.searcher = nullptr;
 }
@@ -171,7 +174,8 @@ static RDKit::ROMol* JGMol2RDMol (const Molecule*m)
 		}
 	}
 
-	return new RDKit::ROMol (rwm);
+	RDKit::ROMol *rom = new RDKit::ROMol (rwm);
+	return rom;
 }
 
 void index_commit (fpsearch_data&d)
@@ -227,6 +231,7 @@ Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
 	RDKit::SparseIntVect<uint32_t> *res =
 	    RDKit::IOCBFingerprints::getFingerprint
 	    (*mol, d.graphSize, d.circSize, d.maxLogFeats, true, &bits);
+	int molAtoms = mol->getNumAtoms();
 	delete mol;
 
 	//convert and pre-sort the fingerprints
@@ -243,7 +248,7 @@ Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
 	std::set<std::string> fps;
 	{
 		std::vector<int> coverage;
-		int uncovered = mol->getNumAtoms(), nfps = 0;
+		int uncovered = molAtoms, nfps = 0;
 		coverage.resize (uncovered, 0);
 
 		for (auto&i : fpi) {
@@ -296,6 +301,8 @@ Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
 
 void FPSEARCH_API (initialize) (void**ddp, const char*index_dir, const char*fp_ordering_file)
 {
+	lucy_bootstrap_parcel();
+
 	*ddp = new fpsearch_data;
 	fpsearch_data&d = * (fpsearch_data*) *ddp;
 	d.folder = Str_newf (index_dir);
