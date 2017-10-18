@@ -389,8 +389,92 @@ void FPSEARCH_API (remove_mol) (void*dd, int guid)
 }
 
 #if JUST_A_TEST
+inline void molecule_init (Molecule *const molecule, int atomsLength, uint8_t *atoms, int bondsLength, uint8_t *bonds, bool *restH, bool explitHonly)
+{
+	const int atomCount = atomsLength / ATOM_BLOCK_SIZE;
+	const int bondCount = bondsLength / BOND_BLOCK_SIZE;
+
+	molecule->atomCount = atomCount;
+	molecule->bondCount = bondCount;
+	molecule->atoms = atoms;
+	molecule->bonds = bonds;
+	molecule->restH = restH;
+
+	molecule->bondLists = (int*) malloc (BOND_LIST_BASE_SIZE * atomCount * sizeof (int));
+	molecule->bondListSizes = (int*) malloc (atomCount * sizeof (int));
+	molecule->contains = (int (*) [2]) malloc (bondCount * 2 * sizeof (int));
+	molecule->bondMatrix = (int*) malloc (atomCount * atomCount * sizeof (int));
+
+
+	for (int i = 0; i < atomCount; i++) {
+		int offset = ATOM_BLOCK_SIZE * i + 1;
+
+		if (explitHonly)
+			molecule->atoms[offset] = molecule->atoms[offset] >> 4;
+		else
+			molecule->atoms[offset] = (molecule->atoms[offset] & 0x0F) + (molecule->atoms[offset] >> 4);
+	}
+
+
+	for (int i = 0; i < atomCount * atomCount; i++)
+		molecule->bondMatrix[i] = -1;
+
+
+	for (int i = 0; i < molecule->bondCount; i++) {
+		int offset = i * BOND_BLOCK_SIZE;
+
+		int b0 = bonds[offset + 0];
+		int b1 = bonds[offset + 1];
+		int b2 = bonds[offset + 2];
+
+		if (bonds[offset + 3] & 128)
+			bonds[offset + 3] = 128;
+
+		int x = b0 | b1 << 4 & 0xF00;
+		int y = b2 | b1 << 8 & 0xF00;
+
+		molecule->bondLists[x * BOND_LIST_BASE_SIZE + molecule->bondListSizes[x]++] = y;
+		molecule->bondLists[y * BOND_LIST_BASE_SIZE + molecule->bondListSizes[y]++] = x;
+
+		molecule->bondMatrix[x * molecule->atomCount + y] = i;
+		molecule->bondMatrix[y * molecule->atomCount + x] = i;
+
+		molecule->contains[i][0] = x;
+		molecule->contains[i][1] = y;
+	}
+}
+
+#include <vector>
+#include <iostream>
+
 int main()
 {
+	std::vector<uint8_t> atoms;
+	std::vector<uint8_t> bonds;
+	atoms.resize (6, 0);
+	atoms[0] = 6;
+	atoms[3] = 6;
+	bonds.resize (4, 0);
+	bonds[0] = 0;
+	bonds[2] = 1;
+	bonds[3] = 1 << 3;
+	Molecule m;
+	molecule_init (&m, atoms.size(), atoms.data(), bonds.size(), bonds.data(), nullptr, true);
+
+	void *fpl, *s;
+
+	fplucy_initialize (&fpl, "index", "fporder.txt");
+
+	fplucy_add_mol (fpl, 123, &m);
+
+	s = fplucy_search (fpl, &m);
+	std::vector<int> rs;
+	rs.resize (10);
+	int rn = fplucy_search_fillbuf (fpl, s, rs.data(), 10);
+	for (int i = 0; i < rn; ++i) std::cout << "found:" << rs[i] << std::endl;
+	fplucy_search_finish (fpl, s);
+
+	fplucy_close (fpl);
 	return 0;
 }
 #endif
