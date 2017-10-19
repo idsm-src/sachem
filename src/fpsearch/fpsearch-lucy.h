@@ -9,11 +9,35 @@
 #include "../molecule.h"
 #undef restrict
 
+#ifndef FPSEARCH_API
 #define FPSEARCH_API(id) fplucy_##id
+#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* all parameters for indexing/searching */
+struct FPSEARCH_API (params_t)
+{
+	/* max bonds in subgraph fingerprints */
+	unsigned graphSize;
+
+	/* max iterations of ECFP */
+	unsigned circSize;
+
+	/* max log-count of indexed feature repetitions */
+	unsigned maxLogFeats;
+
+	/* minimum number of overlapping fingerprints on each query atom */
+	unsigned searchAtomCoverage;
+
+	/* maximum number of fingerprints in search query */
+	unsigned searchMaxFps;
+
+	/* how many index operations to perform before committing to disk */
+	unsigned indexerBatch;
+};
 
 /* fplucy_initialize
  * returns the initialized `dd` object
@@ -25,6 +49,16 @@ void* FPSEARCH_API (initialize) (const char *index_dir,
  * safely close the index
  */
 void FPSEARCH_API (close) (void *dd);
+
+/* fplucy_params_get
+ * load the currently set params to pointed fplucy_params
+ */
+void FPSEARCH_API (params_get) (void *dd, FPSEARCH_API (params_t) *pp);
+
+/* fplucy_params_set
+ * set the parameters from pointed fplucy_params
+ */
+void FPSEARCH_API (params_set) (void *dd, const FPSEARCH_API (params_t) *pp);
 
 /* fplucy_search
  * returns `ss` search cursor
