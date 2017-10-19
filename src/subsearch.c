@@ -173,7 +173,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
         FuncCallContext *funcctx = SRF_FIRSTCALL_INIT();
         PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
 
-        SubstructureSearchData *info = palloc(sizeof(SubstructureSearchData));
+        SubstructureSearchData *info = (SubstructureSearchData *) palloc(sizeof(SubstructureSearchData));
         funcctx->user_fctx = info;
 
         info->topN = topN;
@@ -439,7 +439,7 @@ void orchem_substructure_write_count_index()
     PG_MEMCONTEXT_BEGIN(context);
 
     for(int j = 0; j < COUNTS_SIZE; j++)
-        counts[j] = palloc0(moleculeCount * sizeof(int16));
+        counts[j] = (int16 *) palloc0(moleculeCount * sizeof(int16));
 
     PG_MEMCONTEXT_END();
 

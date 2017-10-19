@@ -137,7 +137,7 @@ Datum orchem_substructure_gin_search(PG_FUNCTION_ARGS)
 
         PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
 
-        SubstructureSearchData *info = palloc(sizeof(SubstructureSearchData));
+        SubstructureSearchData *info = (SubstructureSearchData *) palloc(sizeof(SubstructureSearchData));
         funcctx->user_fctx = info;
 
         info->topN = topN;
@@ -226,7 +226,7 @@ Datum orchem_substructure_gin_search(PG_FUNCTION_ARGS)
 
                 PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
                 size_t nameLength = strlen(cursor->name) + 1;
-                info->cursorName = palloc(nameLength);
+                info->cursorName = (char *) palloc(nameLength);
                 memcpy(info->cursorName, cursor->name, nameLength);
                 PG_MEMCONTEXT_END();
 

@@ -49,10 +49,10 @@ inline void molecule_init(Molecule *const molecule, int atomsLength, uint8_t *at
     molecule->bonds = bonds;
     molecule->restH = restH;
 
-    molecule->bondLists = palloc(BOND_LIST_BASE_SIZE * atomCount * sizeof(int));
-    molecule->bondListSizes = palloc0(atomCount * sizeof(int));
-    molecule->contains = palloc(bondCount * 2 * sizeof(int));
-    molecule->bondMatrix = palloc(atomCount * atomCount * sizeof(int));
+    molecule->bondLists = (int *) palloc(BOND_LIST_BASE_SIZE * atomCount * sizeof(int));
+    molecule->bondListSizes = (int *) palloc0(atomCount * sizeof(int));
+    molecule->contains = (int (*)[2]) palloc(bondCount * 2 * sizeof(int));
+    molecule->bondMatrix = (int *) palloc(atomCount * atomCount * sizeof(int));
 
 
     for(int i = 0; i < atomCount; i++)

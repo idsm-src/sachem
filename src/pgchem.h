@@ -24,7 +24,7 @@ inline void createBasePath()
     size_t basePathLength = strlen(DataDir);
     size_t databaseLength = strlen(database->data);
 
-    char *path = palloc(basePathLength +  databaseLength + 2);
+    char *path = (char *) palloc(basePathLength +  databaseLength + 2);
     char *data = path;
 
     memcpy(data, DataDir, basePathLength);
@@ -50,7 +50,7 @@ inline char *getFilePath(char* fileName)
     size_t databaseLength = strlen(database->data);
     size_t fileNameLength = strlen(fileName);
 
-    char *path = palloc(basePathLength +  databaseLength + fileNameLength + 3);
+    char *path = (char *) palloc(basePathLength +  databaseLength + fileNameLength + 3);
     char *data = path;
 
     memcpy(data, DataDir, basePathLength);

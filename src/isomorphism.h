@@ -89,19 +89,19 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
     vf2state->query = query;
     vf2state->queryAtomCount = queryAtomCount;
     vf2state->core_len = 0;
-    vf2state->query_order = palloc(queryAtomCount * sizeof(int));
-    vf2state->query_range_lens = palloc(queryAtomCount * sizeof(int));
+    vf2state->query_order = (int *) palloc(queryAtomCount * sizeof(int));
+    vf2state->query_range_lens = (int *) palloc(queryAtomCount * sizeof(int));
     vf2state->query_range_len = 0;
-    vf2state->undos = palloc(queryAtomCount * sizeof(VF2Undo));
+    vf2state->undos = (VF2Undo *) palloc(queryAtomCount * sizeof(VF2Undo));
 
 
-    vf2state->core_query = palloc(queryAtomCount * sizeof(int));
+    vf2state->core_query = (int *) palloc(queryAtomCount * sizeof(int));
 
     for(int i = 0; i < queryAtomCount; i++)
         vf2state->core_query[i] = UNDEFINED_CORE;
 
 
-    vf2state->query_range_flags = palloc((queryAtomCount + 1) * queryAtomCount * sizeof(bool));
+    vf2state->query_range_flags = (bool *) palloc((queryAtomCount + 1) * queryAtomCount * sizeof(bool));
     vf2state->query_range_flag = vf2state->query_range_flags;
 
     for(int i = 0; i < queryAtomCount; i++)
@@ -155,9 +155,9 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
 
     if(unlikely(exact))
     {
-        vf2state->target_range_flag = palloc(queryAtomCount * sizeof(bool));
-        vf2state->target_range_stack = palloc(queryAtomCount * sizeof(int));
-        vf2state->core_target = palloc(queryAtomCount * sizeof(int));
+        vf2state->target_range_flag = (bool *) palloc(queryAtomCount * sizeof(bool));
+        vf2state->target_range_stack = (int *) palloc(queryAtomCount * sizeof(int));
+        vf2state->core_target = (int *) palloc(queryAtomCount * sizeof(int));
     }
 }
 
@@ -684,9 +684,9 @@ inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *co
 
     if(likely(!vf2state->exact))
     {
-        vf2state->target_range_flag = palloc(targetAtomCount * sizeof(bool));
-        vf2state->target_range_stack = palloc(targetAtomCount * sizeof(int));
-        vf2state->core_target = palloc(targetAtomCount * sizeof(int));
+        vf2state->target_range_flag = (bool *) palloc(targetAtomCount * sizeof(bool));
+        vf2state->target_range_stack = (int *) palloc(targetAtomCount * sizeof(int));
+        vf2state->core_target = (int *) palloc(targetAtomCount * sizeof(int));
     }
 
     for(int i = 0; i < targetAtomCount; i++)

@@ -121,7 +121,7 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
         FuncCallContext *funcctx = SRF_FIRSTCALL_INIT();
         PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
 
-        SimilaritySearchData *info = palloc(sizeof(SimilaritySearchData));
+        SimilaritySearchData *info = (SimilaritySearchData *) palloc(sizeof(SimilaritySearchData));
         funcctx->user_fctx = info;
 
         info->cutoff = cutoff;

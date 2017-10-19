@@ -24,7 +24,7 @@ typedef struct
 static inline void heap_init(Heap *const heap)
 {
     heap->rows = HEAP_ROW_COUNT;
-    heap->data = palloc0(HEAP_ROW_COUNT * sizeof(HeapItem *));
+    heap->data = (HeapItem **) palloc0(HEAP_ROW_COUNT * sizeof(HeapItem *));
     heap->size = 0;
     heap->context = CurrentMemoryContext;
 }
@@ -58,7 +58,7 @@ static inline void heap_add(Heap *const heap, HeapItem const item)
     if(idx / HEAP_ROW_SIZE >= heap->rows)
     {
         PG_MEMCONTEXT_BEGIN(heap->context);
-        heap->data = repalloc(heap->data, 2 * heap->rows * sizeof(HeapItem *));
+        heap->data = (HeapItem **) repalloc(heap->data, 2 * heap->rows * sizeof(HeapItem *));
         PG_MEMCONTEXT_END();
 
         for(int i = heap->rows; i < 2 * heap->rows; i++)
@@ -70,7 +70,7 @@ static inline void heap_add(Heap *const heap, HeapItem const item)
     if(unlikely(heap->data[idx / HEAP_ROW_SIZE] == NULL))
     {
         PG_MEMCONTEXT_BEGIN(heap->context);
-        heap->data[idx / HEAP_ROW_SIZE] = palloc(HEAP_ROW_SIZE * sizeof(HeapItem));
+        heap->data[idx / HEAP_ROW_SIZE] = (HeapItem *) palloc(HEAP_ROW_SIZE * sizeof(HeapItem));
         PG_MEMCONTEXT_END();
     }
 

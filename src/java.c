@@ -81,7 +81,7 @@ static inline void java_check_exception(const char *str)
     jstring message = (jstring)(*env)->CallObjectMethod(env, exception, toStringMethod);
 
     const char *mstr = (*env)->GetStringUTFChars(env, message, NULL);
-    char *error = palloc(strlen(mstr) + 1);
+    char *error = (char *) palloc(strlen(mstr) + 1);
     strcpy(error, mstr);
 
     (*env)->ReleaseStringUTFChars(env, message, mstr);
@@ -202,7 +202,7 @@ int java_parse_query(QueryData **data, char* query, size_t queryLength, char *ty
 
 
         length = (*env)->GetArrayLength(env, result);
-        QueryData *results = palloc(length * sizeof(QueryData));
+        QueryData *results = (QueryData *) palloc(length * sizeof(QueryData));
 
         for(int i = 0; i < length; i++)
         {
@@ -236,22 +236,22 @@ int java_parse_query(QueryData **data, char* query, size_t queryLength, char *ty
             java_check_exception("java_parse_query()");
 
 
-            results[i].counts = palloc(countsSize * sizeof(jshort));
+            results[i].counts = (jshort *) palloc(countsSize * sizeof(jshort));
             memcpy(results[i].counts, counts, countsSize * sizeof(jshort));
 
-            results[i].fp = palloc(fpSize * sizeof(jshort));
+            results[i].fp = (jshort *) palloc(fpSize * sizeof(jshort));
             memcpy(results[i].fp, fp, fpSize * sizeof(jshort));
 
-            results[i].atoms = palloc(atomsSize);
+            results[i].atoms = (char *) palloc(atomsSize);
             memcpy(results[i].atoms, atoms, atomsSize);
 
-            results[i].bonds = palloc(bondsSize);
+            results[i].bonds = (char *) palloc(bondsSize);
             memcpy(results[i].bonds, bonds, bondsSize);
 
 
             if(restHArray)
             {
-                results[i].restH = palloc(restHSize * sizeof(bool));
+                results[i].restH = (bool *) palloc(restHSize * sizeof(bool));
                 memcpy(results[i].restH, restH, restHSize * sizeof(bool));
             }
             else
@@ -330,7 +330,7 @@ int java_parse_similarity_query(uint64_t **data, char* query, size_t queryLength
             words = (*env)->GetLongArrayElements(env, result, NULL);
             java_check_exception("java_parse_similarity_query()");
 
-            *data = palloc(length * sizeof(jlong));
+            *data = (jlong *) palloc(length * sizeof(jlong));
             memcpy(*data, words, length * sizeof(jlong));
 
             JavaDeleteLongArray(result, words, JNI_ABORT);

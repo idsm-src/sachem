@@ -35,7 +35,7 @@ inline void bitset_init(BitSet *restrict const bitset, uint64_t *words, int leng
 inline void bitset_init_alloc(BitSet *restrict const bitset, int size)
 {
     int length = (size + BITS_PER_WORD - 1) >> ADDRESS_BITS_PER_WORD;
-    uint64_t *words = palloc(length * sizeof(uint64_t));
+    uint64_t *words = (uint64_t *) palloc(length * sizeof(uint64_t));
 
     bitset->words = words;
     bitset->length = length;
@@ -46,7 +46,7 @@ inline void bitset_init_alloc(BitSet *restrict const bitset, int size)
 inline void bitset_init_empty(BitSet *restrict const bitset, int size)
 {
     int length = (size + BITS_PER_WORD - 1) >> ADDRESS_BITS_PER_WORD;
-    uint64_t *words = palloc0(length * sizeof(uint64_t));
+    uint64_t *words = (uint64_t *) palloc0(length * sizeof(uint64_t));
 
     bitset->words = words;
     bitset->length = length;
@@ -57,7 +57,7 @@ inline void bitset_init_empty(BitSet *restrict const bitset, int size)
 inline void bitset_init_setted(BitSet *restrict const bitset, int size)
 {
     int length = (size + BITS_PER_WORD - 1) >> ADDRESS_BITS_PER_WORD;
-    uint64_t *words = palloc(length * sizeof(uint64_t));
+    uint64_t *words = (uint64_t *) palloc(length * sizeof(uint64_t));
 
     for(int i = 0; i < length - 1; i++)
         words[i] = WORD_MASK;
@@ -78,7 +78,7 @@ inline void bitset_init_from_array(BitSet *restrict const bitset, uint8_t *data,
         idx--;
 
     int wordsInUse = (idx + 7) / 8;
-    uint64_t *words = palloc(wordsInUse * sizeof(uint64_t));
+    uint64_t *words = (uint64_t *) palloc(wordsInUse * sizeof(uint64_t));
 
     int i = 0;
 
