@@ -2,12 +2,8 @@
 #ifndef _FPSEARCH_LIB_H
 #define _FPSEARCH_LIB_H
 
-#define restrict //lol
-#define likely(x)       __builtin_expect(!!(x), 1)
-#define unlikely(x)     __builtin_expect(!!(x), 0)
-#define MOLECULE_H_NO_POSTGRES
 #include "../molecule.h"
-#undef restrict
+
 
 #ifndef FPSEARCH_API
 #define FPSEARCH_API(id) fplucy_##id

@@ -1,2 +1,2 @@
-SUBDIRS=src java
+SUBDIRS=lib src java
 ACLOCAL_AMFLAGS=-I m4

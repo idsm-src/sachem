@@ -9,6 +9,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#ifdef __cplusplus
+#define restrict
+#endif
 
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)
