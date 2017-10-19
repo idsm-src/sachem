@@ -79,18 +79,14 @@ struct fpsearch_data {
 	Schema *schema;
 
 	Indexer *indexer;
-	size_t docs_added;
+	size_t index_ops;
 
 	IndexSearcher *searcher;
 	QueryParser *qparser;
 
-	int graphSize;
-	int circSize;
-	int maxLogFeats;
-
-	int searchAtomCoverage;
-	int searchMaxFps;
 	std::map<std::string, int> fporder;
+
+	FPSEARCH_API (params_t) p;
 };
 
 static void close_indexer (fpsearch_data&d)
@@ -99,7 +95,7 @@ static void close_indexer (fpsearch_data&d)
 	Indexer_Commit (d.indexer);
 	DECREF (d.indexer); //TODO any strict unlocking needed?
 	d.indexer = nullptr;
-	d.docs_added = 0;
+	d.index_ops = 0;
 }
 
 static void close_searcher (fpsearch_data&d)
@@ -113,7 +109,8 @@ static void open_indexer (fpsearch_data&d)
 {
 	if (d.indexer) return; //already indexing!
 	close_searcher (d);
-	d.indexer = Indexer_new (d.schema, (Obj*) (d.folder), nullptr, Indexer_CREATE);
+	d.indexer = Indexer_new (d.schema, (Obj*) (d.folder),
+	                         nullptr, Indexer_CREATE);
 }
 
 static void open_searcher (fpsearch_data&d)
@@ -123,7 +120,8 @@ static void open_searcher (fpsearch_data&d)
 	d.searcher = IxSearcher_new ( (Obj*) (d.folder));
 }
 
-static inline RDKit::Bond::BondType bondtype_jg2rd (int multiplicity, bool isAromatic)
+static inline RDKit::Bond::BondType bondtype_jg2rd (int multiplicity,
+                                                    bool isAromatic)
 {
 	if (isAromatic) return RDKit::Bond::AROMATIC;
 	switch (multiplicity) {
@@ -166,11 +164,13 @@ static RDKit::ROMol* JGMol2RDMol (const Molecule*m)
 			int otherAtom = molecule_get_bond_list (m, i) [j];
 			if (otherAtom <= i) continue;
 			int bondData = molecule_get_bond_data
-			               (m, molecule_get_bond (m, i, otherAtom));
+			               (m, molecule_get_bond
+			                (m, i, otherAtom));
 			bool isAromatic = bondData & 0xc0;
 			int multiplicity = (bondData & 0x7c) >> 3;
 			rwm.addBond (atomMap[i], atomMap[otherAtom],
-			             bondtype_jg2rd (multiplicity, isAromatic));
+			             bondtype_jg2rd (multiplicity,
+			                             isAromatic));
 		}
 	}
 
@@ -178,19 +178,21 @@ static RDKit::ROMol* JGMol2RDMol (const Molecule*m)
 	return rom;
 }
 
-void index_commit (fpsearch_data&d)
+static void index_commit (fpsearch_data&d)
 {
 	Indexer_Commit (d.indexer);
-	d.docs_added = 0;
+	d.index_ops = 0;
 }
 
-void index_add (fpsearch_data&d, int guid, RDKit::ROMol*m)
+static void index_add (fpsearch_data&d, int guid, RDKit::ROMol*m)
 {
 	RDKit::SparseIntVect<uint32_t> *res
-	    = RDKit::IOCBFingerprints::getFingerprint (*m, d.graphSize, d.circSize, d.maxLogFeats);
+	    = RDKit::IOCBFingerprints::getFingerprint
+	      (*m, d.p.graphSize, d.p.circSize, d.p.maxLogFeats);
 	std::string fp;
 	fp.reserve (res->size() * 7);
-	for (auto&&i : res->getNonzeroElements()) fp.append (fp2str (i.first) + " ");
+	for (auto&&i : res->getNonzeroElements())
+		fp.append (fp2str (i.first) + " ");
 
 	std::string guids = std::to_string (guid);
 	Doc*doc = Doc_new (nullptr, 0);
@@ -209,19 +211,21 @@ void index_add (fpsearch_data&d, int guid, RDKit::ROMol*m)
 	Indexer_Add_Doc (d.indexer, doc, 1.0);
 	DECREF (doc);
 
-	++d.docs_added;
-	if (d.docs_added >= 10000) index_commit (d);
+	++d.index_ops;
+	if (d.index_ops >= d.p.indexerBatch) index_commit (d);
 }
 
-void index_remove (fpsearch_data&d, int guid)
+static void index_remove (fpsearch_data&d, int guid)
 {
 	std::string guids = std::to_string (guid);
 	String *value = Str_newf (guids.c_str());
 	Indexer_Delete_By_Term (d.indexer, d.guidF, (Obj*) value);
 	DECREF (value);
+	++d.index_ops;
+	if (d.index_ops >= d.p.indexerBatch) index_commit (d);
 }
 
-Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
+static Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
 {
 	auto* molh = JGMol2RDMol (m);
 	auto *mol = RDKit::MolOps::removeHs (*molh, false, false, false);
@@ -230,7 +234,7 @@ Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
 	RDKit::IOCBFingerprints::BitInfo bits;
 	RDKit::SparseIntVect<uint32_t> *res =
 	    RDKit::IOCBFingerprints::getFingerprint
-	    (*mol, d.graphSize, d.circSize, d.maxLogFeats, true, &bits);
+	    (*mol, d.p.graphSize, d.p.circSize, d.p.maxLogFeats, true, &bits);
 	int molAtoms = mol->getNumAtoms();
 	delete mol;
 
@@ -253,14 +257,14 @@ Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
 
 		for (auto&i : fpi) {
 			if (uncovered <= 0) break;
-			if (nfps >= d.searchMaxFps) break;
+			if (nfps >= d.p.searchMaxFps) break;
 			bool found = false;
 			for (auto&a : bits[i.second.first]) {
-				if (coverage[a] < d.searchAtomCoverage) {
+				if (coverage[a] < d.p.searchAtomCoverage) {
 					found = true;
 					++coverage[a];
 					if (coverage[a]
-					    == d.searchAtomCoverage)
+					    == d.p.searchAtomCoverage)
 						--uncovered;
 				}
 			}
@@ -313,14 +317,15 @@ void FPSEARCH_API (initialize) (void**ddp, const char*index_dir, const char*fp_o
 	d.qparser = QParser_new (d.schema, nullptr, d.boolop, nullptr);
 
 	d.indexer = nullptr;
-	d.docs_added = 0;
+	d.index_ops = 0;
 	d.searcher = nullptr;
 
-	d.graphSize = 7;
-	d.circSize = 3;
-	d.maxLogFeats = 5;
-	d.searchAtomCoverage = 2;
-	d.searchMaxFps = 32;
+	d.p.graphSize = 7;
+	d.p.circSize = 3;
+	d.p.maxLogFeats = 5;
+	d.p.searchAtomCoverage = 2;
+	d.p.searchMaxFps = 32;
+	d.p.indexerBatch = 10000;
 
 	d.fporder.clear();
 	{
@@ -343,6 +348,20 @@ void FPSEARCH_API (close) (void*dd)
 	DECREF (d.schema);
 	DECREF (d.qparser);
 	delete (fpsearch_data*) dd;
+}
+
+//retrieve the params
+void FPSEARCH_API (params_get) (void*dd, FPSEARCH_API (params_t) *pp)
+{
+	fpsearch_data&d = * (fpsearch_data*) dd;
+	*pp = d.p;
+}
+
+//set the params
+void FPSEARCH_API (params_set) (void*dd, const FPSEARCH_API (params_t) *pp)
+{
+	fpsearch_data&d = * (fpsearch_data*) dd;
+	d.p = *pp;
 }
 
 //returns a new search object
@@ -396,7 +415,18 @@ void FPSEARCH_API (remove_mol) (void*dd, int guid)
 }
 
 #if JUST_A_TEST
-inline void molecule_init (Molecule *const molecule, int atomsLength, uint8_t *atoms, int bondsLength, uint8_t *bonds, bool *restH, bool explitHonly)
+/*
+ * This isn't included in the library by default, but tests the implementation
+ * a bit. Compile using something like:
+ *
+ * g++ -Ipath/to/rdkit/Code -std=c++11 fpsearch-lucy.cpp -o fpsearch -DJUST_A_TEST -Lpath/to/rdkit/lib -lRDKitFingerprints -lRDKitDataStructs -lRDKitSubgraphs -lRDKitSubstructMatch -lRDKitGraphMol -lRDKitRDGeometryLib -lRDKitRDGeneral -lRDKitSmilesParse -llucy -lclownfish
+ *
+ * and run the resulting binary (it should print some information about that it
+ * found 123 at least once). Note that you need to prepare the `fporder.txt'
+ * file in advance.
+ */
+
+static inline void molecule_init (Molecule *const molecule, int atomsLength, uint8_t *atoms, int bondsLength, uint8_t *bonds, bool *restH, bool explitHonly)
 {
 	const int atomCount = atomsLength / ATOM_BLOCK_SIZE;
 	const int bondCount = bondsLength / BOND_BLOCK_SIZE;
@@ -465,7 +495,7 @@ int main()
 	bonds[0] = 0;
 	bonds[2] = 1;
 	bonds[3] = 1 << 3;
-	Molecule m;
+	Molecule m; //shall be ethane without hydrogens
 	molecule_init (&m, atoms.size(), atoms.data(), bonds.size(), bonds.data(), nullptr, true);
 
 	void *fpl, *s;
