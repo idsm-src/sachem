@@ -218,8 +218,8 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
                 MemoryContextDelete(info->table->tuptabcxt);
                 info->table = NULL;
 
-                float up = info->queryBitCount / info->highBucketNum;
-                float down = info->lowBucketNum / info->queryBitCount;
+                float up = info->queryBitCount / (float) info->highBucketNum;
+                float down = info->lowBucketNum / (float) info->queryBitCount;
 
                 if(up > down)
                 {
