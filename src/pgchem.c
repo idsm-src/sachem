@@ -4,6 +4,7 @@
 #include "simsearch.h"
 #include "subsearch.h"
 #include "subsearch-gin.h"
+#include "subsearch-lucy.h"
 
 
 PG_MODULE_MAGIC;
@@ -15,6 +16,7 @@ void __attribute__ ((constructor)) pgchemInit(void)
     simsearch_module_init();
     subsearch_module_init();
     subsearch_gin_module_init();
+    subsearch_lucy_module_init();
 }
 
 
@@ -24,4 +26,5 @@ void __attribute__ ((destructor)) pgchemFinish(void)
     simsearch_module_finish();
     subsearch_module_finish();
     subsearch_gin_module_finish();
+    subsearch_lucy_module_finish();
 }

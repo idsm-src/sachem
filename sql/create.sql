@@ -53,6 +53,8 @@ CREATE INDEX orchem_substructure_fingerprint__fp ON orchem_substructure_fingerpr
 
 CREATE FUNCTION "orchem_substructure_search"(varchar, varchar, int, boolean, boolean, boolean) RETURNS SETOF int AS 'libpgchem.so','orchem_substructure_search' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "orchem_substructure_gin_search"(varchar, varchar, int, boolean, boolean, boolean) RETURNS SETOF int AS 'libpgchem.so','orchem_substructure_gin_search' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION "lucy_substructure_search"(varchar, varchar, float4, int) RETURNS TABLE (compound int, score float4) AS 'libpgchem.so','lucy_substructure_search' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "orchem_similarity_search"(varchar, varchar, float4, int) RETURNS TABLE (compound int, score float4) AS 'libpgchem.so','orchem_similarity_search' LANGUAGE C IMMUTABLE STRICT;
 
 CREATE FUNCTION "orchem_substructure_write_indexes"() RETURNS bool AS 'libpgchem.so','orchem_substructure_write_indexes' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION "lucy_substructure_create_index"() RETURNS bool AS 'libpgchem.so','lucy_substructure_create_index' LANGUAGE C IMMUTABLE STRICT;
