@@ -230,10 +230,12 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
             if(unlikely(info->tableRowPosition == info->tableRowCount))
             {
                 if(info->table != NULL)
+                {
                     MemoryContextDelete(info->table->tuptabcxt);
+                    info->table = NULL;
+                }
 
-
-                while(info->candidatePosition < 0)
+                if(info->candidatePosition < 0)
                 {
                     info->queryDataPosition++;
 
@@ -262,7 +264,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                 }
 
 
-                int32 *arrayAata = (int32 *) ARR_DATA_PTR(info->arrayBuffer);
+                int32 *arrayData = (int32 *) ARR_DATA_PTR(info->arrayBuffer);
                 QueryData *data = &(info->queryData[info->queryDataPosition]);
 
                 int count = 0;
@@ -283,13 +285,13 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
                     if(isValid)
 #endif
-                        arrayAata[count++] = Int32GetDatum(info->candidatePosition);
+                        arrayData[count++] = info->candidatePosition;
 
                     info->candidatePosition = bitset_next_set_bit(&info->candidates, info->candidatePosition + 1);
                 }
 
                 if(unlikely(count == 0))
-                    break;
+                    continue;
 
 
                 *(ARR_DIMS(info->arrayBuffer)) = count;
