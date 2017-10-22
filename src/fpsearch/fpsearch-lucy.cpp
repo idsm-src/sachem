@@ -243,11 +243,19 @@ static Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
 
 	//convert and pre-sort the fingerprints
 	std::map<int, std::pair<uint32_t, std::string> > fpi;
+	int unknownId = -1;
 	for (auto&&i : res->getNonzeroElements()) {
 		std::string fp = fp2str (i.first);
 		auto o = d.fporder.find (fp);
-		if (o == d.fporder.end()) continue; //TODO complain?
-		fpi[o->second] = std::make_pair (i.first, fp);
+		if (o == d.fporder.end())
+			/* this is a hack: if the fingerprint is not known to
+			 * fporder (which it should be but keeping that
+			 * database in shape isn't very easy), let's assume
+			 * it's very good (and put it on the beginning of the
+			 * queue... :] ) */
+			fpi[unknownId--] = std::make_pair (i.first, fp);
+		else
+			fpi[o->second] = std::make_pair (i.first, fp);
 	}
 	delete res;
 
