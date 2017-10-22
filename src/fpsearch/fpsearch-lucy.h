@@ -38,7 +38,7 @@ typedef struct FPSEARCH_API (params_t)
 /* fplucy_initialize
  * returns the initialized `dd` object
  */
-void* FPSEARCH_API (initialize) (const char *index_dir,
+void FPSEARCH_API (initialize) (void**ddp, const char *index_dir,
                                  const char *fp_ordering_file);
 
 /* fplucy_close
