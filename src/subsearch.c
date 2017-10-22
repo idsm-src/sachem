@@ -230,10 +230,12 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
             if(unlikely(info->tableRowPosition == info->tableRowCount))
             {
                 if(info->table != NULL)
+                {
                     MemoryContextDelete(info->table->tuptabcxt);
+                    info->table = NULL;
+                }
 
-
-                while(info->candidatePosition < 0)
+                if(info->candidatePosition < 0)
                 {
                     info->queryDataPosition++;
 
@@ -289,7 +291,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                 }
 
                 if(unlikely(count == 0))
-                    break;
+                    continue;
 
 
                 *(ARR_DIMS(info->arrayBuffer)) = count;
