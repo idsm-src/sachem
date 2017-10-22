@@ -14,7 +14,7 @@ extern "C" {
 #endif
 
 /* all parameters for indexing/searching */
-struct FPSEARCH_API (params_t)
+typedef struct FPSEARCH_API (params_t)
 {
 	/* max bonds in subgraph fingerprints */
 	unsigned graphSize;
@@ -33,7 +33,7 @@ struct FPSEARCH_API (params_t)
 
 	/* how many index operations to perform before committing to disk */
 	unsigned indexerBatch;
-};
+} FPSEARCH_API (params_t);
 
 /* fplucy_initialize
  * returns the initialized `dd` object
@@ -61,7 +61,7 @@ void FPSEARCH_API (params_set) (void *dd, const FPSEARCH_API (params_t) *pp);
  */
 void* FPSEARCH_API (search) (void *dd,
                              const Molecule *mol,
-                             int max_results = 1000000);
+                             int max_results);
 
 /* fplucy_search_fillbuf
  * output `n` matches of `ss` to pre-allocated array `results`,
