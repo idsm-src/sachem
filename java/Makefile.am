@@ -1,7 +1,7 @@
 bin_SCRIPTS = inchi/inchi-1
 
 jar_DATA = lib/cdk-2.0.jar orchem.jar
-jardir = $(prefix)/$(PACKAGE)/jar
+jardir = $(datadir)/$(PACKAGE)/jar
 
 orchem.jar: force-build
 
