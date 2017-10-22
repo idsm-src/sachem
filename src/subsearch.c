@@ -283,7 +283,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
                     if(isValid)
 #endif
-                        arrayData[count++] = Int32GetDatum(info->candidatePosition);
+                        arrayData[count++] = info->candidatePosition;
 
                     info->candidatePosition = bitset_next_set_bit(&info->candidates, info->candidatePosition + 1);
                 }
