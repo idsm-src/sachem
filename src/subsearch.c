@@ -262,7 +262,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                 }
 
 
-                int32 *arrayAata = (int32 *) ARR_DATA_PTR(info->arrayBuffer);
+                int32 *arrayData = (int32 *) ARR_DATA_PTR(info->arrayBuffer);
                 QueryData *data = &(info->queryData[info->queryDataPosition]);
 
                 int count = 0;
@@ -283,7 +283,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
                     if(isValid)
 #endif
-                        arrayAata[count++] = Int32GetDatum(info->candidatePosition);
+                        arrayData[count++] = Int32GetDatum(info->candidatePosition);
 
                     info->candidatePosition = bitset_next_set_bit(&info->candidates, info->candidatePosition + 1);
                 }
