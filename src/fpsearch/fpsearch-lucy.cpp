@@ -93,7 +93,7 @@ static void close_indexer (fpsearch_data&d)
 {
 	if (!d.indexer) return;
 	Indexer_Commit (d.indexer);
-	DECREF (d.indexer); //TODO any strict unlocking needed?
+	DECREF (d.indexer);
 	d.indexer = nullptr;
 	d.index_ops = 0;
 }
