@@ -496,6 +496,7 @@ void orchem_substructure_write_count_index()
     }
 
 
+    SPI_cursor_close(cursor);
     SPI_finish();
 
     if(close(fd) != 0)
