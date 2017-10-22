@@ -181,6 +181,9 @@ static RDKit::ROMol* JGMol2RDMol (const Molecule*m)
 static void index_commit (fpsearch_data&d)
 {
 	Indexer_Commit (d.indexer);
+	DECREF (d.indexer);
+	d.indexer = Indexer_new (d.schema, (Obj*) (d.folder),
+	                         nullptr, Indexer_CREATE);
 	d.index_ops = 0;
 }
 
