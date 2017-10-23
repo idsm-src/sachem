@@ -1,4 +1,11 @@
 
+#ifdef JUST_A_TEST
+#define MOLECULE_H_NO_POSTGRES
+#define restrict
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+#endif
+
 #include "fpsearch-lucy.h"
 
 #include <fstream>
@@ -516,7 +523,7 @@ int main()
 
 	fplucy_add_mol (fpl, 123, &m);
 
-	s = fplucy_search (fpl, &m);
+	s = fplucy_search (fpl, &m, 1000000);
 	std::vector<int> rs;
 	rs.resize (10);
 	int rn = fplucy_search_fillbuf (fpl, s, rs.data(), 10);
