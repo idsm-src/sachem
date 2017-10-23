@@ -196,6 +196,7 @@ static void index_add (fpsearch_data&d, int guid, RDKit::ROMol*m)
 	fp.reserve (res->size() * 7);
 	for (auto&&i : res->getNonzeroElements())
 		fp.append (fp2str (i.first) + " ");
+	delete res;
 
 	std::string guids = std::to_string (guid);
 	Doc*doc = Doc_new (nullptr, 0);
@@ -394,7 +395,7 @@ int FPSEARCH_API (search_fillbuf) (void*dd, void*ss, int*results, int n)
 		HitDoc*hit = Hits_Next (hits);
 		if (!hit) break;
 		String*guid = (String*) HitDoc_Extract (hit, d.guidF);
-		* (results++) = std::atoi (Str_To_Utf8 (guid));
+		* (results++) = Str_To_I64 (guid);
 		++ret;
 		--n;
 		DECREF (guid);
