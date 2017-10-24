@@ -33,13 +33,14 @@ typedef struct FPSEARCH_API (params_t)
 
 	/* how many index operations to perform before committing to disk */
 	unsigned indexerBatch;
-} FPSEARCH_API (params_t);
+}
+FPSEARCH_API (params_t);
 
 /* fplucy_initialize
  * returns the initialized `dd` object
  */
 void FPSEARCH_API (initialize) (void**ddp, const char *index_dir,
-                                 const char *fp_ordering_file);
+                                const char *fp_ordering_file);
 
 /* fplucy_close
  * safely close the index

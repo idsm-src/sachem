@@ -13,6 +13,8 @@
 #include <map>
 #include <set>
 
+#include <pthread.h>
+
 #define CFISH_USE_SHORT_NAMES
 #define LUCY_USE_SHORT_NAMES
 #include <Clownfish/String.h>
@@ -82,11 +84,13 @@ static Schema* create_schema (String*guidF, String*fpF)
  */
 
 struct fpsearch_data {
+	pthread_mutex_t buffer_mtx;
+	std::list<Doc*> buffer;
+	size_t bufsize;
+	pthread_mutex_t index_mtx;
+
 	String *folder, *guidF, *fpF, *boolop;
 	Schema *schema;
-
-	Indexer *indexer;
-	size_t index_ops;
 
 	IndexSearcher *searcher;
 	QueryParser *qparser;
@@ -96,28 +100,48 @@ struct fpsearch_data {
 	FPSEARCH_API (params_t) p;
 };
 
+static void commit_buffer (fpsearch_data&d, bool force)
+{
+	std::list<Doc*> batch;
+
+	pthread_mutex_lock (&d.buffer_mtx);
+	if (force || d.bufsize > d.p.indexerBatch) {
+		batch.swap (d.buffer);
+		d.bufsize = 0;
+	}
+	pthread_mutex_unlock (&d.buffer_mtx);
+
+	if (batch.empty()) return;
+
+	pthread_mutex_lock (&d.index_mtx);
+	Indexer *indexer = Indexer_new (d.schema, (Obj*) (d.folder),
+	                                nullptr, Indexer_CREATE);
+	for (Doc*doc : batch) {
+		Indexer_Add_Doc (indexer, doc, 1.0);
+		DECREF (doc);
+	}
+	Indexer_Commit (indexer);
+	DECREF (indexer);
+	pthread_mutex_unlock (&d.index_mtx);
+}
+
 static void close_indexer (fpsearch_data&d)
 {
-	if (!d.indexer) return;
-	Indexer_Commit (d.indexer);
-	DECREF (d.indexer);
-	d.indexer = nullptr;
-	d.index_ops = 0;
+	commit_buffer (d, true);
 }
 
 static void close_searcher (fpsearch_data&d)
 {
 	if (!d.searcher) return;
+	pthread_mutex_lock (&d.index_mtx); //this may be called from add_mol
 	DECREF (d.searcher);
 	d.searcher = nullptr;
+	pthread_mutex_unlock (&d.index_mtx);
 }
 
 static void open_indexer (fpsearch_data&d)
 {
-	if (d.indexer) return; //already indexing!
 	close_searcher (d);
-	d.indexer = Indexer_new (d.schema, (Obj*) (d.folder),
-	                         nullptr, Indexer_CREATE);
 }
 
 static void open_searcher (fpsearch_data&d)
@@ -185,15 +209,6 @@ static RDKit::ROMol* JGMol2RDMol (const Molecule*m)
 	return rom;
 }
 
-static void index_commit (fpsearch_data&d)
-{
-	Indexer_Commit (d.indexer);
-	DECREF (d.indexer);
-	d.indexer = Indexer_new (d.schema, (Obj*) (d.folder),
-	                         nullptr, Indexer_CREATE);
-	d.index_ops = 0;
-}
-
 static void index_add (fpsearch_data&d, int guid, RDKit::ROMol*m)
 {
 	RDKit::SparseIntVect<uint32_t> *res
@@ -219,21 +234,33 @@ static void index_add (fpsearch_data&d, int guid, RDKit::ROMol*m)
 		DECREF (value);
 	}
 
-	Indexer_Add_Doc (d.indexer, doc, 1.0);
-	DECREF (doc);
+	std::list<Doc*> batch;
 
-	++d.index_ops;
-	if (d.index_ops >= d.p.indexerBatch) index_commit (d);
+	pthread_mutex_lock (&d.buffer_mtx);
+	d.buffer.push_back (doc);
+	size_t bs = ++d.bufsize;
+	pthread_mutex_unlock (&d.buffer_mtx);
+
+	if (bs > d.p.indexerBatch)
+		commit_buffer (d, false);
 }
 
 static void index_remove (fpsearch_data&d, int guid)
 {
 	std::string guids = std::to_string (guid);
+	pthread_mutex_lock (&d.index_mtx);
+
+	Indexer *indexer = Indexer_new (d.schema, (Obj*) (d.folder),
+	                                nullptr, Indexer_CREATE);
 	String *value = Str_newf (guids.c_str());
-	Indexer_Delete_By_Term (d.indexer, d.guidF, (Obj*) value);
+
+	Indexer_Delete_By_Term (indexer, d.guidF, (Obj*) value);
 	DECREF (value);
-	++d.index_ops;
-	if (d.index_ops >= d.p.indexerBatch) index_commit (d);
+
+	Indexer_Commit (indexer);
+	DECREF (indexer);
+
+	pthread_mutex_unlock (&d.index_mtx);
 }
 
 static Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
@@ -328,16 +355,17 @@ void FPSEARCH_API (initialize) (void**ddp, const char*index_dir, const char*fp_o
 
 	*ddp = new fpsearch_data;
 	fpsearch_data&d = * (fpsearch_data*) *ddp;
+
+	d.buffer_mtx = PTHREAD_MUTEX_INITIALIZER;
+	d.bufsize = 0;
+	d.index_mtx = PTHREAD_MUTEX_INITIALIZER;
+
 	d.folder = Str_newf (index_dir);
 	d.guidF = Str_newf ("guid");
 	d.fpF = Str_newf ("fp");
 	d.boolop = Str_newf ("AND");
 	d.schema = create_schema (d.guidF, d.fpF);
 	d.qparser = QParser_new (d.schema, nullptr, d.boolop, nullptr);
-
-	d.indexer = nullptr;
-	d.index_ops = 0;
-	d.searcher = nullptr;
 
 	d.p.graphSize = 7;
 	d.p.circSize = 3;
