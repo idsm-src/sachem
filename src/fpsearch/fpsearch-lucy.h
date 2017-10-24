@@ -92,6 +92,11 @@ void FPSEARCH_API (add_mol) (void *dd,
 void FPSEARCH_API (remove_mol) (void *dd,
                                 int guid);
 
+/* fplucy_optimize
+ * rearranges the index so that searching is faster
+ */
+void FPSEARCH_API (optimize) (void *dd);
+
 #ifdef __cplusplus
 }
 #endif
