@@ -6,6 +6,7 @@
 #include <utils/array.h>
 #include <utils/builtins.h>
 #include <utils/memutils.h>
+#include <pthread.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -60,6 +61,7 @@ typedef struct
 static bool initialised = false;
 static SPIPlanPtr mainQueryPlan;
 static void *fplucy;
+static pthread_mutex_t indexMutex;
 
 
 void subsearch_lucy_module_init(void)
@@ -356,6 +358,67 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 }
 
 
+void *lucy_substructure_process_spi_table(void* idx)
+{
+    pthread_mutex_lock(&indexMutex);
+    MemoryContext indexContext = AllocSetContextCreate(CurrentMemoryContext, "index thread context",
+            ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
+    pthread_mutex_unlock(&indexMutex);
+
+
+    while(true)
+    {
+        pthread_mutex_lock(&indexMutex);
+        MemoryContextReset(indexContext);
+
+        volatile int *index = (volatile int*) idx;
+        int i = *index;
+
+        if(i >= SPI_processed)
+            break;
+
+        HeapTuple tuple = SPI_tuptable->vals[i];
+        char isNullFlag;
+
+
+        Datum seqid = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
+
+        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+            elog(ERROR, "lucy_substructure_create_index: SPI_getbinval() failed");
+
+
+        Datum atoms = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 2, &isNullFlag);
+
+        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+            elog(ERROR, "lucy_substructure_create_index: SPI_getbinval() failed");
+
+
+        Datum bonds = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 3, &isNullFlag);
+
+        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+            elog(ERROR, "lucy_substructure_create_index: SPI_getbinval() failed");
+
+
+        Molecule molecule;
+
+        PG_MEMCONTEXT_BEGIN(indexContext);
+        bytea *atomsData = DatumGetByteaP(atoms);
+        bytea *bondsData = DatumGetByteaP(bonds);
+        molecule_init(&molecule, VARSIZE(atomsData) - VARHDRSZ, VARDATA(atomsData), VARSIZE(bondsData) - VARHDRSZ, VARDATA(bondsData), NULL, false);
+        PG_MEMCONTEXT_END();
+
+        (*index)++;
+        pthread_mutex_unlock(&indexMutex);
+
+        fplucy_add_mol(fplucy, DatumGetInt32(seqid), &molecule);
+    }
+
+
+    pthread_mutex_unlock(&indexMutex);
+    pthread_exit((void*) 0);
+}
+
+
 PG_FUNCTION_INFO_V1(lucy_substructure_create_index);
 Datum lucy_substructure_create_index(PG_FUNCTION_ARGS)
 {
@@ -367,12 +430,15 @@ Datum lucy_substructure_create_index(PG_FUNCTION_ARGS)
          elog(ERROR, "lucy_substructure_create_index: SPI_connect() failed");
 
 
-    Portal cursor = SPI_cursor_open_with_args(NULL, "select seqid, atoms, bonds from " MOLECULES_TABLE " order by seqid",
+    Portal cursor = SPI_cursor_open_with_args(NULL, "select seqid, atoms, bonds from " MOLECULES_TABLE,
             0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
     if(unlikely(cursor == NULL))
             elog(ERROR, "lucy_substructure_create_index: SPI_cursor_open_with_args() failed");
 
+
+    int countOfThread = sysconf(_SC_NPROCESSORS_ONLN);
+    int processed = 0;
 
     while(true)
     {
@@ -385,41 +451,28 @@ Datum lucy_substructure_create_index(PG_FUNCTION_ARGS)
             break;
 
 
-        for(int i = 0; i < SPI_processed; i++)
-        {
-            HeapTuple tuple = SPI_tuptable->vals[i];
-            char isNullFlag;
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
+        int idx = 0;
+        pthread_t threads[countOfThread];
+        pthread_mutex_init(&indexMutex, NULL);
 
-            Datum seqid = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
+        for(int i = 0; i < countOfThread; i++)
+            pthread_create(&threads[i], &attr, lucy_substructure_process_spi_table, (void *) &idx);
 
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "lucy_substructure_create_index: SPI_getbinval() failed");
+        pthread_attr_destroy(&attr);
 
+        void *status;
 
-            Datum atoms = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 2, &isNullFlag);
+        for(int i = 0; i < countOfThread; i++)
+            pthread_join(threads[i], &status);
 
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "lucy_substructure_create_index: SPI_getbinval() failed");
+        pthread_mutex_destroy(&indexMutex);
 
-
-            Datum bonds = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 3, &isNullFlag);
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "lucy_substructure_create_index: SPI_getbinval() failed");
-
-
-            PG_MEMCONTEXT_BEGIN(indexContext);
-            bytea *atomsData = DatumGetByteaP(atoms);
-            bytea *bondsData = DatumGetByteaP(bonds);
-
-            Molecule molecule;
-            molecule_init(&molecule, VARSIZE(atomsData) - VARHDRSZ, VARDATA(atomsData), VARSIZE(bondsData) - VARHDRSZ, VARDATA(bondsData), NULL, false);
-            fplucy_add_mol(fplucy, DatumGetInt32(seqid), &molecule);
-
-            PG_MEMCONTEXT_END();
-            MemoryContextReset(indexContext);
-        }
+        processed += SPI_processed;
+        elog(NOTICE, "already processed: %i", processed);
 
         SPI_freetuptable(SPI_tuptable);
     }
