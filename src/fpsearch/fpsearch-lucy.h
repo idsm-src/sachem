@@ -86,6 +86,11 @@ void FPSEARCH_API (add_mol) (void *dd,
                              int guid,
                              const Molecule*mol);
 
+/* fplucy_flush
+ * commit molecules from add_mol that are waiting in write buffer
+ */
+void FPSEARCH_API (flush) (void *dd);
+
 /* fplucy_remove_mol
  * removes the molecule identified by `guid` from the index `dd`
  */

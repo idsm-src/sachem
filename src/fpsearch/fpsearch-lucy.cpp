@@ -127,6 +127,8 @@ static void commit_buffer (fpsearch_data&d, bool force)
 
 static void index_optimize (fpsearch_data&d)
 {
+	commit_buffer (d, true);
+
 	pthread_mutex_lock (&d.index_mtx);
 	Indexer *indexer = Indexer_new (d.schema, (Obj*) (d.folder),
 	                                nullptr, Indexer_CREATE);
@@ -470,6 +472,13 @@ void FPSEARCH_API (remove_mol) (void*dd, int guid)
 	fpsearch_data&d = * (fpsearch_data*) dd;
 	open_indexer (d);
 	index_remove (d, guid);
+}
+
+void FPSEARCH_API (flush) (void*dd)
+{
+	fpsearch_data&d = * (fpsearch_data*) dd;
+	open_indexer (d);
+	commit_buffer (d, true);
 }
 
 void FPSEARCH_API (optimize) (void*dd)
