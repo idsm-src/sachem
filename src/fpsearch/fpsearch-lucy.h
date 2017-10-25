@@ -80,11 +80,12 @@ void FPSEARCH_API (search_finish) (void *dd,
                                    void *ss);
 
 /* fplucy_add_mol
- * adds molecule with `guid` identifier to index `dd`
+ * adds molecule with `guid` identifier to index `dd`,
+ * return non-zero on error
  */
-void FPSEARCH_API (add_mol) (void *dd,
-                             int guid,
-                             const Molecule*mol);
+int FPSEARCH_API (add_mol) (void *dd,
+                            int guid,
+                            const Molecule*mol);
 
 /* fplucy_flush
  * commit molecules from add_mol that are waiting in write buffer

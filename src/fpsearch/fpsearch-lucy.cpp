@@ -467,13 +467,15 @@ void FPSEARCH_API (search_finish) (void*dd, void*ss)
 	DECREF ( (Hits*) ss);
 }
 
-void FPSEARCH_API (add_mol) (void*dd, int guid, const Molecule*mol)
+int FPSEARCH_API (add_mol) (void*dd, int guid, const Molecule*mol)
 {
 	fpsearch_data&d = * (fpsearch_data*) dd;
 	open_indexer (d);
 	auto*m = JGMol2RDMol (mol);
+	if (!m) return 1;
 	index_add (d, guid, m);
 	delete m;
+	return 0;
 }
 
 void FPSEARCH_API (remove_mol) (void*dd, int guid)
