@@ -189,37 +189,41 @@ static inline RDKit::Bond::BondType bondtype_jg2rd (int multiplicity,
 //caller responsible for deallocating the ROMol
 static RDKit::ROMol* JGMol2RDMol (const Molecule*m)
 {
-	RDKit::RWMol rwm;
-	std::map<int, int> atomMap;
+	try {
+		RDKit::RWMol rwm;
+		std::map<int, int> atomMap;
 
-	for (int i = 0; i < m->atomCount; ++i) {
-		RDKit::Atom* a = new RDKit::Atom();
-		a->setAtomicNum (molecule_get_atom_number (m, i));
-		a->setFormalCharge (molecule_get_formal_charge (m, i));
-		a->setNumExplicitHs (molecule_get_hydrogen_count (m, i));
-		a->setNoImplicit (true); //no implicit Hs
-		//TODO: pseudoAtom?
-		atomMap[i] = rwm.addAtom (a, false, true);
-	}
-
-	for (int i = 0; i < m->atomCount; ++i) {
-		int nbs = molecule_get_bond_list_size (m, i);
-		for (int j = 0; j < nbs; ++j) {
-			int otherAtom = molecule_get_bond_list (m, i) [j];
-			if (otherAtom <= i) continue;
-			int bondData = molecule_get_bond_data
-			               (m, molecule_get_bond
-			                (m, i, otherAtom));
-			bool isAromatic = bondData & 0xc0;
-			int multiplicity = (bondData & 0x7c) >> 3;
-			rwm.addBond (atomMap[i], atomMap[otherAtom],
-			             bondtype_jg2rd (multiplicity,
-			                             isAromatic));
+		for (int i = 0; i < m->atomCount; ++i) {
+			RDKit::Atom* a = new RDKit::Atom();
+			int aNum = molecule_get_atom_number (m, i);
+			a->setAtomicNum (aNum > 0 ? aNum : 0);
+			a->setFormalCharge (molecule_get_formal_charge (m, i));
+			a->setNumExplicitHs (molecule_get_hydrogen_count (m, i));
+			a->setNoImplicit (true); //no implicit Hs
+			atomMap[i] = rwm.addAtom (a, false, true);
 		}
-	}
 
-	RDKit::ROMol *rom = new RDKit::ROMol (rwm);
-	return rom;
+		for (int i = 0; i < m->atomCount; ++i) {
+			int nbs = molecule_get_bond_list_size (m, i);
+			for (int j = 0; j < nbs; ++j) {
+				int otherAtom = molecule_get_bond_list (m, i) [j];
+				if (otherAtom <= i) continue;
+				int bondData = molecule_get_bond_data
+				               (m, molecule_get_bond
+				                (m, i, otherAtom));
+				bool isAromatic = bondData & 0xc0;
+				int multiplicity = (bondData & 0x7c) >> 3;
+				rwm.addBond (atomMap[i], atomMap[otherAtom],
+				             bondtype_jg2rd (multiplicity,
+				                             isAromatic));
+			}
+		}
+
+		RDKit::ROMol *rom = new RDKit::ROMol (rwm);
+		return rom;
+	} catch (...) {
+		return nullptr;
+	}
 }
 
 static void index_add (fpsearch_data&d, int guid, RDKit::ROMol*m)
