@@ -148,8 +148,10 @@ static void close_searcher (fpsearch_data&d)
 {
 	if (!d.searcher) return;
 	pthread_mutex_lock (&d.index_mtx); //this may be called from add_mol
-	DECREF (d.searcher);
-	d.searcher = nullptr;
+	if (d.searcher) {
+	    DECREF (d.searcher);
+	    d.searcher = nullptr;
+	}
 	pthread_mutex_unlock (&d.index_mtx);
 }
 
