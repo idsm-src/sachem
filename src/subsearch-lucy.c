@@ -422,6 +422,9 @@ void *lucy_substructure_process_spi_table(void* idx)
 PG_FUNCTION_INFO_V1(lucy_substructure_create_index);
 Datum lucy_substructure_create_index(PG_FUNCTION_ARGS)
 {
+    createBasePath();
+
+
     MemoryContext indexContext = AllocSetContextCreate(CurrentMemoryContext, "lucy indexing context",
             ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
 
