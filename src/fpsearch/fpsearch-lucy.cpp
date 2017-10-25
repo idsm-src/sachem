@@ -283,8 +283,13 @@ static void index_remove (fpsearch_data&d, int guid)
 static Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
 {
 	auto* molh = JGMol2RDMol (m);
+	if (!molh) return nullptr;
+#if EXPLICITLY_REMOVE_HS
 	auto *mol = RDKit::MolOps::removeHs (*molh, false, false, false);
 	delete molh;
+#else
+	auto*mol = molh;
+#endif
 
 	RDKit::IOCBFingerprints::BitInfo bits;
 	RDKit::SparseIntVect<uint32_t> *res =
