@@ -12,7 +12,7 @@ import cz.iocb.orchem.shared.MoleculeCreator;
 
 
 
-public class SimilaritySearch
+public class OrchemSimilaritySearch
 {
     private static final String QUERY_TYPE_MOL = "MOL";
     private static final String QUERY_TYPE_SMILES = "SMILES";

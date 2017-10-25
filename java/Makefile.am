@@ -28,7 +28,8 @@ EXTRA_DIST = \
     src/cz/iocb/orchem/load/ConnectionPool.java \
     src/cz/iocb/orchem/load/OrChemLoader.java \
     src/cz/iocb/orchem/search/OrchemMoleculeBuilder.java \
-    src/cz/iocb/orchem/search/SimilaritySearch.java \
+    src/cz/iocb/orchem/search/OrchemSimilaritySearch.java \
+    src/cz/iocb/orchem/search/OrchemSubstructureSearch.java \
     src/cz/iocb/orchem/search/SubstructureSearch.java \
     src/cz/iocb/orchem/shared/MoleculeCounts.java \
     src/cz/iocb/orchem/shared/MoleculeCreator.java \

@@ -54,18 +54,24 @@
 static bool initialised = false;
 static JavaVM* jvm = NULL;
 static JNIEnv* env = NULL;
+static jclass exceptionClass = NULL;
+static jmethodID toStringMethod = NULL;
+
 static jclass substructureSearchClass = NULL;
 static jclass substructureQueryDataClass = NULL;
-static jmethodID queryDataMethod = NULL;
-static jfieldID countsField = NULL;
-static jfieldID fpField = NULL;
 static jfieldID atomsField = NULL;
 static jfieldID bondsField = NULL;
 static jfieldID restHField = NULL;
-static jclass exceptionClass = NULL;
-static jmethodID toStringMethod = NULL;
-static jclass similaritySearchClass = NULL;
-static jmethodID similarityQueryDataMethod = NULL;
+static jmethodID substructureQueryDataMethod = NULL;
+
+static jclass orchemSubstructureSearchClass = NULL;
+static jclass orchemSubstructureQueryDataClass = NULL;
+static jfieldID countsField = NULL;
+static jfieldID fpField = NULL;
+static jmethodID orchemSubstructureQueryDataMethod = NULL;
+
+static jclass orchemSimilaritySearchClass = NULL;
+static jmethodID orchemSimilarityQueryDataMethod = NULL;
 
 
 static inline void java_check_exception(const char *str)
@@ -110,19 +116,17 @@ void java_module_init(void)
         elog(ERROR, "cannot initialize JVM");
 
 
+    exceptionClass = (*env)->FindClass(env, "java/lang/Throwable");
+    java_check_exception("java_module_init()");
+
+    toStringMethod = (*env)->GetMethodID(env, exceptionClass, "toString", "()Ljava/lang/String;");
+    java_check_exception("java_module_init()");
+
+
     substructureSearchClass = (*env)->FindClass(env, "cz/iocb/orchem/search/SubstructureSearch");
     java_check_exception("java_module_init()");
 
-    substructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/SubstructureSearch$SubstructureQueryData");
-    java_check_exception("java_module_init()");
-
-    queryDataMethod = (*env)->GetStaticMethodID(env, substructureSearchClass, "getQueryData", "([BLjava/lang/String;Z)[Lcz/iocb/orchem/search/SubstructureSearch$SubstructureQueryData;");
-    java_check_exception("java_module_init()");
-
-    countsField = (*env)->GetFieldID(env, substructureQueryDataClass, "counts", "[S");
-    java_check_exception("java_module_init()");
-
-    fpField = (*env)->GetFieldID(env, substructureQueryDataClass, "fp", "[S");
+    substructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/SubstructureSearch$QueryData");
     java_check_exception("java_module_init()");
 
     atomsField = (*env)->GetFieldID(env, substructureQueryDataClass, "atoms", "[B");
@@ -134,17 +138,30 @@ void java_module_init(void)
     restHField = (*env)->GetFieldID(env, substructureQueryDataClass, "restH", "[Z");
     java_check_exception("java_module_init()");
 
-    exceptionClass = (*env)->FindClass(env, "java/lang/Throwable");
-    java_check_exception("java_module_init()");
-
-    toStringMethod = (*env)->GetMethodID(env, exceptionClass, "toString", "()Ljava/lang/String;");
+    substructureQueryDataMethod = (*env)->GetStaticMethodID(env, substructureSearchClass, "getQueryData", "([BLjava/lang/String;Z)[Lcz/iocb/orchem/search/SubstructureSearch$QueryData;");
     java_check_exception("java_module_init()");
 
 
-    similaritySearchClass = (*env)->FindClass(env, "cz/iocb/orchem/search/SimilaritySearch");
+    orchemSubstructureSearchClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemSubstructureSearch");
     java_check_exception("java_module_init()");
 
-    similarityQueryDataMethod = (*env)->GetStaticMethodID(env, similaritySearchClass, "getQueryData", "([BLjava/lang/String;)[J");
+    orchemSubstructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemSubstructureSearch$OrchemQueryData");
+    java_check_exception("java_module_init()");
+
+    countsField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "counts", "[S");
+    java_check_exception("java_module_init()");
+
+    fpField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "fp", "[S");
+    java_check_exception("java_module_init()");
+
+    orchemSubstructureQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSubstructureSearchClass, "getQueryData", "([BLjava/lang/String;Z)[Lcz/iocb/orchem/search/OrchemSubstructureSearch$OrchemQueryData;");
+    java_check_exception("java_module_init()");
+
+
+    orchemSimilaritySearchClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemSimilaritySearch");
+    java_check_exception("java_module_init()");
+
+    orchemSimilarityQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSimilaritySearchClass, "getQueryData", "([BLjava/lang/String;)[J");
     java_check_exception("java_module_init()");
 
 
@@ -159,7 +176,121 @@ void java_module_finish(void)
 }
 
 
-int java_parse_query(QueryData **data, char* query, size_t queryLength, char *type, bool tautomers)
+int java_parse_substructure_query(SubstructureQueryData **data, char* query, size_t queryLength, char *type, bool tautomers)
+{
+    if(initialised == false)
+        elog(ERROR, "java module is not properly initialized");
+
+
+    jbyteArray queryArg = NULL;
+    jstring typeArg = NULL;
+    jobjectArray result = NULL;
+    jobject element = NULL;
+    jshortArray countsArray = NULL;
+    jshortArray fpArray = NULL;
+    jbyteArray atomsArray = NULL;
+    jbyteArray bondsArray = NULL;
+    jbooleanArray  restHArray = NULL;
+    jbyte *atoms = NULL;
+    jbyte *bonds = NULL;
+    jboolean *restH = NULL;
+    jsize length = -1;
+
+
+    PG_TRY();
+    {
+        queryArg = (*env)->NewByteArray(env, queryLength);
+        java_check_exception("java_parse_substructure_query()");
+
+        (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte*) query);
+
+
+        typeArg = (*env)->NewStringUTF(env, type);
+        java_check_exception("java_parse_substructure_query()");
+
+
+        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, substructureSearchClass, substructureQueryDataMethod, queryArg, typeArg, (jboolean) tautomers);
+        java_check_exception("java_parse_substructure_query()");
+
+        JavaDeleteRef(queryArg);
+        JavaDeleteRef(typeArg);
+
+
+        length = (*env)->GetArrayLength(env, result);
+        SubstructureQueryData *results = (SubstructureQueryData *) palloc(length * sizeof(SubstructureQueryData));
+
+        for(int i = 0; i < length; i++)
+        {
+            element = (*env)->GetObjectArrayElement(env, result, i);
+
+            atomsArray = (jbyteArray)  (*env)->GetObjectField(env, element, atomsField);
+            bondsArray = (jbyteArray)  (*env)->GetObjectField(env, element, bondsField);
+            restHArray = (jbooleanArray)   (*env)->GetObjectField(env, element, restHField);
+
+            jsize atomsSize = (*env)->GetArrayLength(env, atomsArray);
+            jsize bondsSize = (*env)->GetArrayLength(env, bondsArray);
+            jsize restHSize = restHArray ? (*env)->GetArrayLength(env, restHArray) : -1;
+
+            atoms = (*env)->GetByteArrayElements(env, atomsArray, NULL);
+            java_check_exception("java_parse_substructure_query()");
+
+            bonds = (*env)->GetByteArrayElements(env, bondsArray, NULL);
+            java_check_exception("java_parse_substructure_query()");
+
+            restH = restHArray ? (*env)->GetBooleanArrayElements (env, restHArray, NULL) : 0;
+            java_check_exception("java_parse_substructure_query()");
+
+
+            results[i].atoms = (char *) palloc(atomsSize);
+            memcpy(results[i].atoms, atoms, atomsSize);
+
+            results[i].bonds = (char *) palloc(bondsSize);
+            memcpy(results[i].bonds, bonds, bondsSize);
+
+
+            if(restHArray)
+            {
+                results[i].restH = (bool *) palloc(restHSize * sizeof(bool));
+                memcpy(results[i].restH, restH, restHSize * sizeof(bool));
+            }
+            else
+            {
+                results[i].restH = NULL;
+            }
+
+            results[i].atomLength = atomsSize;
+            results[i].bondLength = bondsSize;
+
+            JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
+            JavaDeleteByteArray(bondsArray, bonds, JNI_ABORT);
+            JavaDeleteBooleanArray(restHArray, restH, JNI_ABORT);
+
+            JavaDeleteRef(element);
+        }
+
+        JavaDeleteRef(result);
+
+        *data = results;
+    }
+    PG_CATCH();
+    {
+        JavaDeleteRef(queryArg);
+        JavaDeleteRef(typeArg);
+        JavaDeleteRef(result);
+        JavaDeleteRef(element);
+        JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
+        JavaDeleteByteArray(bondsArray, bonds, JNI_ABORT);
+        JavaDeleteBooleanArray(restHArray, restH, JNI_ABORT);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
+
+    return length;
+}
+
+
+int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, char* query, size_t queryLength, char *type, bool tautomers)
 {
     if(initialised == false)
         elog(ERROR, "java module is not properly initialized");
@@ -185,24 +316,24 @@ int java_parse_query(QueryData **data, char* query, size_t queryLength, char *ty
     PG_TRY();
     {
         queryArg = (*env)->NewByteArray(env, queryLength);
-        java_check_exception("java_parse_query()");
+        java_check_exception("java_parse_orchem_substructure_query()");
 
         (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte*) query);
 
 
         typeArg = (*env)->NewStringUTF(env, type);
-        java_check_exception("java_parse_query()");
+        java_check_exception("java_parse_orchem_substructure_query()");
 
 
-        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, substructureSearchClass, queryDataMethod, queryArg, typeArg, (jboolean) tautomers);
-        java_check_exception("java_parse_query()");
+        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, orchemSubstructureSearchClass, orchemSubstructureQueryDataMethod, queryArg, typeArg, (jboolean) tautomers);
+        java_check_exception("java_parse_orchem_substructure_query()");
 
         JavaDeleteRef(queryArg);
         JavaDeleteRef(typeArg);
 
 
         length = (*env)->GetArrayLength(env, result);
-        QueryData *results = (QueryData *) palloc(length * sizeof(QueryData));
+        OrchemSubstructureQueryData *results = (OrchemSubstructureQueryData *) palloc(length * sizeof(OrchemSubstructureQueryData));
 
         for(int i = 0; i < length; i++)
         {
@@ -221,19 +352,19 @@ int java_parse_query(QueryData **data, char* query, size_t queryLength, char *ty
             jsize restHSize = restHArray ? (*env)->GetArrayLength(env, restHArray) : -1;
 
             counts = (*env)->GetShortArrayElements(env, countsArray, NULL);
-            java_check_exception("java_parse_query()");
+            java_check_exception("java_parse_orchem_substructure_query()");
 
             fp = (*env)->GetShortArrayElements(env, fpArray, NULL);
-            java_check_exception("java_parse_query()");
+            java_check_exception("java_parse_orchem_substructure_query()");
 
             atoms = (*env)->GetByteArrayElements(env, atomsArray, NULL);
-            java_check_exception("java_parse_query()");
+            java_check_exception("java_parse_orchem_substructure_query()");
 
             bonds = (*env)->GetByteArrayElements(env, bondsArray, NULL);
-            java_check_exception("java_parse_query()");
+            java_check_exception("java_parse_orchem_substructure_query()");
 
             restH = restHArray ? (*env)->GetBooleanArrayElements (env, restHArray, NULL) : 0;
-            java_check_exception("java_parse_query()");
+            java_check_exception("java_parse_orchem_substructure_query()");
 
 
             results[i].counts = (jshort *) palloc(countsSize * sizeof(jshort));
@@ -296,7 +427,7 @@ int java_parse_query(QueryData **data, char* query, size_t queryLength, char *ty
 }
 
 
-int java_parse_similarity_query(uint64_t **data, char* query, size_t queryLength, char *type)
+int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t queryLength, char *type)
 {
     if(initialised == false)
         elog(ERROR, "java module is not properly initialized");
@@ -311,15 +442,15 @@ int java_parse_similarity_query(uint64_t **data, char* query, size_t queryLength
     PG_TRY();
     {
         queryArg = (*env)->NewByteArray(env, queryLength);
-        java_check_exception("java_parse_similarity_query()");
+        java_check_exception("java_parse_orchem_similarity_query()");
 
         (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte*) query);
 
         typeArg = (*env)->NewStringUTF(env, type);
-        java_check_exception("java_parse_similarity_query()");
+        java_check_exception("java_parse_orchem_similarity_query()");
 
-        result = (jlongArray) (*env)->CallStaticObjectMethod(env, similaritySearchClass, similarityQueryDataMethod, queryArg, typeArg);
-        java_check_exception("java_parse_similarity_query()");
+        result = (jlongArray) (*env)->CallStaticObjectMethod(env, orchemSimilaritySearchClass, orchemSimilarityQueryDataMethod, queryArg, typeArg);
+        java_check_exception("java_parse_orchem_similarity_query()");
 
         JavaDeleteRef(queryArg);
         JavaDeleteRef(typeArg);
@@ -328,7 +459,7 @@ int java_parse_similarity_query(uint64_t **data, char* query, size_t queryLength
         {
             length = (*env)->GetArrayLength(env, result);
             words = (*env)->GetLongArrayElements(env, result, NULL);
-            java_check_exception("java_parse_similarity_query()");
+            java_check_exception("java_parse_orchem_similarity_query()");
 
             *data = (jlong *) palloc(length * sizeof(jlong));
             memcpy(*data, words, length * sizeof(jlong));

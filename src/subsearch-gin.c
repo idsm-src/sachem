@@ -33,7 +33,7 @@ typedef struct
     BitSet resultMask;
     int32_t foundResults;
 
-    QueryData *queryData;
+    OrchemSubstructureQueryData *queryData;
     int queryDataCount;
     int queryDataPosition;
 
@@ -144,7 +144,7 @@ Datum orchem_substructure_gin_search(PG_FUNCTION_ARGS)
         info->strictStereo = strictStereo;
         info->exact = exact;
 
-        info->queryDataCount = java_parse_query(&info->queryData, VARDATA(query), VARSIZE(query) - VARHDRSZ, typeStr, tautomers);
+        info->queryDataCount = java_parse_orchem_substructure_query(&info->queryData, VARDATA(query), VARSIZE(query) - VARHDRSZ, typeStr, tautomers);
 
         PG_FREE_IF_COPY(query, 0);
         PG_FREE_IF_COPY(type, 1);
@@ -192,7 +192,7 @@ Datum orchem_substructure_gin_search(PG_FUNCTION_ARGS)
                     break;
 
 
-                QueryData *data = &info->queryData[info->queryDataPosition];
+                OrchemSubstructureQueryData *data = &info->queryData[info->queryDataPosition];
 
                 MemoryContextReset(info->isomorphismContext);
 

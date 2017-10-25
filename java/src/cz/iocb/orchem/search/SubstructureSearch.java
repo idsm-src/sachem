@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.openscience.cdk.CDKConstants;
@@ -31,9 +30,7 @@ import org.openscience.cdk.isomorphism.matchers.RGroupQuery;
 import org.openscience.cdk.silent.SilentChemObjectBuilder;
 import org.openscience.cdk.smiles.SmilesParser;
 import cz.iocb.orchem.convert.ConvertMolecule;
-import cz.iocb.orchem.fingerprint.OrchemFingerprinter;
 import cz.iocb.orchem.isomorphism.IsomorphismSort;
-import cz.iocb.orchem.shared.MoleculeCounts;
 import cz.iocb.orchem.shared.MoleculeCreator;
 import cz.iocb.orchem.tautomers.CombinationCountException;
 import cz.iocb.orchem.tautomers.InchiTautomerGenerator;
@@ -42,10 +39,8 @@ import cz.iocb.orchem.tautomers.InchiTautomerGenerator;
 
 public abstract class SubstructureSearch
 {
-    public static class SubstructureQueryData
+    public static class QueryData
     {
-        public short[] counts;
-        public short[] fp;
         public byte[] atoms;
         public byte[] bonds;
         public boolean[] restH;
@@ -56,22 +51,13 @@ public abstract class SubstructureSearch
     private static final String QUERY_TYPE_RGROUP = "RGROUP";
     private static final String QUERY_TYPE_SMILES = "SMILES";
 
-    private static final ThreadLocal<OrchemFingerprinter> fingerPrinter = new ThreadLocal<OrchemFingerprinter>()
-    {
-        @Override
-        protected OrchemFingerprinter initialValue()
-        {
-            return new OrchemFingerprinter();
-        }
-    };
 
-
-    public static SubstructureQueryData[] getQueryData(byte[] queryArray, String type, boolean tautomers)
+    public static QueryData[] getQueryData(byte[] queryArray, String type, boolean tautomers)
             throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException
     {
         String query = new String(queryArray, StandardCharsets.ISO_8859_1);
         List<IAtomContainer> queryMolecules = translateUserQuery(query, type, tautomers);
-        SubstructureQueryData[] data = new SubstructureQueryData[queryMolecules.size()];
+        QueryData[] data = new QueryData[queryMolecules.size()];
 
         for(int idx = 0; idx < queryMolecules.size(); idx++)
         {
@@ -80,19 +66,9 @@ public abstract class SubstructureSearch
             IAtom[] sortedAtoms = IsomorphismSort.atomsByFrequency(queryMolecule);
             queryMolecule.setAtoms(sortedAtoms);
 
-            BitSet fpbits = fingerPrinter.get().getBitFingerprint(queryMolecule).asBitSet();
-
-            short[] fp = new short[fpbits.cardinality() - 1];
-
-            short p = 0;
-            for(int i = fpbits.nextSetBit(1); i >= 0; i = fpbits.nextSetBit(i + 1))
-                fp[p++] = (short) (i - 1);
-
             OrchemMoleculeBuilder builder = new OrchemMoleculeBuilder(queryMolecule);
             byte[] atomBytes = builder.atomsAsBytes();
             byte[] bondBytes = builder.bondsAsBytes();
-
-            MoleculeCounts counts = new MoleculeCounts(queryMolecule);
 
             boolean[] restH = new boolean[queryMolecule.getAtomCount()];
 
@@ -104,22 +80,7 @@ public abstract class SubstructureSearch
                         && atom.getProperty(CDKConstants.REST_H).equals(true);
             }
 
-
-            data[idx] = new SubstructureQueryData();
-
-            data[idx].counts = new short[10];
-            data[idx].counts[0] = counts.molTripleBondCount;
-            data[idx].counts[1] = counts.molSCount;
-            data[idx].counts[2] = counts.molOCount;
-            data[idx].counts[3] = counts.molNCount;
-            data[idx].counts[4] = counts.molFCount;
-            data[idx].counts[5] = counts.molClCount;
-            data[idx].counts[6] = counts.molBrCount;
-            data[idx].counts[7] = counts.molICount;
-            data[idx].counts[8] = counts.molCCount;
-            data[idx].counts[9] = counts.molPCount;
-
-            data[idx].fp = fp;
+            data[idx] = new QueryData();
             data[idx].atoms = atomBytes;
             data[idx].bonds = bondBytes;
             data[idx].restH = restH;
@@ -145,7 +106,7 @@ public abstract class SubstructureSearch
      * @throws CloneNotSupportedException
      * @throws TimeoutException
      */
-    private static List<IAtomContainer> translateUserQuery(String query, String queryType, boolean tautomers)
+    protected static List<IAtomContainer> translateUserQuery(String query, String queryType, boolean tautomers)
             throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException
     {
         List<IAtomContainer> userQueries = null;

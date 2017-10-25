@@ -128,7 +128,7 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
         info->topN = topN;
 
         uint64_t *words;
-        int length =  java_parse_similarity_query(&words, VARDATA(query), VARSIZE(query) - VARHDRSZ, typeStr);
+        int length =  java_parse_orchem_similarity_query(&words, VARDATA(query), VARSIZE(query) - VARHDRSZ, typeStr);
 
         PG_FREE_IF_COPY(query, 0);
         PG_FREE_IF_COPY(type, 1);
