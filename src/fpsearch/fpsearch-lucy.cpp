@@ -116,9 +116,9 @@ static void commit_buffer (fpsearch_data&d, bool force)
 	pthread_mutex_lock (&d.index_mtx);
 	Indexer *indexer = Indexer_new (d.schema, (Obj*) (d.folder),
 	                                nullptr, Indexer_CREATE);
-	for (Doc*doc : batch) {
-		Indexer_Add_Doc (indexer, doc, 1.0);
-		DECREF (doc);
+	while (!batch.empty()) {
+		Indexer_Add_Doc (indexer, batch.front(), 1.0);
+		DECREF (batch.front());
 	}
 	Indexer_Commit (indexer);
 	DECREF (indexer);
@@ -251,14 +251,12 @@ static void index_add (fpsearch_data&d, int guid, RDKit::ROMol*m)
 		DECREF (value);
 	}
 
-	std::list<Doc*> batch;
-
 	pthread_mutex_lock (&d.buffer_mtx);
 	d.buffer.push_back (doc);
 	size_t bs = ++d.bufsize;
 	pthread_mutex_unlock (&d.buffer_mtx);
 
-	if (bs > d.p.indexerBatch)
+	if (bs >= d.p.indexerBatch)
 		commit_buffer (d, false);
 }
 
