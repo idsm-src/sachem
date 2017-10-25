@@ -119,6 +119,7 @@ static void commit_buffer (fpsearch_data&d, bool force)
 	while (!batch.empty()) {
 		Indexer_Add_Doc (indexer, batch.front(), 1.0);
 		DECREF (batch.front());
+		batch.pop_front();
 	}
 	Indexer_Commit (indexer);
 	DECREF (indexer);
