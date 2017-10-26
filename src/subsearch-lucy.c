@@ -361,7 +361,7 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 
 void *lucy_substructure_process_spi_table(void* idx)
 {
-    MemoryContext indexContext;
+    MemoryContext indexContext = NULL;
 
     pthread_mutex_lock(&indexMutex);
     PG_TRY();
@@ -376,28 +376,26 @@ void *lucy_substructure_process_spi_table(void* idx)
     PG_END_TRY();
     pthread_mutex_unlock(&indexMutex);
 
-    if(indexingError)
-        pthread_exit((void*) 0);
 
-
-    while(true)
+    while(!indexingError)
     {
         Datum seqid;
         Molecule molecule;
 
         pthread_mutex_lock(&indexMutex);
+
+        volatile int *index = (volatile int*) idx;
+        int i = *index;
+
+        if(i >= SPI_processed)
+        {
+            pthread_mutex_unlock(&indexMutex);
+            break;
+        }
+
         PG_TRY();
         {
             MemoryContextReset(indexContext);
-
-            volatile int *index = (volatile int*) idx;
-            int i = *index;
-
-            if(i >= SPI_processed || indexingError)
-            {
-                pthread_mutex_unlock(&indexMutex);
-                break;
-            }
 
             HeapTuple tuple = SPI_tuptable->vals[i];
             char isNullFlag;
@@ -437,13 +435,16 @@ void *lucy_substructure_process_spi_table(void* idx)
         pthread_mutex_unlock(&indexMutex);
 
         if(indexingError)
-            pthread_exit((void*) 0);
+            break;
 
 
         if(fplucy_add_mol(fplucy, DatumGetInt32(seqid), &molecule))
             indexingError = true;
     }
 
+
+    if(indexContext != NULL)
+        MemoryContextDelete(indexContext);
 
     pthread_exit((void*) 0);
 }
@@ -454,8 +455,7 @@ Datum lucy_substructure_create_index(PG_FUNCTION_ARGS)
 {
     createBasePath();
 
-    MemoryContext indexContext = AllocSetContextCreate(CurrentMemoryContext, "lucy indexing context",
-            ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
+    MemoryContext memoryContext = CurrentMemoryContext;
 
 
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
@@ -490,8 +490,10 @@ Datum lucy_substructure_create_index(PG_FUNCTION_ARGS)
         indexingError = false;
         pthread_t threads[countOfThread];
 
+        PG_MEMCONTEXT_BEGIN(memoryContext);
         for(int i = 0; i < countOfThread; i++)
             pthread_create(&threads[i], &attr, lucy_substructure_process_spi_table, (void *) &idx);
+        PG_MEMCONTEXT_END();
 
         void *status;
 
