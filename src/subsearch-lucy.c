@@ -444,7 +444,19 @@ void *lucy_substructure_process_spi_table(void* idx)
 
 
     if(indexContext != NULL)
-        MemoryContextDelete(indexContext);
+    {
+        pthread_mutex_lock(&indexMutex);
+        PG_TRY();
+        {
+            MemoryContextDelete(indexContext);
+        }
+        PG_CATCH();
+        {
+            indexingError = true;
+        }
+        PG_END_TRY();
+        pthread_mutex_unlock(&indexMutex);
+    }
 
     pthread_exit((void*) 0);
 }
