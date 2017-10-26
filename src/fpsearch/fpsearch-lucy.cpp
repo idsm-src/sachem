@@ -241,6 +241,8 @@ static void index_add (fpsearch_data&d, int guid, RDKit::ROMol*m)
 	delete res;
 
 	std::string guids = std::to_string (guid);
+
+	pthread_mutex_lock (&d.index_mtx);
 	Doc*doc = Doc_new (nullptr, 0);
 
 	{
@@ -253,6 +255,7 @@ static void index_add (fpsearch_data&d, int guid, RDKit::ROMol*m)
 		Doc_Store (doc, d.fpF, (Obj*) value);
 		DECREF (value);
 	}
+	pthread_mutex_unlock (&d.index_mtx);
 
 	pthread_mutex_lock (&d.buffer_mtx);
 	d.buffer.push_back (doc);
