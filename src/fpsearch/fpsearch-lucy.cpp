@@ -388,6 +388,7 @@ void FPSEARCH_API (initialize) (void**ddp, const char*index_dir, const char*fp_o
 	d.fpF = Str_newf ("fp");
 	d.boolop = Str_newf ("AND");
 	d.schema = create_schema (d.guidF, d.fpF);
+	d.searcher = nullptr;
 	d.qparser = QParser_new (d.schema, nullptr, d.boolop, nullptr);
 
 	d.p.graphSize = 7;
