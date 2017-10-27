@@ -3,7 +3,9 @@ EXTRA_DIST = clownfish lucy rdkit
 all-local:
 		$(MAKE) -C ../build/clownfish/runtime/c
 		$(MAKE) -C ../build/lucy/c
-		$(MAKE) -C ../build/rdkit
+		$(MAKE) -C ../build/rdkit/Code/Geometry
+		$(MAKE) -C ../build/rdkit/Code/GraphMol
+		$(MAKE) -C ../build/rdkit/Code/RDGeneral		
 
 clean-local:
 		rm -r ../build/clownfish
