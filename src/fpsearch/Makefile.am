@@ -1,6 +1,7 @@
 lib_LTLIBRARIES = libfpsearch.la
 
-libfpsearch_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(CLOWNFISH_CPPFLAGS) $(LUCY_CPPFLAGS) $(RDKIT_CPPFLAGS)
+libfpsearch_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(CLOWNFISH_CPPFLAGS) $(LUCY_CPPFLAGS) $(RDKIT_CPPFLAGS) -DDATADIR=\"$(datadir)/$(PACKAGE)\"
+
 libfpsearch_la_CXXFLAGS = -std=c++11
 libfpsearch_la_LIBADD = -llucy -lclownfish -lboost_thread
 libfpsearch_la_LDFLAGS = $(CLOWNFISH_LDFLAGS) $(LUCY_LDFLAGS) \

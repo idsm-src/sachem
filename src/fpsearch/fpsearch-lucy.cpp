@@ -83,6 +83,17 @@ static Schema* create_schema (String*guidF, String*fpF)
  * internal stuffs
  */
 
+static std::map<std::string, int> fporder;
+
+void load_fporder()
+{
+	fporder.clear();
+	std::ifstream sdf (DATADIR "/fporder.txt");
+	std::string fp;
+	int fpn = 0;
+	while (std::getline (sdf, fp)) fporder[fp] = fpn++;
+}
+
 struct fpsearch_data {
 	pthread_mutex_t buffer_mtx;
 	std::list<Doc*> buffer;
@@ -94,8 +105,6 @@ struct fpsearch_data {
 
 	IndexSearcher *searcher;
 	QueryParser *qparser;
-
-	std::map<std::string, int> fporder;
 
 	FPSEARCH_API (params_t) p;
 };
@@ -149,8 +158,8 @@ static void close_searcher (fpsearch_data&d)
 	if (!d.searcher) return;
 	pthread_mutex_lock (&d.index_mtx); //this may be called from add_mol
 	if (d.searcher) {
-	    DECREF (d.searcher);
-	    d.searcher = nullptr;
+		DECREF (d.searcher);
+		d.searcher = nullptr;
 	}
 	pthread_mutex_unlock (&d.index_mtx);
 }
@@ -307,8 +316,8 @@ static Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
 	int unknownId = -1;
 	for (auto&&i : res->getNonzeroElements()) {
 		std::string fp = fp2str (i.first);
-		auto o = d.fporder.find (fp);
-		if (o == d.fporder.end())
+		auto o = fporder.find (fp);
+		if (o == fporder.end())
 			/* this is a hack: if the fingerprint is not known to
 			 * fporder (which it should be but keeping that
 			 * database in shape isn't very easy), let's assume
@@ -375,7 +384,13 @@ static Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
  * "interface"
  */
 
-void FPSEARCH_API (initialize) (void**ddp, const char*index_dir, const char*fp_ordering_file)
+extern "C"
+void __attribute__ ( (constructor)) fpsearch_lucy_init (void)
+{
+	load_fporder();
+}
+
+void FPSEARCH_API (initialize) (void**ddp, const char*index_dir)
 {
 	lucy_bootstrap_parcel();
 
@@ -400,14 +415,6 @@ void FPSEARCH_API (initialize) (void**ddp, const char*index_dir, const char*fp_o
 	d.p.searchAtomCoverage = 2;
 	d.p.searchMaxFps = 32;
 	d.p.indexerBatch = 10000;
-
-	d.fporder.clear();
-	{
-		std::ifstream sdf (fp_ordering_file);
-		std::string fp;
-		int fpn = 0;
-		while (std::getline (sdf, fp)) d.fporder[fp] = fpn++;
-	}
 }
 
 void FPSEARCH_API (close) (void*dd)
