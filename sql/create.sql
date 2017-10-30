@@ -58,3 +58,4 @@ CREATE FUNCTION "orchem_similarity_search"(varchar, varchar, float4, int) RETURN
 
 CREATE FUNCTION "orchem_substructure_write_indexes"() RETURNS bool AS 'libpgchem.so','orchem_substructure_write_indexes' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "lucy_substructure_create_index"() RETURNS bool AS 'libpgchem.so','lucy_substructure_create_index' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION "lucy_substructure_optimize_index"() RETURNS bool AS 'libpgchem.so','lucy_substructure_optimize_index' LANGUAGE C IMMUTABLE STRICT;

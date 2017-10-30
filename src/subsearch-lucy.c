@@ -532,3 +532,12 @@ Datum lucy_substructure_create_index(PG_FUNCTION_ARGS)
 
     PG_RETURN_BOOL(true);
 }
+
+
+PG_FUNCTION_INFO_V1(lucy_substructure_optimize_index);
+Datum lucy_substructure_optimize_index(PG_FUNCTION_ARGS)
+{
+    fplucy_optimize(fplucy);
+
+    PG_RETURN_BOOL(true);
+}
