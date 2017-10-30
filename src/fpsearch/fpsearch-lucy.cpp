@@ -83,7 +83,7 @@ static Schema* create_schema (String*guidF, String*fpF)
  * internal stuffs
  */
 
-static std::map<std::string, int> fporder;
+static std::map<std::string, int> fporder __attribute__ ((init_priority (150)));
 
 void load_fporder()
 {
@@ -386,12 +386,12 @@ static Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
 
 extern "C" {
 
-PG_MODULE_MAGIC;
+	PG_MODULE_MAGIC;
 
-void __attribute__ ((constructor)) fpsearch_lucy_init (void)
-{
-	load_fporder();
-}
+	void __attribute__ ((constructor (160))) fpsearch_lucy_init (void)
+	{
+		load_fporder();
+	}
 }
 
 void FPSEARCH_API (initialize) (void**ddp, const char*index_dir)
