@@ -601,7 +601,7 @@ int main()
 
 	void *fpl, *s;
 
-	fplucy_initialize (&fpl, "index", "fporder.txt");
+	fplucy_initialize (&fpl, "index");
 
 	fplucy_add_mol (fpl, 123, &m);
 
