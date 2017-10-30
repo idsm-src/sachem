@@ -68,7 +68,7 @@ bool volatile indexingError;
 void subsearch_lucy_module_init(void)
 {
     /* prepare lucy */
-    fplucy_initialize(&fplucy, getFilePath("lucy"), DATADIR "/fporder.txt");
+    fplucy_initialize(&fplucy, getFilePath("lucy"));
 
     if(unlikely(fplucy == NULL))
         elog(ERROR, "subsearch-lucy module: lucy initialization failed");
