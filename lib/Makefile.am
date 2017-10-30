@@ -8,9 +8,9 @@ all-local:
 		$(MAKE) -C ../build/rdkit/Code/RDGeneral		
 
 clean-local:
-		rm -r ../build/clownfish
-		rm -r ../build/lucy
-		rm -r ../build
+		rm -rf ../build/clownfish
+		rm -rf ../build/lucy
+		rm -rf ../build/rdkit
 
 install-exec-local:
 		mkdir -p $(DESTDIR)/$(POSTGRESQL_LIBDIR)
