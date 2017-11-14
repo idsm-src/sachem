@@ -67,28 +67,36 @@ bool volatile indexingError;
 
 void subsearch_lucy_module_init(void)
 {
-    /* prepare lucy */
-    fplucy_initialize(&fplucy, getFilePath("lucy"));
+    PG_TRY();
+    {
+        /* prepare lucy */
+        fplucy_initialize(&fplucy, getFilePath("lucy"));
 
-    if(unlikely(fplucy == NULL))
-        elog(ERROR, "subsearch-lucy module: lucy initialization failed");
-
-
-    /* prepare query plan */
-    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-        elog(ERROR, "subsearch-lucy module: SPI_connect() failed");
-
-    mainQueryPlan = SPI_prepare("select id, seqid, atoms, bonds from " MOLECULES_TABLE " where seqid = any($1)", 1, (Oid[]) { INT4ARRAYOID });
-
-    if(unlikely(mainQueryPlan == NULL))
-        elog(ERROR, "subsearch-lucy module: SPI_prepare_cursor() failed");
-
-    if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
-        elog(ERROR, "subsearch-lucy module: SPI_keepplan() failed");
+        if(unlikely(fplucy == NULL))
+            elog(ERROR, "subsearch-lucy module: lucy initialization failed");
 
 
-    SPI_finish();
-    initialised = true;
+        /* prepare query plan */
+        if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+            elog(ERROR, "subsearch-lucy module: SPI_connect() failed");
+
+        mainQueryPlan = SPI_prepare("select id, seqid, atoms, bonds from " MOLECULES_TABLE " where seqid = any($1)", 1, (Oid[]) { INT4ARRAYOID });
+
+        if(unlikely(mainQueryPlan == NULL))
+            elog(ERROR, "subsearch-lucy module: SPI_prepare_cursor() failed");
+
+        if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
+            elog(ERROR, "subsearch-lucy module: SPI_keepplan() failed");
+
+
+        SPI_finish();
+        initialised = true;
+    }
+    PG_CATCH();
+    {
+        elog(NOTICE, "subsearch-lucy module: initialization failed");
+    }
+    PG_END_TRY();
 }
 
 
