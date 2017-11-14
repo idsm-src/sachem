@@ -125,21 +125,29 @@ void subsearch_module_init(void)
 #endif
 
 
-    /* prepare query plan */
-    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-        elog(ERROR, "subsearch module: SPI_connect() failed");
+    PG_TRY();
+    {
+        /* prepare query plan */
+        if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+            elog(ERROR, "subsearch module: SPI_connect() failed");
 
-    mainQueryPlan = SPI_prepare("select id, seqid, atoms, bonds from " MOLECULES_TABLE " where seqid = any($1)", 1, (Oid[]) { INT4ARRAYOID });
+        mainQueryPlan = SPI_prepare("select id, seqid, atoms, bonds from " MOLECULES_TABLE " where seqid = any($1)", 1, (Oid[]) { INT4ARRAYOID });
 
-    if(unlikely(mainQueryPlan == NULL))
-        elog(ERROR, "subsearch module: SPI_prepare_cursor() failed");
+        if(unlikely(mainQueryPlan == NULL))
+            elog(ERROR, "subsearch module: SPI_prepare_cursor() failed");
 
-    if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
-        elog(ERROR, "subsearch module: SPI_keepplan() failed");
+        if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
+            elog(ERROR, "subsearch module: SPI_keepplan() failed");
 
 
-    SPI_finish();
-    initialised = true;
+        SPI_finish();
+        initialised = true;
+    }
+    PG_CATCH();
+    {
+        elog(NOTICE, "subsearch module: initialization failed");
+    }
+    PG_END_TRY();
 }
 
 

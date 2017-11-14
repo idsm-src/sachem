@@ -59,34 +59,42 @@ static TupleDesc tupdesc = NULL;
 
 void simsearch_module_init(void)
 {
-    /* prepare query plan */
-    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-        elog(ERROR, "simsearch module: SPI_connect() failed");
+    PG_TRY();
+    {
+        /* prepare query plan */
+        if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+            elog(ERROR, "simsearch module: SPI_connect() failed");
 
-    mainQueryPlan = SPI_prepare("select id, fp from " FINGERPRINT_TABLE " where bit_count = $1", 1, (Oid[]) { INT4OID });
+        mainQueryPlan = SPI_prepare("select id, fp from " FINGERPRINT_TABLE " where bit_count = $1", 1, (Oid[]) { INT4OID });
 
-    if(unlikely(mainQueryPlan == NULL))
-        elog(ERROR, "simsearch module: SPI_prepare_cursor() failed");
+        if(unlikely(mainQueryPlan == NULL))
+            elog(ERROR, "simsearch module: SPI_prepare_cursor() failed");
 
-    if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
-        elog(ERROR, "simsearch module: SPI_keepplan() failed");
+        if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
+            elog(ERROR, "simsearch module: SPI_keepplan() failed");
 
-    SPI_finish();
-
-
-    /* create tuple description */
-    mcxt = AllocSetContextCreate(TopMemoryContext, "simsearch memory context",
-            ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
-
-    PG_MEMCONTEXT_BEGIN(mcxt);
-    tupdesc = CreateTemplateTupleDesc(2, false);
-    TupleDescInitEntry(tupdesc, (AttrNumber) 1, "compound", INT4OID, -1, 0);
-    TupleDescInitEntry(tupdesc, (AttrNumber) 2, "score", FLOAT4OID, -1, 0);
-    tupdesc = BlessTupleDesc(tupdesc);
-    PG_MEMCONTEXT_END();
+        SPI_finish();
 
 
-    initialised = true;
+        /* create tuple description */
+        mcxt = AllocSetContextCreate(TopMemoryContext, "simsearch memory context",
+                ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
+
+        PG_MEMCONTEXT_BEGIN(mcxt);
+        tupdesc = CreateTemplateTupleDesc(2, false);
+        TupleDescInitEntry(tupdesc, (AttrNumber) 1, "compound", INT4OID, -1, 0);
+        TupleDescInitEntry(tupdesc, (AttrNumber) 2, "score", FLOAT4OID, -1, 0);
+        tupdesc = BlessTupleDesc(tupdesc);
+        PG_MEMCONTEXT_END();
+
+
+        initialised = true;
+    }
+    PG_CATCH();
+    {
+        elog(NOTICE, "simsearch module: initialization failed");
+    }
+    PG_END_TRY();
 }
 
 
