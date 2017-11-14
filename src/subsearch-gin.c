@@ -63,22 +63,30 @@ static SPIPlanPtr mainQueryPlan;
 
 void subsearch_gin_module_init(void)
 {
-    /* prepare query plan */
-    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-        elog(ERROR, "subsearch-gin module: SPI_connect() failed");
+    PG_TRY();
+    {
+        /* prepare query plan */
+        if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+            elog(ERROR, "subsearch-gin module: SPI_connect() failed");
 
-    mainQueryPlan = SPI_prepare("select m.id, m.seqid, m.atoms, m.bonds from " MOLECULES_TABLE " m, "
-            FINGERPRINT_TABLE " f where m.seqid = f.seqid and f.fp @> $1", 1, (Oid[]) { INT2ARRAYOID });
+        mainQueryPlan = SPI_prepare("select m.id, m.seqid, m.atoms, m.bonds from " MOLECULES_TABLE " m, "
+                FINGERPRINT_TABLE " f where m.seqid = f.seqid and f.fp @> $1", 1, (Oid[]) { INT2ARRAYOID });
 
-    if(unlikely(mainQueryPlan == NULL))
-        elog(ERROR, "subsearch-gin module: SPI_prepare_cursor() failed");
+        if(unlikely(mainQueryPlan == NULL))
+            elog(ERROR, "subsearch-gin module: SPI_prepare_cursor() failed");
 
-    if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
-        elog(ERROR, "subsearch-gin module: SPI_keepplan() failed");
+        if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
+            elog(ERROR, "subsearch-gin module: SPI_keepplan() failed");
 
 
-    SPI_finish();
-    initialised = true;
+        SPI_finish();
+        initialised = true;
+    }
+    PG_CATCH();
+    {
+        elog(NOTICE, "subsearch-gin module: initialization failed");
+    }
+    PG_END_TRY();
 }
 
 
