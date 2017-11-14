@@ -469,7 +469,7 @@ public class OrchemFingerprinter implements IFingerprinter
         /* Map tracking how many of what size multi ring sets we find */
         Map<Integer, Integer> ringsetCountPerSet = new HashMap<Integer, Integer>();
 
-        //int ringSetCount = 0;
+        int ringSetCount = 0;
         int maxConnectedCount = 0;
         int maxHexRingInSetCount = 0;
         int maxPentRingInSetCount = 0;
@@ -484,7 +484,11 @@ public class OrchemFingerprinter implements IFingerprinter
             if(numberOfRingsInSet > 1)
             {
                 /* Increase overall counter, keeping track how many multi ring set are found */
-                //ringSetCount++;
+                if(numberOfRingsInSet <= 4)
+                    ringSetCount++;
+                else
+                    /* big multi ring set can be devided into smaller  multi ring sets */
+                    ringSetCount += (numberOfRingsInSet - 1) / 2;
 
                 /* Track number of rings per set */
                 Integer cnt = ringsetCountPerSet.get(numberOfRingsInSet);
@@ -562,7 +566,7 @@ public class OrchemFingerprinter implements IFingerprinter
                 }
 
                 /* Set bit overall ringset count */
-                //doRingSetBits(1, ringSetCount, BitPosApi.bp.ringsetCountTotalPrefix, fingerprint);
+                doRingSetBits(1, ringSetCount, BitPosApi.bp.ringsetCountTotalPrefix, fingerprint);
 
                 /* Set rings related to cluttering - maximum amount of connected rings for any ring in the set */
                 doRingSetBits(2, maxConnectedCount, BitPosApi.bp.ringsetCountConnectedPrefix, fingerprint);
