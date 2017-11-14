@@ -579,7 +579,7 @@ void orchem_substructure_write_fp_index()
 }
 
 
-PG_FUNCTION_INFO_V1(write_indexes);
+PG_FUNCTION_INFO_V1(orchem_substructure_write_indexes);
 Datum orchem_substructure_write_indexes(PG_FUNCTION_ARGS)
 {
     createBasePath();
