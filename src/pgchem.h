@@ -10,8 +10,10 @@
 #include <sys/types.h>
 
 
+#if PG_VERSION_NUM < 100000
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)
+#endif
 
 #define PG_MEMCONTEXT_BEGIN(context)    do { MemoryContext old = MemoryContextSwitchTo(context)
 #define PG_MEMCONTEXT_END()             MemoryContextSwitchTo(old);} while(0)
