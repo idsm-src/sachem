@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include "pgchem.h"
+#include "sachem.h"
 
 
 #define ADDRESS_BITS_PER_WORD   6

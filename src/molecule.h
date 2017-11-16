@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "pgchem.h"
+#include "sachem.h"
 
 #define Q_ATOM_NUMBER   (-'Q')
 #define H_ATOM_NUMBER        1

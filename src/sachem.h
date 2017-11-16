@@ -1,5 +1,5 @@
-#ifndef PGCHEM_H_
-#define PGCHEM_H_
+#ifndef SACHEM_H_
+#define SACHEM_H_
 
 #include <postgres.h>
 #include <fmgr.h>
@@ -73,4 +73,4 @@ inline char *getFilePath(char* fileName)
     return path;
 }
 
-#endif /* PGCHEM_H_ */
+#endif /* SACHEM_H_ */
