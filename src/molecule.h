@@ -3,10 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-
-#ifndef MOLECULE_H_NO_POSTGRES
 #include "sachem.h"
-#endif
 
 #define Q_ATOM_NUMBER   (-'Q')
 #define H_ATOM_NUMBER        1
