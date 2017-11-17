@@ -1,15 +1,15 @@
 SUBDIRS=fpsearch
 
-lib_LTLIBRARIES = libpgchem.la
+lib_LTLIBRARIES = libsachem.la
 
-libpgchem_la_CFLAGS = -std=gnu99 -Ofast -march=native
-libpgchem_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(JDK8_CPPFLAGS) -DBINDIR=\"$(bindir)\" -DDATADIR=\"$(datadir)/$(PACKAGE)\" -DJARDIR=\"$(datadir)/$(PACKAGE)/jar\"
-libpgchem_la_LDFLAGS = $(JDK8_LDFLAGS)
-libpgchem_la_LIBADD = fpsearch/libfpsearch.la
+libsachem_la_CFLAGS = -std=gnu99 -Ofast -march=native
+libsachem_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(JDK8_CPPFLAGS) -DBINDIR=\"$(bindir)\" -DDATADIR=\"$(datadir)/$(PACKAGE)\" -DJARDIR=\"$(datadir)/$(PACKAGE)/jar\"
+libsachem_la_LDFLAGS = $(JDK8_LDFLAGS)
+libsachem_la_LIBADD = fpsearch/libfpsearch.la
 
-libpgchem_la_SOURCES = \
+libsachem_la_SOURCES = \
         java.c \
-        pgchem.c \
+        sachem.c \
         simsearch.c \
         subsearch.c \
         subsearch-gin.c \
@@ -21,7 +21,7 @@ EXTRA_DIST = \
         isomorphism.h \
         java.h \
         molecule.h \
-        pgchem.h \
+        sachem.h \
         simsearch.h \
         subsearch.h \
         subsearch-gin.h \

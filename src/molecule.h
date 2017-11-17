@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #ifndef MOLECULE_H_NO_POSTGRES
-#include "pgchem.h"
+#include "sachem.h"
 #endif
 
 #define Q_ATOM_NUMBER   (-'Q')

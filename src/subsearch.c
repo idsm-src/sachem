@@ -13,7 +13,7 @@
 #include "isomorphism.h"
 #include "java.h"
 #include "molecule.h"
-#include "pgchem.h"
+#include "sachem.h"
 #include "subsearch.h"
 
 

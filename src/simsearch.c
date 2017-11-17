@@ -15,7 +15,7 @@
 #include "bitset.h"
 #include "heap.h"
 #include "java.h"
-#include "pgchem.h"
+#include "sachem.h"
 #include "simsearch.h"
 
 
