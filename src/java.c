@@ -1,5 +1,9 @@
 #include <jni.h>
 #include <postgres.h>
+#include <libpq/pqsignal.h>
+#include <storage/ipc.h>
+#include <tcop/tcopprot.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include "java.h"
@@ -52,6 +56,7 @@
 
 
 static bool initialised = false;
+static pthread_t mainThread;
 static JavaVM* jvm = NULL;
 static JNIEnv* env = NULL;
 static jclass exceptionClass = NULL;
@@ -98,6 +103,33 @@ static inline void java_check_exception(const char *str)
 }
 
 
+static void java_statement_cancel_handler(int signum)
+{
+    if(pthread_self() == mainThread)
+        StatementCancelHandler(signum);
+    else
+        pthread_kill(mainThread, signum);
+}
+
+
+static void java_die_handler(int signum)
+{
+    if(pthread_self() == mainThread)
+        die(signum);
+    else
+        pthread_kill(mainThread, signum);
+}
+
+
+static void java_quick_die_handler(int signum)
+{
+    if(pthread_self() == mainThread)
+        quickdie(signum);
+    else
+        pthread_kill(mainThread, signum);
+}
+
+
 void java_module_init(void)
 {
     JavaVMInitArgs args = (JavaVMInitArgs) {
@@ -110,7 +142,16 @@ void java_module_init(void)
         .ignoreUnrecognized = JNI_FALSE
     };
 
+    pqsignal(SIGINT, SIG_IGN);
+    pqsignal(SIGTERM, SIG_IGN);
+    pqsignal(SIGQUIT, SIG_IGN);
+
     JNI_CreateJavaVM(&(jvm), (void **) &(env), &args);
+
+    mainThread = pthread_self();
+    pqsignal(SIGINT,  java_statement_cancel_handler);
+    pqsignal(SIGTERM, java_die_handler);
+    pqsignal(SIGQUIT, java_quick_die_handler);
 
     if(jvm == NULL || env == NULL)
         elog(ERROR, "cannot initialize JVM");
