@@ -31,13 +31,22 @@
 #define ISOMORPHISM_H__
 
 #include <postgres.h>
+#include <utils/timeout.h>
 #include <stdbool.h>
 #include "molecule.h"
+
+#define USE_VF2_TIMEOUT              1
 
 #define UNDEFINED_CORE              -1
 #define MASKED_TARGET               -1
 #define is_core_defined(value)      ((value) >= 0)
 #define is_target_masked(value)     ((value) < 0)
+
+
+#if USE_VF2_TIMEOUT
+extern TimeoutId vf2TimeoutId;
+extern volatile bool vf2Timeouted;
+#endif
 
 
 typedef struct
@@ -82,6 +91,10 @@ typedef struct
 } VF2State;
 
 
+void isomorphism_module_init(void);
+void isomorphism_module_finish(void);
+
+
 inline void swap_int(int *a, int *b)
 {
     int t = *a;
@@ -111,6 +124,11 @@ inline void sort_bond_atoms(int array[4])
 
 inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *const restrict query, bool strictStereo, bool exact)
 {
+#if USE_VF2_TIMEOUT
+    if(unlikely(vf2TimeoutId < 0))
+        elog(ERROR, "isomorphism module is not properly initialized");
+#endif
+
     int queryAtomCount = query->atomCount;
 
     vf2state->strictStereo = strictStereo;
@@ -668,6 +686,11 @@ inline bool vf2state_match_core(VF2State *const restrict vf2state)
 
         while(vf2state_next_target(vf2state))
         {
+#if USE_VF2_TIMEOUT
+            if(unlikely(vf2Timeouted))
+                return false;
+#endif
+
             if(vf2state_is_feasible_pair(vf2state))
             {
                 vf2state_add_pair(vf2state);
@@ -689,7 +712,7 @@ inline bool vf2state_match_core(VF2State *const restrict vf2state)
 }
 
 
-inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *const restrict target)
+inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *const restrict target, int timeout)
 {
     if(likely(!vf2state->exact))
     {
@@ -728,7 +751,16 @@ inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *co
         vf2state->core_query[i] = UNDEFINED_CORE;
 
 
-    return vf2state_match_core(vf2state);
+#if USE_VF2_TIMEOUT
+    vf2Timeouted = false;
+    enable_timeout_after(vf2TimeoutId, timeout);
+#endif
+    bool result = vf2state_match_core(vf2state);
+#if USE_VF2_TIMEOUT
+    disable_timeout (vf2TimeoutId, false);
+#endif
+
+    return result;
 }
 
 #endif /* ISOMORPHISM_H__ */

@@ -4,6 +4,7 @@ libsachem_la_CPPFLAGS = -std=gnu99 -Ofast -march=native $(POSTGRESQL_CPPFLAGS) $
 libsachem_la_LDFLAGS = $(JDK8_LDFLAGS)
 
 libsachem_la_SOURCES = \
+		isomorphism.c \
 		java.c \
 		sachem.c \
 		simsearch.c \

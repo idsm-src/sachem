@@ -29,6 +29,7 @@ typedef struct
     int32_t topN;
     bool strictStereo;
     bool exact;
+    int32_t vf2_timeout;
 
     BitSet resultMask;
     int32_t foundResults;
@@ -118,6 +119,7 @@ Datum orchem_substructure_gin_search(PG_FUNCTION_ARGS)
         bool strictStereo = PG_GETARG_BOOL(3);
         bool exact = PG_GETARG_BOOL(4);
         bool tautomers = PG_GETARG_BOOL(5);
+        int32_t vf2_timeout = PG_GETARG_INT32(6);
         char *typeStr = text_to_cstring(type);
 
         FuncCallContext *funcctx = SRF_FIRSTCALL_INIT();
@@ -151,6 +153,7 @@ Datum orchem_substructure_gin_search(PG_FUNCTION_ARGS)
         info->topN = topN;
         info->strictStereo = strictStereo;
         info->exact = exact;
+        info->vf2_timeout = vf2_timeout;
 
         info->queryDataCount = java_parse_query(&info->queryData, VARDATA(query), VARSIZE(query) - VARHDRSZ, typeStr, tautomers);
 
@@ -336,7 +339,7 @@ Datum orchem_substructure_gin_search(PG_FUNCTION_ARGS)
             PG_MEMCONTEXT_BEGIN(info->targetContext);
             Molecule target;
             molecule_init(&target, VARSIZE(atomsData) - VARHDRSZ, VARDATA(atomsData), VARSIZE(bondsData) - VARHDRSZ, VARDATA(bondsData), NULL, false);
-            match = vf2state_match(&info->vf2state, &target);
+            match = vf2state_match(&info->vf2state, &target, info->vf2_timeout);
             PG_MEMCONTEXT_END();
             MemoryContextReset(info->targetContext);
 
