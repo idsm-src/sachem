@@ -686,6 +686,9 @@ inline bool vf2state_match_core(VF2State *const restrict vf2state)
 
         while(vf2state_next_target(vf2state))
         {
+            if(unlikely(QueryCancelPending))
+                return false;
+
 #if USE_VF2_TIMEOUT
             if(unlikely(vf2Timeouted))
                 return false;
