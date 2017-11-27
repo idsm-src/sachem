@@ -8,6 +8,7 @@ libsachem_la_LDFLAGS = $(JDK8_LDFLAGS)
 libsachem_la_LIBADD = fpsearch/libfpsearch.la
 
 libsachem_la_SOURCES = \
+		isomorphism.c \
         java.c \
         sachem.c \
         simsearch.c \
