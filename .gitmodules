@@ -8,5 +8,5 @@
 	branch = 0.6
 [submodule "lib/rdkit"]
 	path = lib/rdkit
-	url = ssh://git@took28.ics.muni.cz:2222/kratochvil/rdkit
+	url = https://took28.ics.muni.cz/kratochvil/rdkit.git
 	branch = iocb
