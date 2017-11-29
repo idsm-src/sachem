@@ -16,10 +16,7 @@ import java.util.zip.GZIPInputStream;
 
 public class CompoundLoader
 {
-    private static String idTag = "> <PUBCHEM_COMPOUND_CID>";
-
-
-    private static void parse(InputStream inputStream) throws Exception
+    private static void parse(InputStream inputStream, String idTag, String idPrefix) throws Exception
     {
         Reader decoder = new InputStreamReader(inputStream, "US-ASCII");
         BufferedReader reader = new BufferedReader(decoder);
@@ -93,7 +90,7 @@ public class CompoundLoader
                         {
                             line = reader.readLine();
 
-                            id = Integer.parseInt(line);
+                            id = Integer.parseInt(line.replaceAll("^" + idPrefix, ""));
                         }
                     }
 
@@ -108,16 +105,8 @@ public class CompoundLoader
     }
 
 
-    public static void main(String[] args) throws Exception
+    public static void loadDirectory(File directory, String idTag, String idPrefix) throws Exception
     {
-        if(args.length != 1)
-        {
-            System.err.println("missing directory name argument");
-            System.exit(1);
-        }
-
-
-        File directory = new File(args[0]);
         final File[] files = directory.listFiles();
 
         Arrays.sort(files, new Comparator<File>()
@@ -142,7 +131,7 @@ public class CompoundLoader
             InputStream fileStream = new FileInputStream(file);
             InputStream gzipStream = new GZIPInputStream(fileStream);
 
-            parse(gzipStream);
+            parse(gzipStream, idTag, idPrefix);
 
             gzipStream.close();
         }
