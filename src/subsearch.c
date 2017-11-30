@@ -88,15 +88,13 @@ void subsearch_module_init(void)
         fstat(fd, &st);
         size_t length = st.st_size;
 
-        uint64_t *addr = mmap(NULL, length, PROT_READ, MAP_SHARED, fd, 0);
-        moleculeCount = *(addr++);
+        uint64_t *base = mmap(NULL, length, PROT_READ, MAP_SHARED, fd, 0);
+        moleculeCount = *(base + FP_SIZE);
 
         for(int i = 0; i < FP_SIZE; i++)
         {
-            int length = *addr;
-
-            bitset_init(bitmap + i, addr + 1, length);
-            addr += length + 1;
+            uint64_t *address = base + base[i];
+            bitset_init(bitmap + i, address + 1, *address);
         }
     }
 
@@ -542,15 +540,15 @@ void orchem_substructure_write_fp_index()
     if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
         elog(ERROR, "orchem_substructure_write_fp_index: SPI_getbinval() failed");
 
-    if(write(fd, &moleculeCount, sizeof(int64_t)) != sizeof(int64_t))
-        elog(ERROR, "orchem_substructure_write_fp_index: write() failed");
-
 
     if(unlikely(SPI_execute("select bitmap from " FINGERPRINT_INDEX_TABLE " order by idx", true, FETCH_ALL) != SPI_OK_SELECT))
         elog(ERROR, "orchem_substructure_write_fp_index: SPI_execute() failed");
 
     if(unlikely(SPI_processed != FP_SIZE || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
         elog(ERROR, "orchem_substructure_write_fp_index: SPI_execute() failed");
+
+
+    BitSet bitmap[FP_SIZE];
 
     for(int i = 0; i < SPI_processed; i++)
     {
@@ -561,15 +559,33 @@ void orchem_substructure_write_fp_index()
         if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
             elog(ERROR, "orchem_substructure_write_fp_index: SPI_getbinval() failed");
 
-        BitSet bitmap;
-        bitset_init_from_array(&bitmap, VARDATA(fp), VARSIZE(fp) - VARHDRSZ);
+        bitset_init_from_array(&bitmap[i], VARDATA(fp), VARSIZE(fp) - VARHDRSZ);
+    }
 
-        uint64_t wordsInUse = bitmap.wordsInUse;
+
+    uint64_t offset = FP_SIZE + 1;
+
+    for(int i = 0; i < SPI_processed; i++)
+    {
+        if(write(fd, &offset, sizeof(uint64_t)) != sizeof(uint64_t))
+            elog(ERROR, "orchem_substructure_write_count_index: write() failed");
+
+        offset += bitmap[i].wordsInUse + 1;
+    }
+
+
+    if(write(fd, &moleculeCount, sizeof(int64_t)) != sizeof(int64_t))
+        elog(ERROR, "orchem_substructure_write_fp_index: write() failed");
+
+
+    for(int i = 0; i < SPI_processed; i++)
+    {
+        uint64_t wordsInUse = bitmap[i].wordsInUse;
 
         if(write(fd, &wordsInUse, sizeof(uint64_t)) != sizeof(uint64_t))
             elog(ERROR, "orchem_substructure_write_count_index: write() failed");
 
-        if(write(fd, bitmap.words, wordsInUse * sizeof(uint64_t)) != wordsInUse * sizeof(uint64_t))
+        if(write(fd, bitmap[i].words, wordsInUse * sizeof(uint64_t)) != wordsInUse * sizeof(uint64_t))
             elog(ERROR, "orchem_substructure_write_count_index: write() failed");
     }
 
