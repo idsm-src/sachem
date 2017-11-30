@@ -11,6 +11,7 @@ import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import cz.iocb.orchem.fingerprint.OrchemExtendedFingerprinter;
 import cz.iocb.orchem.fingerprint.OrchemFingerprinter;
+import cz.iocb.orchem.isomorphism.IsomorphismSort;
 import cz.iocb.orchem.search.OrchemMoleculeBuilder;
 import cz.iocb.orchem.shared.MoleculeCounts;
 import cz.iocb.orchem.shared.MoleculeCreator;
@@ -212,6 +213,7 @@ public class OrChemLoader
                 MoleculeCreator.configureMolecule(readMolecule);
 
                 // calculate molecule binary representation
+                readMolecule.setAtoms(IsomorphismSort.atomsByFrequency(readMolecule));
                 OrchemMoleculeBuilder builder = new OrchemMoleculeBuilder(readMolecule);
                 item.atoms = builder.atomsAsBytes();
                 item.bonds = builder.bondsAsBytes();
