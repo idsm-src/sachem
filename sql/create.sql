@@ -27,7 +27,7 @@ CREATE TABLE orchem_molecule_counts (
     PRIMARY KEY (seqid)
 );
 
-CREATE TABLE orchem_similarity_fingerprint (
+CREATE TABLE orchem_fingerprint (
     id                    INT NOT NULL,
     bit_count             SMALLINT NOT NULL,
     fp                    BIGINT[] NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE orchem_similarity_fingerprint (
 );
 
 
-CREATE INDEX orchem_similarity_fingerprint__bit_count ON orchem_similarity_fingerprint(bit_count);
+CREATE INDEX orchem_fingerprint__bit_count ON orchem_fingerprint(bit_count);
 
 
 CREATE FUNCTION "orchem_substructure_search"(varchar, varchar, int, boolean, boolean, boolean, int = 5000) RETURNS SETOF int AS 'libsachem.so','orchem_substructure_search' LANGUAGE C IMMUTABLE STRICT;

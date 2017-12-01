@@ -23,7 +23,7 @@
 #define FP_SIZE                   788
 #define COUNTS_SIZE               10
 #define MOLECULES_TABLE           "orchem_molecules"
-#define MOLECULE_FP_TABLE         "orchem_similarity_fingerprint"
+#define FINGERPRINT_TABLE         "orchem_fingerprint"
 #define MOLECULE_COUNTS_TABLE     "orchem_molecule_counts"
 #define ORCHEM_INDEX_FILE         "orchem_substructure_index.idx"
 
@@ -427,7 +427,7 @@ Datum orchem_substructure_write_indexes(PG_FUNCTION_ARGS)
     for(int i = 0; i < FP_SIZE; i++)
         bitset_init_empty(bitmap + i, moleculeCount);
 
-    Portal fpCursor = SPI_cursor_open_with_args(NULL, "select f.fp from " MOLECULE_FP_TABLE " f, "
+    Portal fpCursor = SPI_cursor_open_with_args(NULL, "select f.fp from " FINGERPRINT_TABLE " f, "
             MOLECULES_TABLE " m where f.id = m.id order by m.seqid",
             0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 

@@ -38,7 +38,7 @@ public class OrChemLoader
     private static final String compoundsTable = "compounds";
     private static final String moleculesTable = "orchem_molecules";
     private static final String moleculeCountsTable = "orchem_molecule_counts";
-    private static final String similarityFingerprintTable = "orchem_similarity_fingerprint";
+    private static final String fingerprintTable = "orchem_fingerprint";
 
     // fingerprinter
     private static final ThreadLocal<OrchemExtendedFingerprinter> fingerPrinter = new ThreadLocal<OrchemExtendedFingerprinter>()
@@ -65,7 +65,7 @@ public class OrChemLoader
                         + " (seqid, molTripleBondCount, molSCount, molOCount, molNCount, molFCount, molClCount, molBrCount, molICount, molCCount, molPCount) values (?,?,?,?,?,?,?,?,?,?,?)"))
                 {
                     try (PreparedStatement similarityFingerprintStatement = insertConnection.prepareStatement(
-                            "insert into " + similarityFingerprintTable + " (id, bit_count, fp) values (?,?,?)"))
+                            "insert into " + fingerprintTable + " (id, bit_count, fp) values (?,?,?)"))
                     {
                         try (Connection selectConnection = ConnectionPool.getConnection())
                         {
