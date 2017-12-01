@@ -13,7 +13,7 @@ CREATE TABLE orchem_molecules (
 );
 
 CREATE TABLE orchem_molecule_counts (
-    seqid                 INT NOT NULL,
+    id                    INT NOT NULL,
     molTripleBondCount    SMALLINT NOT NULL,
     molSCount             SMALLINT NOT NULL,
     molOCount             SMALLINT NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE orchem_molecule_counts (
     molICount             SMALLINT NOT NULL,
     molCCount             SMALLINT NOT NULL,
     molPCount             SMALLINT NOT NULL,
-    PRIMARY KEY (seqid)
+    PRIMARY KEY (id)
 );
 
 CREATE TABLE orchem_fingerprint (

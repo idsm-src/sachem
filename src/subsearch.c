@@ -410,7 +410,7 @@ Datum orchem_substructure_write_indexes(PG_FUNCTION_ARGS)
         elog(ERROR, "orchem_substructure_write_indexes: SPI_connect() failed");
 
 
-    if(unlikely(SPI_execute("select max(seqid)+1 from " MOLECULE_COUNTS_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
+    if(unlikely(SPI_execute("select count(*) from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
         elog(ERROR, "orchem_substructure_write_indexes: SPI_execute() failed");
 
     if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
@@ -427,8 +427,7 @@ Datum orchem_substructure_write_indexes(PG_FUNCTION_ARGS)
     for(int i = 0; i < FP_SIZE; i++)
         bitset_init_empty(bitmap + i, moleculeCount);
 
-    Portal fpCursor = SPI_cursor_open_with_args(NULL, "select f.fp from " FINGERPRINT_TABLE " f, "
-            MOLECULES_TABLE " m where f.id = m.id order by m.seqid",
+    Portal fpCursor = SPI_cursor_open_with_args(NULL, "select fp from " FINGERPRINT_TABLE " order by id",
             0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
     if(unlikely(fpCursor == NULL))
@@ -499,9 +498,9 @@ Datum orchem_substructure_write_indexes(PG_FUNCTION_ARGS)
 
 
 #if USE_COUNT_FINGERPRINT
-    Portal countCursor = SPI_cursor_open_with_args(NULL, "select seqid, molTripleBondCount, molSCount, molOCount, "
+    Portal countCursor = SPI_cursor_open_with_args(NULL, "select molTripleBondCount, molSCount, molOCount, "
             "molNCount, molFCount, molClCount, molBrCount, molICount, molCCount, molPCount from "
-            MOLECULE_COUNTS_TABLE " order by seqid", 0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
+            MOLECULE_COUNTS_TABLE " order by id", 0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
     if(unlikely(countCursor == NULL))
             elog(ERROR, "orchem_substructure_write_indexes: SPI_cursor_open_with_args() failed");
@@ -510,7 +509,7 @@ Datum orchem_substructure_write_indexes(PG_FUNCTION_ARGS)
     {
         SPI_cursor_fetch(countCursor, true, 100000);
 
-        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != COUNTS_SIZE + 1))
+        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != COUNTS_SIZE))
             elog(ERROR, "orchem_substructure_write_indexes: SPI_cursor_fetch() failed");
 
         if(SPI_processed == 0)
@@ -523,14 +522,9 @@ Datum orchem_substructure_write_indexes(PG_FUNCTION_ARGS)
         {
             HeapTuple tuple = SPI_tuptable->vals[i];
 
-            int32 seqid = DatumGetInt32(SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag));
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "orchem_substructure_write_indexes: SPI_getbinval() failed");
-
             for(int j = 0; j < COUNTS_SIZE; j++)
             {
-                int16 value = DatumGetInt16(SPI_getbinval(tuple, SPI_tuptable->tupdesc, j + 2, &isNullFlag));
+                int16 value = DatumGetInt16(SPI_getbinval(tuple, SPI_tuptable->tupdesc, j + 1, &isNullFlag));
 
                 if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                     elog(ERROR, "orchem_substructure_write_indexes: SPI_getbinval() failed");

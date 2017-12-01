@@ -62,7 +62,7 @@ public class OrChemLoader
             {
                 try (PreparedStatement moleculeCountsStatement = insertConnection.prepareStatement("insert into "
                         + moleculeCountsTable
-                        + " (seqid, molTripleBondCount, molSCount, molOCount, molNCount, molFCount, molClCount, molBrCount, molICount, molCCount, molPCount) values (?,?,?,?,?,?,?,?,?,?,?)"))
+                        + " (id, molTripleBondCount, molSCount, molOCount, molNCount, molFCount, molClCount, molBrCount, molICount, molCCount, molPCount) values (?,?,?,?,?,?,?,?,?,?,?)"))
                 {
                     try (PreparedStatement similarityFingerprintStatement = insertConnection.prepareStatement(
                             "insert into " + fingerprintTable + " (id, bit_count, fp) values (?,?,?)"))
@@ -112,7 +112,7 @@ public class OrChemLoader
                                             moleculesStatement.addBatch();
 
                                             // insert molecule couts
-                                            moleculeCountsStatement.setInt(1, item.seqid);
+                                            moleculeCountsStatement.setInt(1, item.id);
                                             moleculeCountsStatement.setShort(2, item.counts.molTripleBondCount);
                                             moleculeCountsStatement.setShort(3, item.counts.molSCount);
                                             moleculeCountsStatement.setShort(4, item.counts.molOCount);
