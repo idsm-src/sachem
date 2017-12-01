@@ -42,11 +42,9 @@ CREATE TABLE orchem_substructure_fingerprint (
 
 
 CREATE INDEX orchem_similarity_fingerprint__bit_count ON orchem_similarity_fingerprint(bit_count);
-CREATE INDEX orchem_substructure_fingerprint__fp ON orchem_substructure_fingerprint USING gin(fp);
 
 
 CREATE FUNCTION "orchem_substructure_search"(varchar, varchar, int, boolean, boolean, boolean, int = 5000) RETURNS SETOF int AS 'libsachem.so','orchem_substructure_search' LANGUAGE C IMMUTABLE STRICT;
-CREATE FUNCTION "orchem_substructure_gin_search"(varchar, varchar, int, boolean, boolean, boolean, int = 5000) RETURNS SETOF int AS 'libsachem.so','orchem_substructure_gin_search' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "lucy_substructure_search"(varchar, varchar, int, boolean, boolean, boolean, int = 5000) RETURNS SETOF int AS 'libsachem.so','lucy_substructure_search' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "orchem_similarity_search"(varchar, varchar, float4, int) RETURNS TABLE (compound int, score float4) AS 'libsachem.so','orchem_similarity_search' LANGUAGE C IMMUTABLE STRICT;
 

@@ -13,7 +13,6 @@ libsachem_la_SOURCES = \
         sachem.c \
         simsearch.c \
         subsearch.c \
-        subsearch-gin.c \
         subsearch-lucy.c
 
 EXTRA_DIST = \
@@ -25,5 +24,4 @@ EXTRA_DIST = \
         sachem.h \
         simsearch.h \
         subsearch.h \
-        subsearch-gin.h \
         subsearch-lucy.h
