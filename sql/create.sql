@@ -40,12 +40,6 @@ CREATE TABLE orchem_substructure_fingerprint (
     PRIMARY KEY (seqid)
 );
 
-CREATE TABLE orchem_substructure_fingerprint_index (
-    idx                   SMALLINT NOT NULL,
-    bitmap                BYTEA NOT NULL,
-    PRIMARY KEY (idx)
-);
-
 
 CREATE INDEX orchem_similarity_fingerprint__bit_count ON orchem_similarity_fingerprint(bit_count);
 CREATE INDEX orchem_substructure_fingerprint__fp ON orchem_substructure_fingerprint USING gin(fp);

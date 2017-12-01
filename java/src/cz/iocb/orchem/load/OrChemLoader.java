@@ -43,7 +43,6 @@ public class OrChemLoader
     private static final String moleculeCountsTable = "orchem_molecule_counts";
     private static final String similarityFingerprintTable = "orchem_similarity_fingerprint";
     private static final String substructureFingerprintTable = "orchem_substructure_fingerprint";
-    private static final String substructureFingerprintIndexTable = "orchem_substructure_fingerprint_index";
 
     // bitmap index parameters
     private static final int fpSize = new OrchemFingerprinter().getSize();
@@ -178,22 +177,6 @@ public class OrChemLoader
                                             substructureFingerprintStatement.executeBatch();
                                         }
                                     }
-                                }
-
-
-                                // insert bitmap indexes
-                                try (PreparedStatement substructureFingerprintInsexStatement = insertConnection
-                                        .prepareStatement("insert into " + substructureFingerprintIndexTable
-                                                + " (idx, bitmap) values (?,?)"))
-                                {
-                                    for(int idx = 0; idx < bitmasks.length; idx++)
-                                    {
-                                        substructureFingerprintInsexStatement.setShort(1, (short) idx);
-                                        substructureFingerprintInsexStatement.setBytes(2, bitmasks[idx].toByteArray());
-                                        substructureFingerprintInsexStatement.addBatch();
-                                    }
-
-                                    substructureFingerprintInsexStatement.executeBatch();
                                 }
                             }
                         }
