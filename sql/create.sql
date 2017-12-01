@@ -34,12 +34,6 @@ CREATE TABLE orchem_similarity_fingerprint (
     PRIMARY KEY (id)
 );
 
-CREATE TABLE orchem_substructure_fingerprint (
-    seqid                 INT NOT NULL,
-    fp                    SMALLINT[] NOT NULL,
-    PRIMARY KEY (seqid)
-);
-
 
 CREATE INDEX orchem_similarity_fingerprint__bit_count ON orchem_similarity_fingerprint(bit_count);
 

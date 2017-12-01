@@ -23,7 +23,7 @@
 #define FP_SIZE                   788
 #define COUNTS_SIZE               10
 #define MOLECULES_TABLE           "orchem_molecules"
-#define MOLECULE_FP_TABLE         "orchem_substructure_fingerprint"
+#define MOLECULE_FP_TABLE         "orchem_similarity_fingerprint"
 #define MOLECULE_COUNTS_TABLE     "orchem_molecule_counts"
 #define ORCHEM_INDEX_FILE         "orchem_substructure_index.idx"
 
@@ -427,17 +427,20 @@ Datum orchem_substructure_write_indexes(PG_FUNCTION_ARGS)
     for(int i = 0; i < FP_SIZE; i++)
         bitset_init_empty(bitmap + i, moleculeCount);
 
-    Portal fpCursor = SPI_cursor_open_with_args(NULL, "select seqid, fp from " MOLECULE_FP_TABLE " order by seqid",
+    Portal fpCursor = SPI_cursor_open_with_args(NULL, "select f.fp from " MOLECULE_FP_TABLE " f, "
+            MOLECULES_TABLE " m where f.id = m.id order by m.seqid",
             0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
     if(unlikely(fpCursor == NULL))
             elog(ERROR, "orchem_substructure_write_indexes: SPI_cursor_open_with_args() failed");
 
+    int seqid = 0;
+
     while(true)
     {
         SPI_cursor_fetch(fpCursor, true, 100000);
 
-        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
+        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
             elog(ERROR, "orchem_substructure_write_indexes: SPI_cursor_fetch() failed");
 
         if(SPI_processed == 0)
@@ -448,23 +451,26 @@ Datum orchem_substructure_write_indexes(PG_FUNCTION_ARGS)
         {
             HeapTuple tuple = SPI_tuptable->vals[i];
 
-            int32 seqid = DatumGetInt32(SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag));
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "orchem_substructure_write_indexes: SPI_getbinval() failed");
-
-            Datum fpDatum = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 2, &isNullFlag);
+            Datum fpDatum = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                 elog(ERROR, "orchem_substructure_write_indexes: SPI_getbinval() failed");
 
             ArrayType *fpArray = DatumGetArrayTypeP(fpDatum);
-            int length = ARR_DIMS(fpArray)[0];
-            int16 *data = (int16 *) ARR_DATA_PTR(fpArray);
 
             if(ARR_NDIM(fpArray))
-                for(int j = 0; j < length; j++)
-                    bitset_set(bitmap + data[j], seqid);
+            {
+                int length = ARR_DIMS(fpArray)[0];
+                uint64_t *data = (uint64_t *) ARR_DATA_PTR(fpArray);
+
+                BitSet fp;
+                bitset_init(&fp, data, length);
+
+                for(int j = bitset_next_set_bit(&fp, 1); j >= 0 && j <= FP_SIZE; j = bitset_next_set_bit(&fp, j + 1))
+                    bitset_set(bitmap + j - 1, seqid);
+            }
+
+            seqid++;
         }
 
         SPI_freetuptable(SPI_tuptable);
