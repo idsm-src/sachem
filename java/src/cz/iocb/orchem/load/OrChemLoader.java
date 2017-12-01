@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.BitSet;
 import org.openscience.cdk.exception.CDKException;
@@ -82,26 +81,6 @@ public class OrChemLoader
                             {
                                 selectConnection.setAutoCommit(false);
 
-                                // create empty bitmap index
-                                int moleculeCount = 0;
-
-                                try (Statement statement = selectConnection.createStatement(ResultSet.TYPE_FORWARD_ONLY,
-                                        ResultSet.CONCUR_READ_ONLY))
-                                {
-                                    try (ResultSet result = statement
-                                            .executeQuery("select count(*) from " + compoundsTable))
-                                    {
-                                        result.next();
-                                        moleculeCount = result.getInt(1);
-                                    }
-                                }
-
-                                BitSet[] bitmasks = new BitSet[fpSize - fpOffset];
-
-                                for(int i = 0; i < fpSize - fpOffset; i++)
-                                    bitmasks[i] = new BitSet(moleculeCount);
-
-
                                 // load compounds
                                 try (PreparedStatement selectStatement = selectConnection.prepareStatement(
                                         "SELECT id, molfile FROM " + compoundsTable + " ORDER BY id",
@@ -131,7 +110,7 @@ public class OrChemLoader
                                             if(items.size() == 0)
                                                 break;
 
-                                            process(items, bitmasks);
+                                            process(items);
 
                                             for(Item item : items)
                                             {
@@ -187,7 +166,7 @@ public class OrChemLoader
     }
 
 
-    private static void process(ArrayList<Item> items, BitSet[] bitmasks) throws CDKException, IOException
+    private static void process(ArrayList<Item> items) throws CDKException, IOException
     {
         items.stream().parallel().forEach(item -> {
             try
@@ -228,14 +207,6 @@ public class OrChemLoader
                 int position = 0;
                 for(int i = fp.nextSetBit(fpOffset); i > 0 && i < fpSize; i = fp.nextSetBit(i + 1))
                     item.substructureFingerprint[position++] = i - fpOffset;
-
-
-                // set bitmap indexes
-                synchronized(OrChemLoader.class)
-                {
-                    for(int idx = fp.nextSetBit(fpOffset); idx >= 0 && idx < fpSize; idx = fp.nextSetBit(idx + 1))
-                        bitmasks[idx - fpOffset].set(item.seqid);
-                }
             }
             catch (Throwable e)
             {
