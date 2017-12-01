@@ -122,7 +122,7 @@ inline bool bitset_get(BitSet *restrict const bitset, int bitIndex)
 
 #if BITSET_ASSERT
     if(wordIndex >= bitset->length)
-        elog(ERROR, "bitset_set(): wrong bitset value");
+        elog(ERROR, "bitset_get(): wrong index");
 #endif
 
     return (bitset->words[wordIndex] & (1L << (bitIndex % BITS_PER_WORD))) != 0;
@@ -135,7 +135,7 @@ inline void bitset_set(BitSet *restrict const bitset, int bitIndex)
 
 #if BITSET_ASSERT
     if(wordIndex >= bitset->length)
-        elog(ERROR, "bitset_set(): wrong bitset value");
+        elog(ERROR, "bitset_set(): wrong index");
 #endif
 
     bitset->words[wordIndex] |= (1L << (bitIndex % BITS_PER_WORD));
@@ -151,7 +151,7 @@ inline void bitset_unset(BitSet *restrict const bitset, int bitIndex)
 
 #if BITSET_ASSERT
     if(wordIndex >= bitset->length)
-        elog(ERROR, "bitset_unset(): wrong bitset value");
+        elog(ERROR, "bitset_unset(): wrong index");
 #endif
 
     bitset->words[wordIndex] &= ~(1L << (bitIndex % BITS_PER_WORD));
