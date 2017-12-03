@@ -14,16 +14,7 @@ CREATE TABLE orchem_molecules (
 
 CREATE TABLE orchem_molecule_counts (
     id                    INT NOT NULL,
-    molTripleBondCount    SMALLINT NOT NULL,
-    molSCount             SMALLINT NOT NULL,
-    molOCount             SMALLINT NOT NULL,
-    molNCount             SMALLINT NOT NULL,
-    molFCount             SMALLINT NOT NULL,
-    molClCount            SMALLINT NOT NULL,
-    molBrCount            SMALLINT NOT NULL,
-    molICount             SMALLINT NOT NULL,
-    molCCount             SMALLINT NOT NULL,
-    molPCount             SMALLINT NOT NULL,
+    counts                SMALLINT[] NOT NULL,
     PRIMARY KEY (id)
 );
 
@@ -43,5 +34,6 @@ CREATE FUNCTION "lucy_substructure_search"(varchar, varchar, int, boolean, boole
 CREATE FUNCTION "orchem_similarity_search"(varchar, varchar, float4, int) RETURNS TABLE (compound int, score float4) AS 'libsachem.so','orchem_similarity_search' LANGUAGE C IMMUTABLE STRICT;
 
 CREATE FUNCTION "orchem_substructure_write_indexes"() RETURNS bool AS 'libsachem.so','orchem_substructure_write_indexes' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION "orchem_load_data"() RETURNS int AS 'libsachem.so','orchem_load_data' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "lucy_substructure_create_index"() RETURNS bool AS 'libsachem.so','lucy_substructure_create_index' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "lucy_substructure_optimize_index"() RETURNS bool AS 'libsachem.so','lucy_substructure_optimize_index' LANGUAGE C IMMUTABLE STRICT;

@@ -22,6 +22,7 @@
 #define FETCH_SIZE                1000
 #define FP_SIZE                   788
 #define COUNTS_SIZE               10
+#define COMPOUNDS_TABLE           "compounds"
 #define MOLECULES_TABLE           "orchem_molecules"
 #define FINGERPRINT_TABLE         "orchem_fingerprint"
 #define MOLECULE_COUNTS_TABLE     "orchem_molecule_counts"
@@ -498,9 +499,8 @@ Datum orchem_substructure_write_indexes(PG_FUNCTION_ARGS)
 
 
 #if USE_COUNT_FINGERPRINT
-    Portal countCursor = SPI_cursor_open_with_args(NULL, "select molTripleBondCount, molSCount, molOCount, "
-            "molNCount, molFCount, molClCount, molBrCount, molICount, molCCount, molPCount from "
-            MOLECULE_COUNTS_TABLE " order by id", 0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
+    Portal countCursor = SPI_cursor_open_with_args(NULL, "select counts from " MOLECULE_COUNTS_TABLE " order by id",
+            0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
     if(unlikely(countCursor == NULL))
             elog(ERROR, "orchem_substructure_write_indexes: SPI_cursor_open_with_args() failed");
@@ -509,30 +509,28 @@ Datum orchem_substructure_write_indexes(PG_FUNCTION_ARGS)
     {
         SPI_cursor_fetch(countCursor, true, 100000);
 
-        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != COUNTS_SIZE))
+        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
             elog(ERROR, "orchem_substructure_write_indexes: SPI_cursor_fetch() failed");
 
         if(SPI_processed == 0)
             break;
 
 
-        int16 counts[COUNTS_SIZE];
-
         for(int i = 0; i < SPI_processed; i++)
         {
             HeapTuple tuple = SPI_tuptable->vals[i];
 
-            for(int j = 0; j < COUNTS_SIZE; j++)
-            {
-                int16 value = DatumGetInt16(SPI_getbinval(tuple, SPI_tuptable->tupdesc, j + 1, &isNullFlag));
+            Datum countsDatum = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
 
-                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                    elog(ERROR, "orchem_substructure_write_indexes: SPI_getbinval() failed");
+            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                elog(ERROR, "orchem_substructure_write_indexes: SPI_getbinval() failed");
 
-                counts[j] = value;
-            }
+            ArrayType *countsArray = DatumGetArrayTypeP(countsDatum);
 
-            if(write(fd, counts, COUNTS_SIZE * sizeof(int16)) != COUNTS_SIZE * sizeof(int16))
+            if(ARR_NDIM(countsArray) != 1 && ARR_DIMS(countsArray)[0] != COUNTS_SIZE)
+                elog(ERROR, "orchem_substructure_write_indexes: SPI_getbinval() failed");
+
+            if(write(fd, ARR_DATA_PTR(countsArray), COUNTS_SIZE * sizeof(int16)) != COUNTS_SIZE * sizeof(int16))
                 elog(ERROR, "orchem_substructure_write_indexes: write() failed");
         }
 
@@ -567,4 +565,134 @@ Datum orchem_substructure_write_indexes(PG_FUNCTION_ARGS)
 
     SPI_finish();
     PG_RETURN_BOOL(true);
+}
+
+
+PG_FUNCTION_INFO_V1(orchem_load_data);
+Datum orchem_load_data(PG_FUNCTION_ARGS)
+{
+    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+        elog(ERROR, "sachem_load_orchem_data: SPI_connect() failed");
+
+    char isNullFlag;
+
+
+    /* TODO: find a better way to obtain bigint[] OID */
+    if(unlikely(SPI_exec("select typarray from pg_type where typname = 'int8'", 0) != SPI_OK_SELECT))
+        elog(ERROR, "sachem_load_orchem_data: SPI_exec() failed");
+
+    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
+        elog(ERROR, "sachem_load_orchem_data: SPI_exec() failed");
+
+    Oid int8arrayOid = DatumGetObjectId(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
+
+    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+        elog(ERROR, "sachem_load_orchem_data: SPI_getbinval() failed");
+
+    if(int8arrayOid == 0)
+        elog(ERROR, "sachem_load_orchem_data: cannot determine bigint[] oid");
+
+
+    SPIPlanPtr moleculesPlan = SPI_prepare("insert into " MOLECULES_TABLE " (seqid, id, atoms, bonds) values ($1,$2,$3,$4)",
+            4, (Oid[]) { INT4OID, INT4OID, BYTEAOID, BYTEAOID });
+
+    if(unlikely(moleculesPlan == NULL))
+        elog(ERROR, "sachem_load_orchem_data: SPI_prepare() failed");
+
+
+    SPIPlanPtr countsPlan = SPI_prepare("insert into " MOLECULE_COUNTS_TABLE " (id, counts) values ($1,$2)",
+            2, (Oid[]) { INT4OID, INT2ARRAYOID });
+
+    if(unlikely(countsPlan == NULL))
+        elog(ERROR, "sachem_load_orchem_data: SPI_prepare() failed");
+
+
+    SPIPlanPtr fingerprintPlan = SPI_prepare("insert into " FINGERPRINT_TABLE " (id, bit_count, fp) values ($1,$2,$3)",
+            3, (Oid[]) { INT4OID, INT2OID, int8arrayOid });
+
+    if(unlikely(fingerprintPlan == NULL))
+        elog(ERROR, "sachem_load_orchem_data: SPI_prepare() failed");
+
+
+    Portal cursor = SPI_cursor_open_with_args(NULL, "select id, molfile from " COMPOUNDS_TABLE " order by id",
+            0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
+
+    if(unlikely(cursor == NULL))
+            elog(ERROR, "sachem_load_orchem_data: SPI_cursor_open_with_args() failed");
+
+
+    int seqid = 0;
+
+    while(true)
+    {
+        SPI_cursor_fetch(cursor, true, 100000);
+
+        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
+            elog(ERROR, "sachem_load_orchem_data: SPI_cursor_fetch() failed");
+
+        if(SPI_processed == 0)
+            break;
+
+
+        int processed = SPI_processed;
+        SPITupleTable *tuptable = SPI_tuptable;
+
+        for(int i = 0; i < processed; i++)
+        {
+            HeapTuple tuple = tuptable->vals[i];
+
+            Datum id = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
+
+            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                elog(ERROR, "sachem_load_orchem_data: SPI_getbinval() failed");
+
+
+            Datum molfile = SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag);
+
+            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                elog(ERROR, "sachem_load_orchem_data: SPI_getbinval() failed");
+
+
+            OrchemLoaderData data;
+            VarChar *mol = DatumGetVarCharP(molfile);
+
+            java_parse_orchem_data(&data, VARDATA(mol), VARSIZE(mol) - VARHDRSZ);
+
+            if((char *) mol != DatumGetPointer(molfile))
+                pfree(mol);
+
+
+            Datum moleculesValues[] = { Int32GetDatum(seqid), id, PointerGetDatum(data.atoms), PointerGetDatum(data.bonds)};
+
+            if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
+                elog(ERROR, "sachem_load_orchem_data: SPI_execute_plan() failed");
+
+
+            Datum countsValues[] = { id, PointerGetDatum(data.counts) };
+
+            if(SPI_execute_plan(countsPlan, countsValues, NULL, false, 0) != SPI_OK_INSERT)
+                elog(ERROR, "sachem_load_orchem_data: SPI_execute_plan() failed");
+
+
+            Datum fingerprintValues[] = { id, Int16GetDatum(data.bitCount), PointerGetDatum(data.fp) };
+
+            if(SPI_execute_plan(fingerprintPlan, fingerprintValues, NULL, false, 0) != SPI_OK_INSERT)
+                elog(ERROR, "sachem_load_orchem_data: SPI_execute_plan() failed");
+
+
+            pfree(data.counts);
+            pfree(data.fp);
+            pfree(data.atoms);
+            pfree(data.bonds);
+
+            seqid++;
+        }
+
+        SPI_freetuptable(tuptable);
+    }
+
+    SPI_cursor_close(cursor);
+    SPI_finish();
+
+    PG_RETURN_INT32(seqid);
 }

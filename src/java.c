@@ -1,13 +1,15 @@
-#include <jni.h>
 #include <postgres.h>
+#include <catalog/pg_type.h>
 #include <libpq/pqsignal.h>
 #include <storage/ipc.h>
 #include <tcop/tcopprot.h>
+#include <jni.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include "java.h"
 #include "sachem.h"
+#include "bitset.h"
 
 
 #define JavaDeleteRef(ref) \
@@ -77,6 +79,14 @@ static jmethodID orchemSubstructureQueryDataMethod = NULL;
 
 static jclass orchemSimilaritySearchClass = NULL;
 static jmethodID orchemSimilarityQueryDataMethod = NULL;
+
+static jclass orchemLoaderClass = NULL;
+static jclass orchemLoaderDataClass = NULL;
+static jfieldID orchemLoaderCountsField = NULL;
+static jfieldID orchemLoaderFpField = NULL;
+static jfieldID orchemLoaderAtomsField = NULL;
+static jfieldID orchemLoaderBondsField = NULL;
+static jmethodID orchemLoaderDataMethod = NULL;
 
 
 static inline void java_check_exception(const char *str)
@@ -203,6 +213,28 @@ void java_module_init(void)
     java_check_exception("java_module_init()");
 
     orchemSimilarityQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSimilaritySearchClass, "getQueryData", "([BLjava/lang/String;)[J");
+    java_check_exception("java_module_init()");
+
+
+    orchemLoaderClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemLoader");
+    java_check_exception("java_module_init()");
+
+    orchemLoaderDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemLoader$OrchemData");
+    java_check_exception("java_module_init()");
+
+    orchemLoaderCountsField = (*env)->GetFieldID(env, orchemLoaderDataClass, "counts", "[S");
+    java_check_exception("java_module_init()");
+
+    orchemLoaderFpField = (*env)->GetFieldID(env, orchemLoaderDataClass, "fp", "[J");
+    java_check_exception("java_module_init()");
+
+    orchemLoaderAtomsField = (*env)->GetFieldID(env, orchemLoaderDataClass, "atoms", "[B");
+    java_check_exception("java_module_init()");
+
+    orchemLoaderBondsField = (*env)->GetFieldID(env, orchemLoaderDataClass, "bonds", "[B");
+    java_check_exception("java_module_init()");
+
+    orchemLoaderDataMethod = (*env)->GetStaticMethodID(env, orchemLoaderClass, "getIndexData", "([B)Lcz/iocb/orchem/search/OrchemLoader$OrchemData;");
     java_check_exception("java_module_init()");
 
 
@@ -523,4 +555,112 @@ int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t quer
     PG_END_TRY();
 
     return length;
+}
+
+
+void java_parse_orchem_data(OrchemLoaderData *data, char* molfile, size_t length)
+{
+    if(initialised == false)
+        elog(ERROR, "java module is not properly initialized");
+
+
+    jbyteArray molfileArg = NULL;
+    jobject element = NULL;
+    jshortArray countsArray = NULL;
+    jlongArray fpArray = NULL;
+    jbyteArray atomsArray = NULL;
+    jbyteArray bondsArray = NULL;
+    jshort *counts = NULL;
+    jlong *fp = NULL;
+    jbyte *atoms = NULL;
+    jbyte *bonds = NULL;
+
+
+    PG_TRY();
+    {
+        molfileArg = (*env)->NewByteArray(env, length);
+        java_check_exception("java_parse_orchem_data()");
+
+        (*env)->SetByteArrayRegion(env, molfileArg, 0, length, (jbyte*) molfile);
+
+
+        element = (*env)->CallStaticObjectMethod(env, orchemLoaderClass, orchemLoaderDataMethod, molfileArg);
+        java_check_exception("java_parse_orchem_data()");
+
+        JavaDeleteRef(molfileArg);
+
+
+        countsArray = (jshortArray) (*env)->GetObjectField(env, element, orchemLoaderCountsField);
+        fpArray = (jlongArray) (*env)->GetObjectField(env, element, orchemLoaderFpField);
+        atomsArray = (jbyteArray)  (*env)->GetObjectField(env, element, orchemLoaderAtomsField);
+        bondsArray = (jbyteArray)  (*env)->GetObjectField(env, element, orchemLoaderBondsField);
+
+        jsize countsSize = (*env)->GetArrayLength(env, countsArray);
+        jsize fpSize = (*env)->GetArrayLength(env, fpArray);
+        jsize atomsSize = (*env)->GetArrayLength(env, atomsArray);
+        jsize bondsSize = (*env)->GetArrayLength(env, bondsArray);
+
+        counts = (*env)->GetShortArrayElements(env, countsArray, NULL);
+        java_check_exception("java_parse_orchem_data()");
+
+        fp = (*env)->GetLongArrayElements(env, fpArray, NULL);
+        java_check_exception("java_parse_orchem_data()");
+
+        atoms = (*env)->GetByteArrayElements(env, atomsArray, NULL);
+        java_check_exception("java_parse_orchem_data()");
+
+        bonds = (*env)->GetByteArrayElements(env, bondsArray, NULL);
+        java_check_exception("java_parse_orchem_data()");
+
+
+        data->fp = (ArrayType *) palloc(fpSize * sizeof(uint64_t) + ARR_OVERHEAD_NONULLS(1));
+        data->fp->ndim = 1;
+        data->fp->dataoffset = 0;
+        data->fp->elemtype = INT8OID;
+        memcpy(ARR_DATA_PTR(data->fp), fp, fpSize * sizeof(uint64_t));
+        *(ARR_DIMS(data->fp)) = fpSize;
+        *(ARR_LBOUND(data->fp)) = 1;
+        SET_VARSIZE(data->fp, fpSize * sizeof(uint64_t) + ARR_OVERHEAD_NONULLS(1));
+
+        BitSet bitset;
+        bitset_init(&bitset, fp, fpSize);
+        data->bitCount = bitset_cardinality(&bitset);
+
+        data->counts = (ArrayType *) palloc(countsSize * sizeof(int16) + ARR_OVERHEAD_NONULLS(1));
+        data->counts->ndim = 1;
+        data->counts->dataoffset = 0;
+        data->counts->elemtype = INT2OID;
+        memcpy(ARR_DATA_PTR(data->counts), counts, countsSize * sizeof(int16));
+        *(ARR_DIMS(data->counts)) = countsSize;
+        *(ARR_LBOUND(data->counts)) = 1;
+        SET_VARSIZE(data->counts, countsSize * sizeof(int16) + ARR_OVERHEAD_NONULLS(1));
+
+        data->atoms = (bytea *) palloc(VARHDRSZ + atomsSize);
+        SET_VARSIZE(data->atoms, VARHDRSZ + atomsSize);
+        memcpy(VARDATA(data->atoms), atoms, atomsSize);
+
+        data->bonds = (bytea *) palloc(VARHDRSZ + bondsSize);
+        SET_VARSIZE(data->bonds, VARHDRSZ + bondsSize);
+        memcpy(VARDATA(data->bonds), bonds, bondsSize);
+
+
+        JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
+        JavaDeleteLongArray(fpArray, fp, JNI_ABORT);
+        JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
+        JavaDeleteByteArray(bondsArray, bonds, JNI_ABORT);
+
+        JavaDeleteRef(element);
+    }
+    PG_CATCH();
+    {
+        JavaDeleteRef(molfileArg);
+        JavaDeleteRef(element);
+        JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
+        JavaDeleteLongArray(fpArray, fp, JNI_ABORT);
+        JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
+        JavaDeleteByteArray(bondsArray, bonds, JNI_ABORT);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
 }
