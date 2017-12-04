@@ -62,7 +62,8 @@ inline void bitset_init_setted(BitSet *restrict const bitset, int size)
     for(int i = 0; i < length - 1; i++)
         words[i] = WORD_MASK;
 
-    words[length - 1] = WORD_MASK >> (-((int) size) & 0x3f);
+    if(length > 0)
+        words[length - 1] = WORD_MASK >> (-((int) size) & 0x3f);
 
     bitset->words = words;
     bitset->length = length;
