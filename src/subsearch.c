@@ -22,11 +22,11 @@
 #define FP_SIZE                   788
 #define COUNTS_SIZE               10
 #define COMPOUNDS_TABLE           "compounds"
+#define AUDIT_TABLE               "orchem_compound_audit"
 #define INDEX_TABLE               "orchem_index"
 #define MOLECULES_TABLE           "orchem_molecules"
 #define FINGERPRINT_TABLE         "orchem_fingerprint"
 #define MOLECULE_COUNTS_TABLE     "orchem_molecule_counts"
-#define ORCHEM_INDEX_FILE         "orchem_substructure_index.idx"
 
 
 typedef struct
@@ -453,13 +453,30 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 }
 
 
-PG_FUNCTION_INFO_V1(orchem_load_data);
-Datum orchem_load_data(PG_FUNCTION_ARGS)
+PG_FUNCTION_INFO_V1(orchem_sync_data);
+Datum orchem_sync_data(PG_FUNCTION_ARGS)
 {
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-        elog(ERROR, "orchem_load_data: SPI_connect() failed");
+        elog(ERROR, "orchem_sync_data: SPI_connect() failed");
 
     char isNullFlag;
+
+
+    /*
+     *  delete unnecessary data
+     */
+
+    if(unlikely(SPI_exec("delete from " MOLECULES_TABLE " tbl using "
+            AUDIT_TABLE " aud where tbl.id = aud.id and not aud.stored", 0) != SPI_OK_DELETE))
+        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
+
+    if(unlikely(SPI_exec("delete from " MOLECULE_COUNTS_TABLE " tbl using "
+            AUDIT_TABLE " aud where tbl.id = aud.id and not aud.stored", 0) != SPI_OK_DELETE))
+        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
+
+    if(unlikely(SPI_exec("delete from " FINGERPRINT_TABLE " tbl using "
+            AUDIT_TABLE " aud where tbl.id = aud.id and not aud.stored", 0) != SPI_OK_DELETE))
+        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
 
 
     /*
@@ -468,46 +485,57 @@ Datum orchem_load_data(PG_FUNCTION_ARGS)
 
     /* TODO: find a better way to obtain bigint[] OID */
     if(unlikely(SPI_exec("select typarray from pg_type where typname = 'int8'", 0) != SPI_OK_SELECT))
-        elog(ERROR, "orchem_load_data: SPI_exec() failed");
+        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
 
     if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-        elog(ERROR, "orchem_load_data: SPI_exec() failed");
+        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
 
     Oid int8arrayOid = DatumGetObjectId(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
 
     if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-        elog(ERROR, "orchem_load_data: SPI_getbinval() failed");
+        elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
 
     if(int8arrayOid == 0)
-        elog(ERROR, "orchem_load_data: cannot determine bigint[] oid");
+        elog(ERROR, "orchem_sync_data: cannot determine bigint[] oid");
 
 
-    SPIPlanPtr moleculesPlan = SPI_prepare("insert into " MOLECULES_TABLE " (seqid, id, atoms, bonds) values ($1,$2,$3,$4)",
+    SPIPlanPtr sequencePlan = SPI_prepare("update " MOLECULES_TABLE " SET seqid=$1 where id=$2",
+            2, (Oid[]) { INT4OID, INT4OID });
+
+    if(unlikely(sequencePlan == NULL))
+        elog(ERROR, "orchem_sync_data: SPI_prepare() failed");
+
+
+    SPIPlanPtr moleculesPlan = SPI_prepare("insert into " MOLECULES_TABLE " (seqid, id, atoms, bonds) values ($1,$2,$3,$4) "
+            "ON CONFLICT (id) DO UPDATE SET seqid=EXCLUDED.seqid, id=EXCLUDED.id, atoms=EXCLUDED.atoms, bonds=EXCLUDED.bonds",
             4, (Oid[]) { INT4OID, INT4OID, BYTEAOID, BYTEAOID });
 
     if(unlikely(moleculesPlan == NULL))
-        elog(ERROR, "orchem_load_data: SPI_prepare() failed");
+        elog(ERROR, "orchem_sync_data: SPI_prepare() failed");
 
 
-    SPIPlanPtr countsPlan = SPI_prepare("insert into " MOLECULE_COUNTS_TABLE " (id, counts) values ($1,$2)",
+    SPIPlanPtr countsPlan = SPI_prepare("insert into " MOLECULE_COUNTS_TABLE " (id, counts) values ($1,$2) "
+            "ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id, counts=EXCLUDED.counts",
             2, (Oid[]) { INT4OID, INT2ARRAYOID });
 
     if(unlikely(countsPlan == NULL))
-        elog(ERROR, "orchem_load_data: SPI_prepare() failed");
+        elog(ERROR, "orchem_sync_data: SPI_prepare() failed");
 
 
-    SPIPlanPtr fingerprintPlan = SPI_prepare("insert into " FINGERPRINT_TABLE " (id, bit_count, fp) values ($1,$2,$3)",
+    SPIPlanPtr fingerprintPlan = SPI_prepare("insert into " FINGERPRINT_TABLE " (id, bit_count, fp) values ($1,$2,$3) "
+            "ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id, bit_count=EXCLUDED.bit_count, fp=EXCLUDED.fp",
             3, (Oid[]) { INT4OID, INT2OID, int8arrayOid });
 
     if(unlikely(fingerprintPlan == NULL))
-        elog(ERROR, "orchem_load_data: SPI_prepare() failed");
+        elog(ERROR, "orchem_sync_data: SPI_prepare() failed");
 
 
-    Portal cursor = SPI_cursor_open_with_args(NULL, "select id, molfile from " COMPOUNDS_TABLE " order by id",
+    Portal cursor = SPI_cursor_open_with_args(NULL, "select cmp.id, aud.stored, cmp.molfile from " COMPOUNDS_TABLE " cmp "
+            " left join " AUDIT_TABLE " aud on cmp.id = aud.id order by cmp.id",
             0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
     if(unlikely(cursor == NULL))
-            elog(ERROR, "orchem_load_data: SPI_cursor_open_with_args() failed");
+            elog(ERROR, "orchem_sync_data: SPI_cursor_open_with_args() failed");
 
 
     int seqid = 0;
@@ -516,8 +544,8 @@ Datum orchem_load_data(PG_FUNCTION_ARGS)
     {
         SPI_cursor_fetch(cursor, true, 100000);
 
-        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
-            elog(ERROR, "orchem_load_data: SPI_cursor_fetch() failed");
+        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 3))
+            elog(ERROR, "orchem_sync_data: SPI_cursor_fetch() failed");
 
         if(SPI_processed == 0)
             break;
@@ -533,46 +561,61 @@ Datum orchem_load_data(PG_FUNCTION_ARGS)
             Datum id = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "orchem_load_data: SPI_getbinval() failed");
+                elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
 
 
-            Datum molfile = SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag);
+            Datum stored = SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag);
 
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "orchem_load_data: SPI_getbinval() failed");
+            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE))
+                elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
 
+            if(isNullFlag)
+            {
+                Datum sequenceValues[] = { Int32GetDatum(seqid), id };
 
-            OrchemLoaderData data;
-            VarChar *mol = DatumGetVarCharP(molfile);
+                if(SPI_execute_plan(sequencePlan, sequenceValues, NULL, false, 0) != SPI_OK_UPDATE)
+                    elog(ERROR, "orchem_sync_data: SPI_execute_plan() failed");
+            }
+            else
+            {
+                Datum molfile = SPI_getbinval(tuple, tuptable->tupdesc, 3, &isNullFlag);
 
-            java_parse_orchem_data(&data, VARDATA(mol), VARSIZE(mol) - VARHDRSZ);
-
-            if((char *) mol != DatumGetPointer(molfile))
-                pfree(mol);
-
-
-            Datum moleculesValues[] = { Int32GetDatum(seqid), id, PointerGetDatum(data.atoms), PointerGetDatum(data.bonds)};
-
-            if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
-                elog(ERROR, "orchem_load_data: SPI_execute_plan() failed");
-
-
-            Datum countsValues[] = { id, PointerGetDatum(data.counts) };
-
-            if(SPI_execute_plan(countsPlan, countsValues, NULL, false, 0) != SPI_OK_INSERT)
-                elog(ERROR, "orchem_load_data: SPI_execute_plan() failed");
+                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                    elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
 
 
-            Datum fingerprintValues[] = { id, Int16GetDatum(data.bitCount), PointerGetDatum(data.fp) };
+                OrchemLoaderData data;
+                VarChar *mol = DatumGetVarCharP(molfile);
 
-            if(SPI_execute_plan(fingerprintPlan, fingerprintValues, NULL, false, 0) != SPI_OK_INSERT)
-                elog(ERROR, "orchem_load_data: SPI_execute_plan() failed");
+                java_parse_orchem_data(&data, VARDATA(mol), VARSIZE(mol) - VARHDRSZ);
+
+                if((char *) mol != DatumGetPointer(molfile))
+                    pfree(mol);
 
 
-            pfree(data.counts);
-            pfree(data.fp);
-            pfree(data.atoms);
-            pfree(data.bonds);
+                Datum moleculesValues[] = {Int32GetDatum(seqid), id, PointerGetDatum(data.atoms), PointerGetDatum(data.bonds)};
+
+                if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
+                    elog(ERROR, "orchem_sync_data: SPI_execute_plan() failed");
+
+
+                Datum countsValues[] = { id, PointerGetDatum(data.counts) };
+
+                if(SPI_execute_plan(countsPlan, countsValues, NULL, false, 0) != SPI_OK_INSERT)
+                    elog(ERROR, "orchem_sync_data: SPI_execute_plan() failed");
+
+
+                Datum fingerprintValues[] = { id, Int16GetDatum(data.bitCount), PointerGetDatum(data.fp) };
+
+                if(SPI_execute_plan(fingerprintPlan, fingerprintValues, NULL, false, 0) != SPI_OK_INSERT)
+                    elog(ERROR, "orchem_sync_data: SPI_execute_plan() failed");
+
+
+                pfree(data.counts);
+                pfree(data.fp);
+                pfree(data.atoms);
+                pfree(data.bonds);
+            }
 
             seqid++;
         }
@@ -582,6 +625,9 @@ Datum orchem_load_data(PG_FUNCTION_ARGS)
 
     SPI_cursor_close(cursor);
 
+    if(unlikely(SPI_exec("delete from " AUDIT_TABLE, 0) != SPI_OK_DELETE))
+        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
+
 
     /*
      *  create index
@@ -589,168 +635,205 @@ Datum orchem_load_data(PG_FUNCTION_ARGS)
 
     createBasePath();
 
-    char *indexFilePath = getFilePath(ORCHEM_INDEX_FILE);
-    int fd = open(indexFilePath, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+    if(unlikely(SPI_exec("select id from " INDEX_TABLE, 0) != SPI_OK_SELECT))
+        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
 
-    if(fd == -1)
-        elog(ERROR, "orchem_load_data: open() failed");
+    int indexNumber = 0;
 
-
-    if(unlikely(SPI_execute("select count(*) from " MOLECULES_TABLE, false, FETCH_ALL) != SPI_OK_SELECT))
-        elog(ERROR, "orchem_load_data: SPI_execute() failed");
-
-    if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
-        elog(ERROR, "orchem_load_data: SPI_execute() failed");
-
-    int64_t moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
-
-    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-        elog(ERROR, "orchem_load_data: SPI_getbinval() failed");
-
-
-    BitSet bitmap[FP_SIZE];
-
-    for(int i = 0; i < FP_SIZE; i++)
-        bitset_init_empty(bitmap + i, moleculeCount);
-
-    Portal fpCursor = SPI_cursor_open_with_args(NULL, "select fp from " FINGERPRINT_TABLE " order by id",
-            0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
-
-    if(unlikely(fpCursor == NULL))
-            elog(ERROR, "orchem_load_data: SPI_cursor_open_with_args() failed");
-
-    int idx = 0;
-
-    while(true)
+    if(SPI_processed != 0)
     {
-        SPI_cursor_fetch(fpCursor, true, 100000);
+        if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
+            elog(ERROR, "orchem_sync_data: SPI_execute_plan() failed");
 
-        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-            elog(ERROR, "orchem_load_data: SPI_cursor_fetch() failed");
+        Datum number = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
 
-        if(SPI_processed == 0)
-            break;
+        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE) || isNullFlag)
+            elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
 
-
-        for(int i = 0; i < SPI_processed; i++)
-        {
-            HeapTuple tuple = SPI_tuptable->vals[i];
-
-            Datum fpDatum = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "orchem_load_data: SPI_getbinval() failed");
-
-            ArrayType *fpArray = DatumGetArrayTypeP(fpDatum);
-
-            if(ARR_NDIM(fpArray))
-            {
-                int length = ARR_DIMS(fpArray)[0];
-                uint64_t *data = (uint64_t *) ARR_DATA_PTR(fpArray);
-
-                BitSet fp;
-                bitset_init(&fp, data, length);
-
-                for(int j = bitset_next_set_bit(&fp, 1); j >= 0 && j <= FP_SIZE; j = bitset_next_set_bit(&fp, j + 1))
-                    bitset_set(bitmap + j - 1, idx);
-            }
-
-            idx++;
-        }
-
-        SPI_freetuptable(SPI_tuptable);
+        indexNumber = DatumGetInt32(number) + 1;
     }
 
-    SPI_cursor_close(fpCursor);
+    Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
+    size_t basePathLength = strlen(DataDir);
+    size_t databaseLength = strlen(database->data);
+
+    char *indexFilePath = (char *) palloc(basePathLength +  databaseLength + 64);
+    sprintf(indexFilePath, "%s/%s/orchem_substructure_index-%i.idx", DataDir, database->data, indexNumber);
 
 
-    uint64_t offset = FP_SIZE + 1;
-
-#if USE_COUNT_FINGERPRINT
-    offset += (moleculeCount * COUNTS_SIZE * sizeof(uint16) + sizeof(uint64_t) - 1) / sizeof(uint64_t);
-#endif
-
-    for(int i = 0; i < FP_SIZE; i++)
-    {
-        if(write(fd, &offset, sizeof(uint64_t)) != sizeof(uint64_t))
-            elog(ERROR, "orchem_load_data: write() failed");
-
-        offset += bitmap[i].wordsInUse + 1;
-    }
-
-    if(write(fd, &moleculeCount, sizeof(int64_t)) != sizeof(int64_t))
-        elog(ERROR, "orchem_load_data: write() failed");
-
-
-#if USE_COUNT_FINGERPRINT
-    Portal countCursor = SPI_cursor_open_with_args(NULL, "select counts from " MOLECULE_COUNTS_TABLE " order by id",
-            0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
-
-    if(unlikely(countCursor == NULL))
-            elog(ERROR, "orchem_load_data: SPI_cursor_open_with_args() failed");
-
-    while(true)
-    {
-        SPI_cursor_fetch(countCursor, true, 100000);
-
-        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-            elog(ERROR, "orchem_load_data: SPI_cursor_fetch() failed");
-
-        if(SPI_processed == 0)
-            break;
-
-
-        for(int i = 0; i < SPI_processed; i++)
-        {
-            HeapTuple tuple = SPI_tuptable->vals[i];
-
-            Datum countsDatum = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "orchem_load_data: SPI_getbinval() failed");
-
-            ArrayType *countsArray = DatumGetArrayTypeP(countsDatum);
-
-            if(ARR_NDIM(countsArray) != 1 && ARR_DIMS(countsArray)[0] != COUNTS_SIZE)
-                elog(ERROR, "orchem_load_data: SPI_getbinval() failed");
-
-            if(write(fd, ARR_DATA_PTR(countsArray), COUNTS_SIZE * sizeof(int16)) != COUNTS_SIZE * sizeof(int16))
-                elog(ERROR, "orchem_load_data: write() failed");
-        }
-
-        SPI_freetuptable(SPI_tuptable);
-    }
-
-    SPI_cursor_close(countCursor);
-
-
-    uint64_t zero = 0;
-    size_t padding = (sizeof(uint64_t) - (moleculeCount * COUNTS_SIZE * sizeof(uint16)) % sizeof(uint64_t)) % sizeof(uint64_t);
-
-    if(write(fd, &zero, padding) != padding)
-        elog(ERROR, "orchem_load_data: write() failed");
-#endif
-
-
-    for(int i = 0; i < FP_SIZE; i++)
-    {
-        uint64_t wordsInUse = bitmap[i].wordsInUse;
-
-        if(write(fd, &wordsInUse, sizeof(uint64_t)) != sizeof(uint64_t))
-            elog(ERROR, "orchem_load_data: write() failed");
-
-        if(write(fd, bitmap[i].words, wordsInUse * sizeof(uint64_t)) != wordsInUse * sizeof(uint64_t))
-            elog(ERROR, "orchem_load_data: write() failed");
-    }
-
-
-    if(close(fd) != 0)
-        elog(ERROR, "orchem_load_data: close() failed");
-
+    if(unlikely(SPI_exec("delete from " INDEX_TABLE, 0) != SPI_OK_DELETE))
+        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
 
     if(SPI_execute_with_args("insert into " INDEX_TABLE " (id, path) values ($1,$2)", 2, (Oid[]) { INT4OID, TEXTOID },
-            (Datum[]) {Int32GetDatum(0), CStringGetTextDatum(indexFilePath)}, NULL, false, 0) != SPI_OK_INSERT)
-        elog(ERROR, "orchem_load_data: SPI_execute_with_args() failed");
+            (Datum[]) {Int32GetDatum(indexNumber), CStringGetTextDatum(indexFilePath)}, NULL, false, 0) != SPI_OK_INSERT)
+        elog(ERROR, "orchem_sync_data: SPI_execute_with_args() failed");
+
+
+    int fd = open(indexFilePath, O_WRONLY, S_IRUSR | S_IWUSR);
+
+    if(fd == -1)
+        elog(ERROR, "orchem_sync_data: open() failed");
+
+    PG_TRY();
+    {
+        if(unlikely(SPI_execute("select count(*) from " MOLECULES_TABLE, false, FETCH_ALL) != SPI_OK_SELECT))
+            elog(ERROR, "orchem_sync_data: SPI_execute() failed");
+
+        if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
+            elog(ERROR, "orchem_sync_data: SPI_execute() failed");
+
+        int64_t moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
+
+        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+            elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
+
+
+        BitSet bitmap[FP_SIZE];
+
+        for(int i = 0; i < FP_SIZE; i++)
+            bitset_init_empty(bitmap + i, moleculeCount);
+
+        Portal fpCursor = SPI_cursor_open_with_args(NULL, "select fp from " FINGERPRINT_TABLE " order by id",
+                0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
+
+        if(unlikely(fpCursor == NULL))
+                elog(ERROR, "orchem_sync_data: SPI_cursor_open_with_args() failed");
+
+        int idx = 0;
+
+        while(true)
+        {
+            SPI_cursor_fetch(fpCursor, true, 100000);
+
+            if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
+                elog(ERROR, "orchem_sync_data: SPI_cursor_fetch() failed");
+
+            if(SPI_processed == 0)
+                break;
+
+
+            for(int i = 0; i < SPI_processed; i++)
+            {
+                HeapTuple tuple = SPI_tuptable->vals[i];
+
+                Datum fpDatum = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
+
+                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                    elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
+
+                ArrayType *fpArray = DatumGetArrayTypeP(fpDatum);
+
+                if(ARR_NDIM(fpArray))
+                {
+                    int length = ARR_DIMS(fpArray)[0];
+                    uint64_t *data = (uint64_t *) ARR_DATA_PTR(fpArray);
+
+                    BitSet fp;
+                    bitset_init(&fp, data, length);
+
+                    for(int j = bitset_next_set_bit(&fp, 1); j >= 0 && j <= FP_SIZE; j = bitset_next_set_bit(&fp, j + 1))
+                        bitset_set(bitmap + j - 1, idx);
+                }
+
+                idx++;
+            }
+
+            SPI_freetuptable(SPI_tuptable);
+        }
+
+        SPI_cursor_close(fpCursor);
+
+
+        uint64_t offset = FP_SIZE + 1;
+
+    #if USE_COUNT_FINGERPRINT
+        offset += (moleculeCount * COUNTS_SIZE * sizeof(uint16) + sizeof(uint64_t) - 1) / sizeof(uint64_t);
+    #endif
+
+        for(int i = 0; i < FP_SIZE; i++)
+        {
+            if(write(fd, &offset, sizeof(uint64_t)) != sizeof(uint64_t))
+                elog(ERROR, "orchem_sync_data: write() failed");
+
+            offset += bitmap[i].wordsInUse + 1;
+        }
+
+        if(write(fd, &moleculeCount, sizeof(int64_t)) != sizeof(int64_t))
+            elog(ERROR, "orchem_sync_data: write() failed");
+
+
+#if USE_COUNT_FINGERPRINT
+        Portal countCursor = SPI_cursor_open_with_args(NULL, "select counts from " MOLECULE_COUNTS_TABLE " order by id",
+                0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
+
+        if(unlikely(countCursor == NULL))
+                elog(ERROR, "orchem_sync_data: SPI_cursor_open_with_args() failed");
+
+        while(true)
+        {
+            SPI_cursor_fetch(countCursor, true, 100000);
+
+            if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
+                elog(ERROR, "orchem_sync_data: SPI_cursor_fetch() failed");
+
+            if(SPI_processed == 0)
+                break;
+
+
+            for(int i = 0; i < SPI_processed; i++)
+            {
+                HeapTuple tuple = SPI_tuptable->vals[i];
+
+                Datum countsDatum = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
+
+                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                    elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
+
+                ArrayType *countsArray = DatumGetArrayTypeP(countsDatum);
+
+                if(ARR_NDIM(countsArray) != 1 && ARR_DIMS(countsArray)[0] != COUNTS_SIZE)
+                    elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
+
+                if(write(fd, ARR_DATA_PTR(countsArray), COUNTS_SIZE * sizeof(int16)) != COUNTS_SIZE * sizeof(int16))
+                    elog(ERROR, "orchem_sync_data: write() failed");
+            }
+
+            SPI_freetuptable(SPI_tuptable);
+        }
+
+        SPI_cursor_close(countCursor);
+
+
+        uint64_t zero = 0;
+        size_t padding = (sizeof(uint64_t) - (moleculeCount * COUNTS_SIZE * sizeof(uint16)) % sizeof(uint64_t)) % sizeof(uint64_t);
+
+        if(write(fd, &zero, padding) != padding)
+            elog(ERROR, "orchem_sync_data: write() failed");
+#endif
+
+
+        for(int i = 0; i < FP_SIZE; i++)
+        {
+            uint64_t wordsInUse = bitmap[i].wordsInUse;
+
+            if(write(fd, &wordsInUse, sizeof(uint64_t)) != sizeof(uint64_t))
+                elog(ERROR, "orchem_sync_data: write() failed");
+
+            if(write(fd, bitmap[i].words, wordsInUse * sizeof(uint64_t)) != wordsInUse * sizeof(uint64_t))
+                elog(ERROR, "orchem_sync_data: write() failed");
+        }
+
+
+        if(close(fd) != 0)
+            elog(ERROR, "orchem_sync_data: close() failed");
+    }
+    PG_CATCH();
+    {
+        unlink(indexFilePath);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
 
 
     SPI_finish();

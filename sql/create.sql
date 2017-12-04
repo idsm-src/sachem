@@ -17,11 +17,11 @@ CREATE TABLE orchem_index (
 );
 
 CREATE TABLE orchem_molecules (
-    seqid                 INT NOT NULL,
     id                    INT NOT NULL,
+    seqid                 INT NOT NULL,
     atoms                 BYTEA NOT NULL,
     bonds                 BYTEA NOT NULL,
-    PRIMARY KEY (seqid)
+    PRIMARY KEY (id)
 );
 
 CREATE TABLE orchem_molecule_counts (
@@ -38,6 +38,7 @@ CREATE TABLE orchem_fingerprint (
 );
 
 
+CREATE INDEX orchem_molecules__seqid ON orchem_molecules(seqid);
 CREATE INDEX orchem_fingerprint__bit_count ON orchem_fingerprint(bit_count);
 
 
@@ -45,7 +46,7 @@ CREATE FUNCTION "orchem_substructure_search"(varchar, varchar, int, boolean, boo
 CREATE FUNCTION "lucy_substructure_search"(varchar, varchar, int, boolean, boolean, boolean, int = 5000) RETURNS SETOF int AS 'libsachem.so','lucy_substructure_search' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "orchem_similarity_search"(varchar, varchar, float4, int) RETURNS TABLE (compound int, score float4) AS 'libsachem.so','orchem_similarity_search' LANGUAGE C IMMUTABLE STRICT;
 
-CREATE FUNCTION "orchem_load_data"() RETURNS void AS 'libsachem.so','orchem_load_data' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION "orchem_sync_data"() RETURNS void AS 'libsachem.so','orchem_sync_data' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "lucy_substructure_create_index"() RETURNS bool AS 'libsachem.so','lucy_substructure_create_index' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "lucy_substructure_optimize_index"() RETURNS bool AS 'libsachem.so','lucy_substructure_optimize_index' LANGUAGE C IMMUTABLE STRICT;
 
