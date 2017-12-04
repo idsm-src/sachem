@@ -244,10 +244,10 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
         bitset_init_alloc(&info->candidates, moleculeCount);
         bitset_init_setted(&info->resultMask, moleculeCount);
 
-        info->isomorphismContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx, "subsearch isomorphism context",
-                ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
-        info->targetContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx, "subsearch target context",
-                ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
+        info->isomorphismContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx,
+                "subsearch isomorphism context", ALLOCSET_DEFAULT_SIZES);
+        info->targetContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx,
+                "subsearch target context", ALLOCSET_DEFAULT_SIZES);
 
         info->arrayBuffer = (ArrayType *) palloc(FETCH_SIZE * sizeof(int32) + ARR_OVERHEAD_NONULLS(1));
         info->arrayBuffer->ndim = 1;

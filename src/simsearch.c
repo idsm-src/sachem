@@ -7,11 +7,7 @@
 #include <utils/array.h>
 #include <utils/builtins.h>
 #include <utils/memutils.h>
-
-#if PG_VERSION_NUM >= 90300
 #include <access/htup_details.h>
-#endif
-
 #include "bitset.h"
 #include "heap.h"
 #include "java.h"
@@ -77,8 +73,7 @@ void simsearch_module_init(void)
 
 
         /* create tuple description */
-        mcxt = AllocSetContextCreate(TopMemoryContext, "simsearch memory context",
-                ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
+        mcxt = AllocSetContextCreate(TopMemoryContext, "simsearch memory context", ALLOCSET_DEFAULT_SIZES);
 
         PG_MEMCONTEXT_BEGIN(mcxt);
         tupdesc = CreateTemplateTupleDesc(2, false);
