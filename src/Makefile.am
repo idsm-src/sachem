@@ -23,5 +23,4 @@ EXTRA_DIST = \
         molecule.h \
         sachem.h \
         simsearch.h \
-        subsearch.h \
         subsearch-lucy.h
