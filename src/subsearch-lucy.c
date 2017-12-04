@@ -15,7 +15,6 @@
 #include "java.h"
 #include "molecule.h"
 #include "sachem.h"
-#include "subsearch.h"
 #include "fpsearch/fpsearch-lucy.h"
 
 
