@@ -669,7 +669,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
         elog(ERROR, "orchem_sync_data: SPI_execute_with_args() failed");
 
 
-    int fd = open(indexFilePath, O_WRONLY, S_IRUSR | S_IWUSR);
+    int fd = open(indexFilePath, O_EXCL | O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
 
     if(fd == -1)
         elog(ERROR, "orchem_sync_data: open() failed");
