@@ -1,4 +1,5 @@
-lib_LTLIBRARIES = libfpsearch.la
+pglibdir = $(POSTGRESQL_LIBDIR)
+pglib_LTLIBRARIES = libfpsearch.la
 
 libfpsearch_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(CLOWNFISH_CPPFLAGS) $(LUCY_CPPFLAGS) $(RDKIT_CPPFLAGS) -DDATADIR=\"$(datadir)/$(PACKAGE)\"
 

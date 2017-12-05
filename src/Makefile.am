@@ -1,6 +1,7 @@
 SUBDIRS=fpsearch
 
-lib_LTLIBRARIES = libsachem.la
+pglibdir = $(POSTGRESQL_LIBDIR)
+pglib_LTLIBRARIES = libsachem.la
 
 libsachem_la_CFLAGS = -std=gnu99 -Ofast -march=native
 libsachem_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(JDK8_CPPFLAGS) -DBINDIR=\"$(bindir)\" -DDATADIR=\"$(datadir)/$(PACKAGE)\" -DJARDIR=\"$(datadir)/$(PACKAGE)/jar\"

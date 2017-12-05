@@ -29,8 +29,6 @@ fi
 dnl check for PostgreSQL
 AX_LIB_POSTGRESQL(9.5.0)
 
-libdir=$POSTGRESQL_LIBDIR
-
 dnl check for JDK8
 AX_JDK8
 
