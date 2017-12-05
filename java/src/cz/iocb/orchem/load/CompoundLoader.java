@@ -16,6 +16,9 @@ import java.util.zip.GZIPInputStream;
 
 public class CompoundLoader
 {
+    private static final int batchSize = 1000;
+
+
     private static void parse(InputStream inputStream, String idTag, String idPrefix) throws Exception
     {
         Reader decoder = new InputStreamReader(inputStream, "US-ASCII");
@@ -28,6 +31,7 @@ public class CompoundLoader
             try (PreparedStatement insertStatement = connection
                     .prepareStatement("insert into compounds (id, molfile) values (?,?)"))
             {
+                int count = 0;
 
                 while((line = reader.readLine()) != null)
                 {
@@ -94,12 +98,17 @@ public class CompoundLoader
                         }
                     }
 
+                    count++;
                     insertStatement.setInt(1, id);
                     insertStatement.setString(2, sdf);
                     insertStatement.addBatch();
+
+                    if(count % batchSize == 0)
+                        insertStatement.executeBatch();
                 }
 
-                insertStatement.executeBatch();
+                if(count % batchSize != 0)
+                    insertStatement.executeBatch();
             }
         }
     }
