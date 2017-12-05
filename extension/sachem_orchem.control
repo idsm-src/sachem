@@ -1,0 +1,5 @@
+# sachem_orchem extension
+comment = 'Sachem/OrChem chemical cartridge'
+default_version = '0.1'
+module_pathname = '$libdir/libsachem'
+relocatable = true
