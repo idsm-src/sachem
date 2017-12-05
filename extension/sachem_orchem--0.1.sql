@@ -4,6 +4,7 @@
 
 CREATE TABLE compounds (
     id                    INT NOT NULL,
+    version               INT NOT NULL,
     molfile               TEXT NOT NULL,
     PRIMARY KEY (id)
 );
@@ -61,9 +62,15 @@ CREATE FUNCTION "orchem_sync_data"() RETURNS void AS 'MODULE_PATHNAME','orchem_s
 CREATE FUNCTION orchem_compound_audit() RETURNS TRIGGER AS
 $body$
 BEGIN
-  IF (TG_OP = 'UPDATE' OR TG_OP = 'INSERT') THEN
+  IF (TG_OP = 'INSERT') THEN
     INSERT INTO orchem_compound_audit (id, stored) VALUES (NEW.id, true)
         ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id, stored=true;
+    RETURN NEW;
+  ELSIF (TG_OP = 'UPDATE') THEN
+    IF (OLD.molfile != NEW.molfile) THEN
+        INSERT INTO orchem_compound_audit (id, stored) VALUES (NEW.id, true)
+            ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id, stored=true;
+    END IF;
     RETURN NEW;
   ELSIF (TG_OP = 'DELETE') THEN
     INSERT INTO orchem_compound_audit (id, stored) VALUES (OLD.id, false)
@@ -77,7 +84,7 @@ BEGIN
 END;
 $body$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE TRIGGER orchem_compound_audit BEFORE INSERT OR UPDATE OR DELETE ON compounds
+CREATE TRIGGER orchem_compound_audit AFTER INSERT OR UPDATE OR DELETE ON compounds
     FOR EACH ROW EXECUTE PROCEDURE orchem_compound_audit();
 
 CREATE TRIGGER orchem_truncate_compounds_audit BEFORE TRUNCATE ON compounds
