@@ -29,6 +29,14 @@ CREATE TABLE orchem_molecules (
     PRIMARY KEY (id)
 );
 
+CREATE TABLE orchem_molecule_errors (
+    id                    SERIAL NOT NULL,
+    timestamp             TIMESTAMPTZ NOT NULL DEFAULT now(),
+    compound              INT NOT NULL,
+    message               TEXT NOT NULL,
+    PRIMARY KEY (id)
+);
+
 CREATE TABLE orchem_molecule_counts (
     id                    INT NOT NULL,
     counts                SMALLINT[] NOT NULL,
@@ -52,6 +60,7 @@ GRANT INSERT ON TABLE compounds TO PUBLIC;
 GRANT UPDATE ON TABLE compounds TO PUBLIC;
 GRANT DELETE ON TABLE compounds TO PUBLIC;
 GRANT TRUNCATE ON TABLE compounds TO PUBLIC;
+GRANT SELECT ON TABLE orchem_molecule_errors TO PUBLIC;
 
 
 CREATE FUNCTION "orchem_substructure_search"(varchar, varchar, int, boolean, boolean, boolean, int = 5000) RETURNS SETOF int AS 'MODULE_PATHNAME','orchem_substructure_search' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;

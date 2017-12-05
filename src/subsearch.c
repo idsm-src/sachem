@@ -25,6 +25,7 @@
 #define AUDIT_TABLE               "orchem_compound_audit"
 #define INDEX_TABLE               "orchem_index"
 #define MOLECULES_TABLE           "orchem_molecules"
+#define MOLECULE_ERRORS_TABLE     "orchem_molecule_errors"
 #define FINGERPRINT_TABLE         "orchem_fingerprint"
 #define MOLECULE_COUNTS_TABLE     "orchem_molecule_counts"
 
@@ -538,6 +539,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             elog(ERROR, "orchem_sync_data: SPI_cursor_open_with_args() failed");
 
 
+    MemoryContext originalMemoryContext = CurrentMemoryContext;
     int seqid = 0;
 
     while(true)
@@ -586,12 +588,36 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
                 OrchemLoaderData data;
                 VarChar *mol = DatumGetVarCharP(molfile);
+                ErrorData *edata = NULL;
 
-                java_parse_orchem_data(&data, VARDATA(mol), VARSIZE(mol) - VARHDRSZ);
+                PG_TRY();
+                {
+                    java_parse_orchem_data(&data, VARDATA(mol), VARSIZE(mol) - VARHDRSZ);
+                }
+                PG_CATCH();
+                {
+                    MemoryContextSwitchTo(originalMemoryContext);
+                    edata = CopyErrorData();
+                    FlushErrorState();
+                }
+                PG_END_TRY();
 
                 if((char *) mol != DatumGetPointer(molfile))
                     pfree(mol);
 
+                if(edata != NULL)
+                {
+                    elog(NOTICE, "%i: %s", DatumGetInt32(id), edata->message);
+                    Datum message = CStringGetTextDatum(edata->message);
+
+                    if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)", 2,
+                            (Oid[]) { INT4OID, TEXTOID }, (Datum[]) {Int32GetDatum(id), message}, NULL, false, 0) != SPI_OK_INSERT)
+                        elog(ERROR, "orchem_sync_data: SPI_execute_with_args() failed");
+
+                    pfree(DatumGetPointer(message));
+                    FreeErrorData(edata);
+                    continue;
+                }
 
                 Datum moleculesValues[] = {Int32GetDatum(seqid), id, PointerGetDatum(data.atoms), PointerGetDatum(data.bonds)};
 
