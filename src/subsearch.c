@@ -390,9 +390,9 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                 elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
-    #if SHOW_STATS
+#if SHOW_STATS
             info->candidateCount++;
-    #endif
+#endif
 
             bytea *atomsData = DatumGetByteaP(atoms);
             bytea *bondsData = DatumGetByteaP(bonds);
@@ -751,9 +751,9 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
         uint64_t offset = FP_SIZE + 1;
 
-    #if USE_COUNT_FINGERPRINT
+#if USE_COUNT_FINGERPRINT
         offset += (moleculeCount * COUNTS_SIZE * sizeof(uint16) + sizeof(uint64_t) - 1) / sizeof(uint64_t);
-    #endif
+#endif
 
         for(int i = 0; i < FP_SIZE; i++)
         {

@@ -308,9 +308,9 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                 elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
-    #if SHOW_STATS
+#if SHOW_STATS
             info->candidateCount++;
-    #endif
+#endif
 
             bytea *atomsData = DatumGetByteaP(atoms);
             bytea *bondsData = DatumGetByteaP(bonds);
