@@ -23,5 +23,4 @@ EXTRA_DIST = \
         java.h \
         molecule.h \
         sachem.h \
-        simsearch.h \
         subsearch-lucy.h

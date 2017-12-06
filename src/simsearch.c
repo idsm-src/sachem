@@ -12,7 +12,6 @@
 #include "heap.h"
 #include "java.h"
 #include "sachem.h"
-#include "simsearch.h"
 
 
 #define SHOW_STATS          0
@@ -47,55 +46,51 @@ typedef struct
 } SimilaritySearchData;
 
 
-static bool initialised = false;
-static SPIPlanPtr mainQueryPlan;
-static MemoryContext mcxt = NULL;
+static SPIPlanPtr mainQueryPlan = NULL;
 static TupleDesc tupdesc = NULL;
 
 
-void simsearch_module_init(void)
+static void orchem_simsearch_init(void)
 {
-    PG_TRY();
+    /* prepare query plan */
+    if(unlikely(mainQueryPlan == NULL))
     {
-        /* prepare query plan */
         if(unlikely(SPI_connect() != SPI_OK_CONNECT))
             elog(ERROR, "%s: SPI_connect() failed", __func__);
 
-        mainQueryPlan = SPI_prepare("select id, fp from " FINGERPRINT_TABLE " where bit_count = $1", 1, (Oid[]) { INT4OID });
+        SPIPlanPtr plan = SPI_prepare("select id, fp from " FINGERPRINT_TABLE " where bit_count = $1", 1, (Oid[]) { INT4OID });
 
-        if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
+        if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
             elog(ERROR, "%s: SPI_keepplan() failed", __func__);
 
+        mainQueryPlan = plan;
         SPI_finish();
-
-
-        /* create tuple description */
-        mcxt = AllocSetContextCreate(TopMemoryContext, "simsearch memory context", ALLOCSET_DEFAULT_SIZES);
-
-        PG_MEMCONTEXT_BEGIN(mcxt);
-        tupdesc = CreateTemplateTupleDesc(2, false);
-        TupleDescInitEntry(tupdesc, (AttrNumber) 1, "compound", INT4OID, -1, 0);
-        TupleDescInitEntry(tupdesc, (AttrNumber) 2, "score", FLOAT4OID, -1, 0);
-        tupdesc = BlessTupleDesc(tupdesc);
-        PG_MEMCONTEXT_END();
-
-
-        initialised = true;
     }
-    PG_CATCH();
+
+    /* create tuple description */
+    if(unlikely(tupdesc == NULL))
     {
-        elog(NOTICE, "%s: initialization failed", __func__);
+        TupleDesc desc = NULL;
+
+        PG_MEMCONTEXT_BEGIN(TopMemoryContext);
+        PG_TRY();
+        {
+            desc = CreateTemplateTupleDesc(2, false);
+            TupleDescInitEntry(desc, (AttrNumber) 1, "compound", INT4OID, -1, 0);
+            TupleDescInitEntry(desc, (AttrNumber) 2, "score", FLOAT4OID, -1, 0);
+            desc = BlessTupleDesc(desc);
+            tupdesc = desc;
+        }
+        PG_CATCH();
+        {
+            if(desc != NULL)
+                FreeTupleDesc(desc);
+
+            PG_RE_THROW();
+        }
+        PG_END_TRY();
+        PG_MEMCONTEXT_END();
     }
-    PG_END_TRY();
-}
-
-
-void simsearch_module_finish(void)
-{
-    initialised = false;
-
-    if(mcxt != NULL)
-        MemoryContextDelete(mcxt);
 }
 
 
@@ -104,13 +99,12 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
 {
     if(SRF_IS_FIRSTCALL())
     {
+        orchem_simsearch_init();
+
 #if SHOW_STATS
         struct timeval begin;
         gettimeofday(&begin, NULL);
 #endif
-
-        if(unlikely(!initialised))
-            elog(ERROR, "%s: simsearch module is not properly initialized", __func__);
 
         VarChar *query = PG_GETARG_VARCHAR_P(0);
         text *type = PG_GETARG_TEXT_P(1);
