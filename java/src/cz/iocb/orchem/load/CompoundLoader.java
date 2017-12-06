@@ -36,57 +36,19 @@ public class CompoundLoader
 
             while((line = reader.readLine()) != null)
             {
-                int id = -1;
+                Integer id = null;
                 StringBuilder sdfBuilder = new StringBuilder();
 
-
-                sdfBuilder.append('\n');
-                sdfBuilder.append(line);
-
-                line = reader.readLine();
-                sdfBuilder.append(line);
-                sdfBuilder.append('\n');
-
-
-
-                for(int i = 0; i < 2; i++)
+                while(!line.startsWith(">") && !line.equals("$$$$") && line != null)
                 {
+                    sdfBuilder.append(line);
+                    sdfBuilder.append('\n');
                     line = reader.readLine();
-                    sdfBuilder.append(line);
-                    sdfBuilder.append('\n');
-                }
-
-                int atoms = Integer.parseInt(line.substring(0, 3).trim());
-                int bonds = Integer.parseInt(line.substring(3, 6).trim());
-
-
-                for(int i = 0; i < atoms; i++)
-                {
-                    line = reader.readLine();
-                    sdfBuilder.append(line);
-                    sdfBuilder.append('\n');
-                }
-
-
-                for(int i = 0; i < bonds; i++)
-                {
-                    line = reader.readLine();
-                    sdfBuilder.append(line);
-                    sdfBuilder.append('\n');
-                }
-
-                while((line = reader.readLine()) != null)
-                {
-                    sdfBuilder.append(line);
-                    sdfBuilder.append('\n');
-
-                    if(line.compareTo("M  END") == 0)
-                        break;
                 }
 
                 String sdf = sdfBuilder.toString();
 
-                while((line = reader.readLine()) != null)
+                do
                 {
                     if(line.compareTo("$$$$") == 0)
                         break;
@@ -98,6 +60,7 @@ public class CompoundLoader
                         id = Integer.parseInt(line.replaceAll("^" + idPrefix, ""));
                     }
                 }
+                while((line = reader.readLine()) != null);
 
                 count++;
                 insertStatement.setInt(1, id);
