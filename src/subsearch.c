@@ -82,7 +82,7 @@ static int16 (*counts)[COUNTS_SIZE];
 static void orchem_subsearch_init(void)
 {
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-        elog(ERROR, "subsearch_init: SPI_connect() failed");
+        elog(ERROR, "%s: SPI_connect() failed", __func__);
 
 
     /* prepare index query plan */
@@ -91,10 +91,10 @@ static void orchem_subsearch_init(void)
         SPIPlanPtr plan = SPI_prepare("select id, path from " INDEX_TABLE, 0, NULL);
 
         if(unlikely(plan == NULL))
-            elog(ERROR, "subsearch_init: SPI_prepare_cursor() failed");
+            elog(ERROR, "%s: SPI_prepare_cursor() failed", __func__);
 
         if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
-            elog(ERROR, "subsearch_init: SPI_keepplan() failed");
+            elog(ERROR, "%s: SPI_keepplan() failed", __func__);
 
         indexQueryPlan = plan;
     }
@@ -106,10 +106,10 @@ static void orchem_subsearch_init(void)
         SPIPlanPtr plan = SPI_prepare("select id, seqid, atoms, bonds from " MOLECULES_TABLE " where seqid = any($1)", 1, (Oid[]) { INT4ARRAYOID });
 
         if(unlikely(plan == NULL))
-            elog(ERROR, "subsearch module: SPI_prepare_cursor() failed");
+            elog(ERROR, "%s: SPI_prepare_cursor() failed", __func__);
 
         if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
-            elog(ERROR, "subsearch module: SPI_keepplan() failed");
+            elog(ERROR, "%s: SPI_keepplan() failed", __func__);
 
         mainQueryPlan = plan;
     }
@@ -117,10 +117,10 @@ static void orchem_subsearch_init(void)
 
     /* get index information */
     if(unlikely(SPI_execute_plan(indexQueryPlan, NULL, NULL, true, 0) != SPI_OK_SELECT))
-        elog(ERROR, "subsearch_init: SPI_execute_plan() failed");
+        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
     if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
-        elog(ERROR, "subsearch_init: SPI_execute_plan() failed");
+        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
 
     char isNullFlag;
@@ -128,14 +128,14 @@ static void orchem_subsearch_init(void)
     Datum id = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
 
     if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-        elog(ERROR, "subsearch_init: SPI_getbinval() failed");
+        elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
     if(unlikely(DatumGetInt32(id) != indexId))
     {
         if(likely(base != MAP_FAILED))
         {
             if(unlikely(munmap(base, length) < 0))
-                elog(ERROR, "subsearch_init: munmap() failed");
+                elog(ERROR, "%s: munmap() failed", __func__);
 
             base = MAP_FAILED;
         }
@@ -144,7 +144,7 @@ static void orchem_subsearch_init(void)
         Datum path = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 2, &isNullFlag);
 
         if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-            elog(ERROR, "subsearch_init: SPI_getbinval() failed");
+            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
         int fd = -1;
         void *address = MAP_FAILED;
@@ -153,16 +153,16 @@ static void orchem_subsearch_init(void)
         PG_TRY();
         {
             if(unlikely((fd = open(TextDatumGetCString(path), O_RDONLY, 0)) < 0))
-                elog(ERROR, "subsearch_init: open() failed");
+                elog(ERROR, "%s: open() failed", __func__);
 
             if(fstat(fd, &st) < 0)
-                elog(ERROR, "subsearch_init: fstat() failed");
+                elog(ERROR, "%s: fstat() failed", __func__);
 
             if(unlikely((address = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0)) == MAP_FAILED))
-                elog(ERROR, "subsearch_init: mmap() failed");
+                elog(ERROR, "%s: mmap() failed", __func__);
 
             if(unlikely(close(fd) < 0))
-                elog(ERROR, "subsearch_init: close() failed");
+                elog(ERROR, "%s: close() failed", __func__);
         }
         PG_CATCH();
         {
@@ -350,16 +350,16 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
 
                 if(unlikely(!connected && SPI_connect() != SPI_OK_CONNECT))
-                     elog(ERROR, "subsearch module: SPI_connect() failed");
+                     elog(ERROR, "%s: SPI_connect() failed", __func__);
 
                 connected = true;
 
 
                 if(unlikely(SPI_execute_plan(mainQueryPlan, values, NULL, true, 0) != SPI_OK_SELECT))
-                    elog(ERROR, "subsearch module: SPI_execute_plan() failed");
+                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
                 if(unlikely(SPI_processed != count || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 4))
-                    elog(ERROR, "subsearch module: SPI_execute_plan() failed");
+                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
                 info->table = SPI_tuptable;
                 info->tableRowCount = SPI_processed;
@@ -376,25 +376,25 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
             Datum id = SPI_getbinval(tuple, tupdesc, 1, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "subsearch module: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
             Datum seqid = SPI_getbinval(tuple, tupdesc, 2, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "subsearch module: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
             Datum atoms = SPI_getbinval(tuple, tupdesc, 3, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "subsearch module: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
             Datum bonds = SPI_getbinval(tuple, tupdesc, 4, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "subsearch module: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
     #if SHOW_STATS
             info->candidateCount++;
@@ -458,7 +458,7 @@ PG_FUNCTION_INFO_V1(orchem_sync_data);
 Datum orchem_sync_data(PG_FUNCTION_ARGS)
 {
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-        elog(ERROR, "orchem_sync_data: SPI_connect() failed");
+        elog(ERROR, "%s: SPI_connect() failed", __func__);
 
     char isNullFlag;
 
@@ -469,15 +469,15 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
     if(unlikely(SPI_exec("delete from " MOLECULES_TABLE " tbl using "
             AUDIT_TABLE " aud where tbl.id = aud.id and not aud.stored", 0) != SPI_OK_DELETE))
-        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
 
     if(unlikely(SPI_exec("delete from " MOLECULE_COUNTS_TABLE " tbl using "
             AUDIT_TABLE " aud where tbl.id = aud.id and not aud.stored", 0) != SPI_OK_DELETE))
-        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
 
     if(unlikely(SPI_exec("delete from " FINGERPRINT_TABLE " tbl using "
             AUDIT_TABLE " aud where tbl.id = aud.id and not aud.stored", 0) != SPI_OK_DELETE))
-        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
 
 
     /*
@@ -486,25 +486,25 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
     /* TODO: find a better way to obtain bigint[] OID */
     if(unlikely(SPI_exec("select typarray from pg_type where typname = 'int8'", 0) != SPI_OK_SELECT))
-        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
 
     if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
 
     Oid int8arrayOid = DatumGetObjectId(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
 
     if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-        elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
+        elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
     if(int8arrayOid == 0)
-        elog(ERROR, "orchem_sync_data: cannot determine bigint[] oid");
+        elog(ERROR, "%s: cannot determine bigint[] oid", __func__);
 
 
     SPIPlanPtr sequencePlan = SPI_prepare("update " MOLECULES_TABLE " SET seqid=$1 where id=$2",
             2, (Oid[]) { INT4OID, INT4OID });
 
     if(unlikely(sequencePlan == NULL))
-        elog(ERROR, "orchem_sync_data: SPI_prepare() failed");
+        elog(ERROR, "%s: SPI_prepare() failed", __func__);
 
 
     SPIPlanPtr moleculesPlan = SPI_prepare("insert into " MOLECULES_TABLE " (seqid, id, atoms, bonds) values ($1,$2,$3,$4) "
@@ -512,7 +512,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             4, (Oid[]) { INT4OID, INT4OID, BYTEAOID, BYTEAOID });
 
     if(unlikely(moleculesPlan == NULL))
-        elog(ERROR, "orchem_sync_data: SPI_prepare() failed");
+        elog(ERROR, "%s: SPI_prepare() failed", __func__);
 
 
     SPIPlanPtr countsPlan = SPI_prepare("insert into " MOLECULE_COUNTS_TABLE " (id, counts) values ($1,$2) "
@@ -520,7 +520,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             2, (Oid[]) { INT4OID, INT2ARRAYOID });
 
     if(unlikely(countsPlan == NULL))
-        elog(ERROR, "orchem_sync_data: SPI_prepare() failed");
+        elog(ERROR, "%s: SPI_prepare() failed", __func__);
 
 
     SPIPlanPtr fingerprintPlan = SPI_prepare("insert into " FINGERPRINT_TABLE " (id, bit_count, fp) values ($1,$2,$3) "
@@ -528,7 +528,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             3, (Oid[]) { INT4OID, INT2OID, int8arrayOid });
 
     if(unlikely(fingerprintPlan == NULL))
-        elog(ERROR, "orchem_sync_data: SPI_prepare() failed");
+        elog(ERROR, "%s: SPI_prepare() failed", __func__);
 
 
     Portal cursor = SPI_cursor_open_with_args(NULL, "select cmp.id, aud.stored, cmp.molfile from " COMPOUNDS_TABLE " cmp "
@@ -536,7 +536,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
     if(unlikely(cursor == NULL))
-            elog(ERROR, "orchem_sync_data: SPI_cursor_open_with_args() failed");
+            elog(ERROR, "%s: SPI_cursor_open_with_args() failed", __func__);
 
 
     MemoryContext originalMemoryContext = CurrentMemoryContext;
@@ -547,7 +547,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
         SPI_cursor_fetch(cursor, true, 100000);
 
         if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 3))
-            elog(ERROR, "orchem_sync_data: SPI_cursor_fetch() failed");
+            elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
 
         if(SPI_processed == 0)
             break;
@@ -563,27 +563,27 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             Datum id = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
             Datum stored = SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE))
-                elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
             if(isNullFlag)
             {
                 Datum sequenceValues[] = { Int32GetDatum(seqid), id };
 
                 if(SPI_execute_plan(sequencePlan, sequenceValues, NULL, false, 0) != SPI_OK_UPDATE)
-                    elog(ERROR, "orchem_sync_data: SPI_execute_plan() failed");
+                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
             }
             else
             {
                 Datum molfile = SPI_getbinval(tuple, tuptable->tupdesc, 3, &isNullFlag);
 
                 if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                    elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
+                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
                 OrchemLoaderData data;
@@ -612,7 +612,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
                     if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)", 2,
                             (Oid[]) { INT4OID, TEXTOID }, (Datum[]) {Int32GetDatum(id), message}, NULL, false, 0) != SPI_OK_INSERT)
-                        elog(ERROR, "orchem_sync_data: SPI_execute_with_args() failed");
+                        elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
                     pfree(DatumGetPointer(message));
                     FreeErrorData(edata);
@@ -622,19 +622,19 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
                 Datum moleculesValues[] = {Int32GetDatum(seqid), id, PointerGetDatum(data.atoms), PointerGetDatum(data.bonds)};
 
                 if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
-                    elog(ERROR, "orchem_sync_data: SPI_execute_plan() failed");
+                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
 
                 Datum countsValues[] = { id, PointerGetDatum(data.counts) };
 
                 if(SPI_execute_plan(countsPlan, countsValues, NULL, false, 0) != SPI_OK_INSERT)
-                    elog(ERROR, "orchem_sync_data: SPI_execute_plan() failed");
+                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
 
                 Datum fingerprintValues[] = { id, Int16GetDatum(data.bitCount), PointerGetDatum(data.fp) };
 
                 if(SPI_execute_plan(fingerprintPlan, fingerprintValues, NULL, false, 0) != SPI_OK_INSERT)
-                    elog(ERROR, "orchem_sync_data: SPI_execute_plan() failed");
+                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
 
                 pfree(data.counts);
@@ -652,7 +652,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
     SPI_cursor_close(cursor);
 
     if(unlikely(SPI_exec("delete from " AUDIT_TABLE, 0) != SPI_OK_DELETE))
-        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
 
 
     /*
@@ -662,19 +662,19 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
     createBasePath();
 
     if(unlikely(SPI_exec("select id from " INDEX_TABLE, 0) != SPI_OK_SELECT))
-        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
 
     int indexNumber = 0;
 
     if(SPI_processed != 0)
     {
         if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-            elog(ERROR, "orchem_sync_data: SPI_execute_plan() failed");
+            elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
         Datum number = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
 
         if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE) || isNullFlag)
-            elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
+            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
         indexNumber = DatumGetInt32(number) + 1;
     }
@@ -688,30 +688,30 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
 
     if(unlikely(SPI_exec("delete from " INDEX_TABLE, 0) != SPI_OK_DELETE))
-        elog(ERROR, "orchem_sync_data: SPI_exec() failed");
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
 
     if(SPI_execute_with_args("insert into " INDEX_TABLE " (id, path) values ($1,$2)", 2, (Oid[]) { INT4OID, TEXTOID },
             (Datum[]) {Int32GetDatum(indexNumber), CStringGetTextDatum(indexFilePath)}, NULL, false, 0) != SPI_OK_INSERT)
-        elog(ERROR, "orchem_sync_data: SPI_execute_with_args() failed");
+        elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
 
     int fd = open(indexFilePath, O_EXCL | O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
 
     if(fd == -1)
-        elog(ERROR, "orchem_sync_data: open() failed");
+        elog(ERROR, "%s: open() failed", __func__);
 
     PG_TRY();
     {
         if(unlikely(SPI_execute("select count(*) from " MOLECULES_TABLE, false, FETCH_ALL) != SPI_OK_SELECT))
-            elog(ERROR, "orchem_sync_data: SPI_execute() failed");
+            elog(ERROR, "%s: SPI_execute() failed", __func__);
 
         if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
-            elog(ERROR, "orchem_sync_data: SPI_execute() failed");
+            elog(ERROR, "%s: SPI_execute() failed", __func__);
 
         int64_t moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
 
         if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-            elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
+            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
         BitSet bitmap[FP_SIZE];
@@ -723,7 +723,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
                 0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
         if(unlikely(fpCursor == NULL))
-                elog(ERROR, "orchem_sync_data: SPI_cursor_open_with_args() failed");
+                elog(ERROR, "%s: SPI_cursor_open_with_args() failed", __func__);
 
         int idx = 0;
 
@@ -732,7 +732,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             SPI_cursor_fetch(fpCursor, true, 100000);
 
             if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-                elog(ERROR, "orchem_sync_data: SPI_cursor_fetch() failed");
+                elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
 
             if(SPI_processed == 0)
                 break;
@@ -745,7 +745,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
                 Datum fpDatum = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
 
                 if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                    elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
+                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
                 ArrayType *fpArray = DatumGetArrayTypeP(fpDatum);
 
@@ -779,13 +779,13 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
         for(int i = 0; i < FP_SIZE; i++)
         {
             if(write(fd, &offset, sizeof(uint64_t)) != sizeof(uint64_t))
-                elog(ERROR, "orchem_sync_data: write() failed");
+                elog(ERROR, "%s: write() failed", __func__);
 
             offset += bitmap[i].wordsInUse + 1;
         }
 
         if(write(fd, &moleculeCount, sizeof(int64_t)) != sizeof(int64_t))
-            elog(ERROR, "orchem_sync_data: write() failed");
+            elog(ERROR, "%s: write() failed", __func__);
 
 
 #if USE_COUNT_FINGERPRINT
@@ -793,14 +793,14 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
                 0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
         if(unlikely(countCursor == NULL))
-                elog(ERROR, "orchem_sync_data: SPI_cursor_open_with_args() failed");
+                elog(ERROR, "%s: SPI_cursor_open_with_args() failed", __func__);
 
         while(true)
         {
             SPI_cursor_fetch(countCursor, true, 100000);
 
             if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-                elog(ERROR, "orchem_sync_data: SPI_cursor_fetch() failed");
+                elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
 
             if(SPI_processed == 0)
                 break;
@@ -813,15 +813,15 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
                 Datum countsDatum = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
 
                 if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                    elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
+                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
                 ArrayType *countsArray = DatumGetArrayTypeP(countsDatum);
 
                 if(ARR_NDIM(countsArray) != 1 && ARR_DIMS(countsArray)[0] != COUNTS_SIZE)
-                    elog(ERROR, "orchem_sync_data: SPI_getbinval() failed");
+                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
                 if(write(fd, ARR_DATA_PTR(countsArray), COUNTS_SIZE * sizeof(int16)) != COUNTS_SIZE * sizeof(int16))
-                    elog(ERROR, "orchem_sync_data: write() failed");
+                    elog(ERROR, "%s: write() failed", __func__);
             }
 
             SPI_freetuptable(SPI_tuptable);
@@ -834,7 +834,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
         size_t padding = (sizeof(uint64_t) - (moleculeCount * COUNTS_SIZE * sizeof(uint16)) % sizeof(uint64_t)) % sizeof(uint64_t);
 
         if(write(fd, &zero, padding) != padding)
-            elog(ERROR, "orchem_sync_data: write() failed");
+            elog(ERROR, "%s: write() failed", __func__);
 #endif
 
 
@@ -843,15 +843,15 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             uint64_t wordsInUse = bitmap[i].wordsInUse;
 
             if(write(fd, &wordsInUse, sizeof(uint64_t)) != sizeof(uint64_t))
-                elog(ERROR, "orchem_sync_data: write() failed");
+                elog(ERROR, "%s: write() failed", __func__);
 
             if(write(fd, bitmap[i].words, wordsInUse * sizeof(uint64_t)) != wordsInUse * sizeof(uint64_t))
-                elog(ERROR, "orchem_sync_data: write() failed");
+                elog(ERROR, "%s: write() failed", __func__);
         }
 
 
         if(close(fd) != 0)
-            elog(ERROR, "orchem_sync_data: close() failed");
+            elog(ERROR, "%s: close() failed", __func__);
     }
     PG_CATCH();
     {

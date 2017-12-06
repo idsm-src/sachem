@@ -59,15 +59,15 @@ void simsearch_module_init(void)
     {
         /* prepare query plan */
         if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-            elog(ERROR, "simsearch module: SPI_connect() failed");
+            elog(ERROR, "%s: SPI_connect() failed", __func__);
 
         mainQueryPlan = SPI_prepare("select id, fp from " FINGERPRINT_TABLE " where bit_count = $1", 1, (Oid[]) { INT4OID });
 
         if(unlikely(mainQueryPlan == NULL))
-            elog(ERROR, "simsearch module: SPI_prepare_cursor() failed");
+            elog(ERROR, "%s: SPI_prepare_cursor() failed", __func__);
 
         if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
-            elog(ERROR, "simsearch module: SPI_keepplan() failed");
+            elog(ERROR, "%s: SPI_keepplan() failed", __func__);
 
         SPI_finish();
 
@@ -87,7 +87,7 @@ void simsearch_module_init(void)
     }
     PG_CATCH();
     {
-        elog(NOTICE, "simsearch module: initialization failed");
+        elog(NOTICE, "%s: initialization failed", __func__);
     }
     PG_END_TRY();
 }
@@ -113,7 +113,7 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
 #endif
 
         if(unlikely(!initialised))
-            elog(ERROR, "simsearch module is not properly initialized");
+            elog(ERROR, "%s: simsearch module is not properly initialized", __func__);
 
         VarChar *query = PG_GETARG_VARCHAR_P(0);
         text *type = PG_GETARG_TEXT_P(1);
@@ -196,17 +196,17 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
             if(unlikely(info->table == NULL))
             {
                 if(unlikely(!connected && SPI_connect() != SPI_OK_CONNECT))
-                     elog(ERROR, "simsearch module: SPI_connect() failed");
+                     elog(ERROR, "%s: SPI_connect() failed", __func__);
 
                 connected = true;
 
                 Datum values[] = { Int32GetDatum(info->currBucketNum)};
 
                 if(unlikely(SPI_execute_plan(mainQueryPlan, values, NULL, true, 0) != SPI_OK_SELECT))
-                    elog(ERROR, "simsearch module: SPI_execute_plan() failed");
+                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
                 if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
-                    elog(ERROR, "simsearch module: SPI_execute_plan() failed");
+                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
                 info->table = SPI_tuptable;
                 info->tableRowCount = SPI_processed;
@@ -255,13 +255,13 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
             Datum id = SPI_getbinval(tuple, tupdesc, 1, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "simsearch module: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
             Datum fpDatum = SPI_getbinval(tuple, tupdesc, 2, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "simsearch module: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
             BitSet fp;

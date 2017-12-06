@@ -126,7 +126,7 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
 {
 #if USE_VF2_TIMEOUT
     if(unlikely(vf2TimeoutId < 0))
-        elog(ERROR, "isomorphism module is not properly initialized");
+        elog(ERROR, "%s: isomorphism module is not properly initialized", __func__);
 #endif
 
     int queryAtomCount = query->atomCount;

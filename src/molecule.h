@@ -85,7 +85,7 @@ inline void molecule_init(Molecule *const molecule, int atomsLength, uint8_t *at
         molecule->bondLists[y * BOND_LIST_BASE_SIZE + molecule->bondListSizes[y]++] = x;
 
         if(unlikely(molecule->bondListSizes[x] == BOND_LIST_BASE_SIZE || molecule->bondListSizes[y] == BOND_LIST_BASE_SIZE))
-            elog(ERROR, "molecule_init(): too high atom valence");
+            elog(ERROR, "%s: too high atom valence", __func__);
 
         molecule->bondMatrix[x * molecule->atomCount + y] = i;
         molecule->bondMatrix[y * molecule->atomCount + x] = i;

@@ -9,7 +9,7 @@ volatile bool vf2Timeouted;
 
 static void vf2_timeout_handler()
 {
-    elog(NOTICE, "isomorphism module: VF2 timeout expired");
+    elog(WARNING, "isomorphism: VF2 timeout expired");
     vf2Timeouted = true;
 }
 #endif
@@ -24,7 +24,7 @@ void isomorphism_module_init(void)
     }
     PG_CATCH();
     {
-        elog(NOTICE, "isomorphism module: initialization failed");
+        elog(WARNING, "%s: RegisterTimeout() failed", __func__);
     }
     PG_END_TRY();
 #endif

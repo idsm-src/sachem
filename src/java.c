@@ -164,78 +164,78 @@ void java_module_init(void)
     pqsignal(SIGQUIT, java_quick_die_handler);
 
     if(jvm == NULL || env == NULL)
-        elog(ERROR, "cannot initialize JVM");
+        elog(ERROR, "%s: cannot initialize JVM", __func__);
 
 
     exceptionClass = (*env)->FindClass(env, "java/lang/Throwable");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     toStringMethod = (*env)->GetMethodID(env, exceptionClass, "toString", "()Ljava/lang/String;");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
 
     substructureSearchClass = (*env)->FindClass(env, "cz/iocb/orchem/search/SubstructureSearch");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     substructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/SubstructureSearch$QueryData");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     atomsField = (*env)->GetFieldID(env, substructureQueryDataClass, "atoms", "[B");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     bondsField = (*env)->GetFieldID(env, substructureQueryDataClass, "bonds", "[B");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     restHField = (*env)->GetFieldID(env, substructureQueryDataClass, "restH", "[Z");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     substructureQueryDataMethod = (*env)->GetStaticMethodID(env, substructureSearchClass, "getQueryData", "([BLjava/lang/String;Z)[Lcz/iocb/orchem/search/SubstructureSearch$QueryData;");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
 
     orchemSubstructureSearchClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemSubstructureSearch");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     orchemSubstructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemSubstructureSearch$OrchemQueryData");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     countsField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "counts", "[S");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     fpField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "fp", "[S");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     orchemSubstructureQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSubstructureSearchClass, "getQueryData", "([BLjava/lang/String;Z)[Lcz/iocb/orchem/search/OrchemSubstructureSearch$OrchemQueryData;");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
 
     orchemSimilaritySearchClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemSimilaritySearch");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     orchemSimilarityQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSimilaritySearchClass, "getQueryData", "([BLjava/lang/String;)[J");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
 
     orchemLoaderClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemLoader");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     orchemLoaderDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemLoader$OrchemData");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     orchemLoaderCountsField = (*env)->GetFieldID(env, orchemLoaderDataClass, "counts", "[S");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     orchemLoaderFpField = (*env)->GetFieldID(env, orchemLoaderDataClass, "fp", "[J");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     orchemLoaderAtomsField = (*env)->GetFieldID(env, orchemLoaderDataClass, "atoms", "[B");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     orchemLoaderBondsField = (*env)->GetFieldID(env, orchemLoaderDataClass, "bonds", "[B");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
     orchemLoaderDataMethod = (*env)->GetStaticMethodID(env, orchemLoaderClass, "getIndexData", "([B)Lcz/iocb/orchem/search/OrchemLoader$OrchemData;");
-    java_check_exception("java_module_init()");
+    java_check_exception(__func__);
 
 
     initialised = true;
@@ -252,7 +252,7 @@ void java_module_finish(void)
 int java_parse_substructure_query(SubstructureQueryData **data, char* query, size_t queryLength, char *type, bool tautomers)
 {
     if(initialised == false)
-        elog(ERROR, "java module is not properly initialized");
+        elog(ERROR, "%s: java module is not properly initialized", __func__);
 
 
     jbyteArray queryArg = NULL;
@@ -273,17 +273,17 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
     PG_TRY();
     {
         queryArg = (*env)->NewByteArray(env, queryLength);
-        java_check_exception("java_parse_substructure_query()");
+        java_check_exception(__func__);
 
         (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte*) query);
 
 
         typeArg = (*env)->NewStringUTF(env, type);
-        java_check_exception("java_parse_substructure_query()");
+        java_check_exception(__func__);
 
 
         result = (jobjectArray) (*env)->CallStaticObjectMethod(env, substructureSearchClass, substructureQueryDataMethod, queryArg, typeArg, (jboolean) tautomers);
-        java_check_exception("java_parse_substructure_query()");
+        java_check_exception(__func__);
 
         JavaDeleteRef(queryArg);
         JavaDeleteRef(typeArg);
@@ -305,13 +305,13 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
             jsize restHSize = restHArray ? (*env)->GetArrayLength(env, restHArray) : -1;
 
             atoms = (*env)->GetByteArrayElements(env, atomsArray, NULL);
-            java_check_exception("java_parse_substructure_query()");
+            java_check_exception(__func__);
 
             bonds = (*env)->GetByteArrayElements(env, bondsArray, NULL);
-            java_check_exception("java_parse_substructure_query()");
+            java_check_exception(__func__);
 
             restH = restHArray ? (*env)->GetBooleanArrayElements (env, restHArray, NULL) : 0;
-            java_check_exception("java_parse_substructure_query()");
+            java_check_exception(__func__);
 
 
             results[i].atoms = (char *) palloc(atomsSize);
@@ -366,7 +366,7 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
 int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, char* query, size_t queryLength, char *type, bool tautomers)
 {
     if(initialised == false)
-        elog(ERROR, "java module is not properly initialized");
+        elog(ERROR, "%s: java module is not properly initialized", __func__);
 
 
     jbyteArray queryArg = NULL;
@@ -389,17 +389,17 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
     PG_TRY();
     {
         queryArg = (*env)->NewByteArray(env, queryLength);
-        java_check_exception("java_parse_orchem_substructure_query()");
+        java_check_exception(__func__);
 
         (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte*) query);
 
 
         typeArg = (*env)->NewStringUTF(env, type);
-        java_check_exception("java_parse_orchem_substructure_query()");
+        java_check_exception(__func__);
 
 
         result = (jobjectArray) (*env)->CallStaticObjectMethod(env, orchemSubstructureSearchClass, orchemSubstructureQueryDataMethod, queryArg, typeArg, (jboolean) tautomers);
-        java_check_exception("java_parse_orchem_substructure_query()");
+        java_check_exception(__func__);
 
         JavaDeleteRef(queryArg);
         JavaDeleteRef(typeArg);
@@ -425,19 +425,19 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
             jsize restHSize = restHArray ? (*env)->GetArrayLength(env, restHArray) : -1;
 
             counts = (*env)->GetShortArrayElements(env, countsArray, NULL);
-            java_check_exception("java_parse_orchem_substructure_query()");
+            java_check_exception(__func__);
 
             fp = (*env)->GetShortArrayElements(env, fpArray, NULL);
-            java_check_exception("java_parse_orchem_substructure_query()");
+            java_check_exception(__func__);
 
             atoms = (*env)->GetByteArrayElements(env, atomsArray, NULL);
-            java_check_exception("java_parse_orchem_substructure_query()");
+            java_check_exception(__func__);
 
             bonds = (*env)->GetByteArrayElements(env, bondsArray, NULL);
-            java_check_exception("java_parse_orchem_substructure_query()");
+            java_check_exception(__func__);
 
             restH = restHArray ? (*env)->GetBooleanArrayElements (env, restHArray, NULL) : 0;
-            java_check_exception("java_parse_orchem_substructure_query()");
+            java_check_exception(__func__);
 
 
             results[i].counts = (jshort *) palloc(countsSize * sizeof(jshort));
@@ -503,7 +503,7 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
 int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t queryLength, char *type)
 {
     if(initialised == false)
-        elog(ERROR, "java module is not properly initialized");
+        elog(ERROR, "%s: java module is not properly initialized", __func__);
 
     jbyteArray queryArg = NULL;
     jstring typeArg = NULL;
@@ -515,15 +515,15 @@ int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t quer
     PG_TRY();
     {
         queryArg = (*env)->NewByteArray(env, queryLength);
-        java_check_exception("java_parse_orchem_similarity_query()");
+        java_check_exception(__func__);
 
         (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte*) query);
 
         typeArg = (*env)->NewStringUTF(env, type);
-        java_check_exception("java_parse_orchem_similarity_query()");
+        java_check_exception(__func__);
 
         result = (jlongArray) (*env)->CallStaticObjectMethod(env, orchemSimilaritySearchClass, orchemSimilarityQueryDataMethod, queryArg, typeArg);
-        java_check_exception("java_parse_orchem_similarity_query()");
+        java_check_exception(__func__);
 
         JavaDeleteRef(queryArg);
         JavaDeleteRef(typeArg);
@@ -532,7 +532,7 @@ int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t quer
         {
             length = (*env)->GetArrayLength(env, result);
             words = (*env)->GetLongArrayElements(env, result, NULL);
-            java_check_exception("java_parse_orchem_similarity_query()");
+            java_check_exception(__func__);
 
             *data = (jlong *) palloc(length * sizeof(jlong));
             memcpy(*data, words, length * sizeof(jlong));
@@ -561,7 +561,7 @@ int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t quer
 void java_parse_orchem_data(OrchemLoaderData *data, char* molfile, size_t length)
 {
     if(initialised == false)
-        elog(ERROR, "java module is not properly initialized");
+        elog(ERROR, "%s: java module is not properly initialized", __func__);
 
 
     jbyteArray molfileArg = NULL;
@@ -579,13 +579,13 @@ void java_parse_orchem_data(OrchemLoaderData *data, char* molfile, size_t length
     PG_TRY();
     {
         molfileArg = (*env)->NewByteArray(env, length);
-        java_check_exception("java_parse_orchem_data()");
+        java_check_exception(__func__);
 
         (*env)->SetByteArrayRegion(env, molfileArg, 0, length, (jbyte*) molfile);
 
 
         element = (*env)->CallStaticObjectMethod(env, orchemLoaderClass, orchemLoaderDataMethod, molfileArg);
-        java_check_exception("java_parse_orchem_data()");
+        java_check_exception(__func__);
 
         JavaDeleteRef(molfileArg);
 
@@ -601,16 +601,16 @@ void java_parse_orchem_data(OrchemLoaderData *data, char* molfile, size_t length
         jsize bondsSize = (*env)->GetArrayLength(env, bondsArray);
 
         counts = (*env)->GetShortArrayElements(env, countsArray, NULL);
-        java_check_exception("java_parse_orchem_data()");
+        java_check_exception(__func__);
 
         fp = (*env)->GetLongArrayElements(env, fpArray, NULL);
-        java_check_exception("java_parse_orchem_data()");
+        java_check_exception(__func__);
 
         atoms = (*env)->GetByteArrayElements(env, atomsArray, NULL);
-        java_check_exception("java_parse_orchem_data()");
+        java_check_exception(__func__);
 
         bonds = (*env)->GetByteArrayElements(env, bondsArray, NULL);
-        java_check_exception("java_parse_orchem_data()");
+        java_check_exception(__func__);
 
 
         data->fp = (ArrayType *) palloc(fpSize * sizeof(uint64_t) + ARR_OVERHEAD_NONULLS(1));

@@ -109,7 +109,7 @@ inline void bitset_copy(BitSet *restrict const bitset, const BitSet *restrict co
 {
 #if BITSET_ASSERT
     if(bitset->length != source->length)
-        elog(ERROR, "bitset_copy(): incompatible bitset lengths");
+        elog(ERROR, "%s: incompatible bitset lengths", __func__);
 #endif
 
     memcpy(bitset->words, source->words, source->length * sizeof(uint64_t));
@@ -123,7 +123,7 @@ inline bool bitset_get(BitSet *restrict const bitset, int bitIndex)
 
 #if BITSET_ASSERT
     if(wordIndex >= bitset->length)
-        elog(ERROR, "bitset_get(): wrong index");
+        elog(ERROR, "%s: wrong bit index value", __func__);
 #endif
 
     return (bitset->words[wordIndex] & (1L << (bitIndex % BITS_PER_WORD))) != 0;
@@ -136,7 +136,7 @@ inline void bitset_set(BitSet *restrict const bitset, int bitIndex)
 
 #if BITSET_ASSERT
     if(wordIndex >= bitset->length)
-        elog(ERROR, "bitset_set(): wrong index");
+        elog(ERROR, "%s: wrong bit index value", __func__);
 #endif
 
     bitset->words[wordIndex] |= (1L << (bitIndex % BITS_PER_WORD));
@@ -152,7 +152,7 @@ inline void bitset_unset(BitSet *restrict const bitset, int bitIndex)
 
 #if BITSET_ASSERT
     if(wordIndex >= bitset->length)
-        elog(ERROR, "bitset_unset(): wrong index");
+        elog(ERROR, "%s: wrong bit index value", __func__);
 #endif
 
     bitset->words[wordIndex] &= ~(1L << (bitIndex % BITS_PER_WORD));

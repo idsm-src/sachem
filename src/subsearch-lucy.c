@@ -73,20 +73,20 @@ void subsearch_lucy_module_init(void)
         fplucy_initialize(&fplucy, getFilePath("lucy"));
 
         if(unlikely(fplucy == NULL))
-            elog(ERROR, "subsearch-lucy module: lucy initialization failed");
+            elog(ERROR, "%s: lucy initialization failed", __func__);
 
 
         /* prepare query plan */
         if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-            elog(ERROR, "subsearch-lucy module: SPI_connect() failed");
+            elog(ERROR, "%s: SPI_connect() failed", __func__);
 
         mainQueryPlan = SPI_prepare("select id, seqid, atoms, bonds from " MOLECULES_TABLE " where seqid = any($1)", 1, (Oid[]) { INT4ARRAYOID });
 
         if(unlikely(mainQueryPlan == NULL))
-            elog(ERROR, "subsearch-lucy module: SPI_prepare_cursor() failed");
+            elog(ERROR, "%s: SPI_prepare_cursor() failed", __func__);
 
         if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
-            elog(ERROR, "subsearch-lucy module: SPI_keepplan() failed");
+            elog(ERROR, "%s: SPI_keepplan() failed", __func__);
 
 
         SPI_finish();
@@ -94,7 +94,7 @@ void subsearch_lucy_module_init(void)
     }
     PG_CATCH();
     {
-        elog(NOTICE, "subsearch-lucy module: initialization failed");
+        elog(NOTICE, "%s: initialization failed", __func__);
     }
     PG_END_TRY();
 }
@@ -123,7 +123,7 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 #endif
 
         if(unlikely(!initialised))
-            elog(ERROR, "subsearch-lucy module is not properly initialized");
+            elog(ERROR, "%s: subsearch-lucy module is not properly initialized", __func__);
 
         VarChar *query = PG_GETARG_VARCHAR_P(0);
         text *type = PG_GETARG_TEXT_P(1);
@@ -138,21 +138,21 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 
 
         if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-             elog(ERROR, "subsearch-lucy module: SPI_connect() failed");
+             elog(ERROR, "%s: SPI_connect() failed", __func__);
 
         connected = true;
 
         if(unlikely(SPI_execute("select max(seqid) + 1 from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
-            elog(ERROR, "subsearch-lucy module: SPI_execute() failed");
+            elog(ERROR, "%s: SPI_execute() failed", __func__);
 
         if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
-            elog(ERROR, "subsearch-lucy module: SPI_execute() failed");
+            elog(ERROR, "%s: SPI_execute() failed", __func__);
 
         char isNullFlag;
         int64_t moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
 
         if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-            elog(ERROR, "subsearch-lucy module: SPI_getbinval() failed");
+            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
         SPI_freetuptable(SPI_tuptable);
 
@@ -262,16 +262,16 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 
 
                 if(unlikely(!connected && SPI_connect() != SPI_OK_CONNECT))
-                     elog(ERROR, "subsearch-lucy module: SPI_connect() failed");
+                     elog(ERROR, "%s: SPI_connect() failed", __func__);
 
                 connected = true;
 
 
                 if(unlikely(SPI_execute_plan(mainQueryPlan, values, NULL, true, 0) != SPI_OK_SELECT))
-                    elog(ERROR, "subsearch-lucy module: SPI_execute_plan() failed");
+                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
                 if(unlikely(SPI_processed != count || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 4))
-                    elog(ERROR, "subsearch-lucy module: SPI_execute_plan() failed");
+                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
                 info->table = SPI_tuptable;
                 info->tableRowCount = SPI_processed;
@@ -288,13 +288,13 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
             Datum id = SPI_getbinval(tuple, tupdesc, 1, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "subsearch-lucy module: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
             int32 seqid = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isNullFlag));
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "subsearch-lucy module: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
             if(bitset_get(&info->resultMask, seqid))
                 continue;
@@ -303,13 +303,13 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
             Datum atoms = SPI_getbinval(tuple, tupdesc, 3, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "subsearch-lucy module: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
             Datum bonds = SPI_getbinval(tuple, tupdesc, 4, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "subsearch-lucy module: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
     #if SHOW_STATS
             info->candidateCount++;
@@ -413,19 +413,19 @@ void *lucy_substructure_process_spi_table(void* idx)
             seqid = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "lucy_substructure_create_index: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
             Datum atoms = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 2, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "lucy_substructure_create_index: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
             Datum bonds = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 3, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "lucy_substructure_create_index: SPI_getbinval() failed");
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
             PG_MEMCONTEXT_BEGIN(indexContext);
@@ -480,13 +480,13 @@ Datum lucy_substructure_create_index(PG_FUNCTION_ARGS)
 
 
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-         elog(ERROR, "lucy_substructure_create_index: SPI_connect() failed");
+         elog(ERROR, "%s: SPI_connect() failed", __func__);
 
     Portal cursor = SPI_cursor_open_with_args(NULL, "select seqid, atoms, bonds from " MOLECULES_TABLE,
             0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
     if(unlikely(cursor == NULL))
-            elog(ERROR, "lucy_substructure_create_index: SPI_cursor_open_with_args() failed");
+            elog(ERROR, "%s: SPI_cursor_open_with_args() failed", __func__);
 
 
     int countOfThread = sysconf(_SC_NPROCESSORS_ONLN);
@@ -502,7 +502,7 @@ Datum lucy_substructure_create_index(PG_FUNCTION_ARGS)
         SPI_cursor_fetch(cursor, true, 10000);
 
         if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 3))
-            elog(ERROR, "lucy_substructure_create_index: SPI_cursor_fetch() failed");
+            elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
 
         if(SPI_processed == 0)
             break;
@@ -534,7 +534,7 @@ Datum lucy_substructure_create_index(PG_FUNCTION_ARGS)
     pthread_attr_destroy(&attr);
 
     if(indexingError)
-        elog(ERROR, "lucy_substructure_create_index: error in an indexing thread");
+        elog(ERROR, "%s: error in an indexing thread", __func__);
 
     fplucy_flush(fplucy);
     SPI_finish();

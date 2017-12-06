@@ -43,7 +43,7 @@ inline void createBasePath()
     *data = '\0';
 
     if(mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR) == -1 && errno != EEXIST)
-        elog(ERROR, "create base directory: mkdir() failed");
+        elog(ERROR, "%s: mkdir() failed", __func__);
 }
 
 
