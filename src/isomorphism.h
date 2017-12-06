@@ -43,12 +43,6 @@
 #define is_target_masked(value)     ((value) < 0)
 
 
-#if USE_VF2_TIMEOUT
-extern TimeoutId vf2TimeoutId;
-extern volatile bool vf2Timeouted;
-#endif
-
-
 typedef struct
 {
     int target_range_len;
@@ -91,8 +85,12 @@ typedef struct
 } VF2State;
 
 
-void isomorphism_module_init(void);
-void isomorphism_module_finish(void);
+#if USE_VF2_TIMEOUT
+extern TimeoutId vf2TimeoutId;
+extern volatile bool vf2Timeouted;
+
+void vf2_timeout_handler();
+#endif
 
 
 inline void swap_int(int *a, int *b)
@@ -125,8 +123,8 @@ inline void sort_bond_atoms(int array[4])
 inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *const restrict query, bool strictStereo, bool exact)
 {
 #if USE_VF2_TIMEOUT
-    if(unlikely(vf2TimeoutId < 0))
-        elog(ERROR, "%s: isomorphism module is not properly initialized", __func__);
+    if(unlikely(vf2TimeoutId == MAX_TIMEOUTS))
+        vf2TimeoutId = RegisterTimeout(USER_TIMEOUT, vf2_timeout_handler);
 #endif
 
     int queryAtomCount = query->atomCount;
