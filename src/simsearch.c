@@ -63,9 +63,6 @@ void simsearch_module_init(void)
 
         mainQueryPlan = SPI_prepare("select id, fp from " FINGERPRINT_TABLE " where bit_count = $1", 1, (Oid[]) { INT4OID });
 
-        if(unlikely(mainQueryPlan == NULL))
-            elog(ERROR, "%s: SPI_prepare_cursor() failed", __func__);
-
         if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
             elog(ERROR, "%s: SPI_keepplan() failed", __func__);
 

@@ -90,9 +90,6 @@ static void orchem_subsearch_init(void)
     {
         SPIPlanPtr plan = SPI_prepare("select id, path from " INDEX_TABLE, 0, NULL);
 
-        if(unlikely(plan == NULL))
-            elog(ERROR, "%s: SPI_prepare_cursor() failed", __func__);
-
         if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
             elog(ERROR, "%s: SPI_keepplan() failed", __func__);
 
@@ -104,9 +101,6 @@ static void orchem_subsearch_init(void)
     if(unlikely(mainQueryPlan == NULL))
     {
         SPIPlanPtr plan = SPI_prepare("select id, seqid, atoms, bonds from " MOLECULES_TABLE " where seqid = any($1)", 1, (Oid[]) { INT4ARRAYOID });
-
-        if(unlikely(plan == NULL))
-            elog(ERROR, "%s: SPI_prepare_cursor() failed", __func__);
 
         if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
             elog(ERROR, "%s: SPI_keepplan() failed", __func__);
@@ -503,32 +497,17 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
     SPIPlanPtr sequencePlan = SPI_prepare("update " MOLECULES_TABLE " SET seqid=$1 where id=$2",
             2, (Oid[]) { INT4OID, INT4OID });
 
-    if(unlikely(sequencePlan == NULL))
-        elog(ERROR, "%s: SPI_prepare() failed", __func__);
-
-
     SPIPlanPtr moleculesPlan = SPI_prepare("insert into " MOLECULES_TABLE " (seqid, id, atoms, bonds) values ($1,$2,$3,$4) "
             "ON CONFLICT (id) DO UPDATE SET seqid=EXCLUDED.seqid, id=EXCLUDED.id, atoms=EXCLUDED.atoms, bonds=EXCLUDED.bonds",
             4, (Oid[]) { INT4OID, INT4OID, BYTEAOID, BYTEAOID });
-
-    if(unlikely(moleculesPlan == NULL))
-        elog(ERROR, "%s: SPI_prepare() failed", __func__);
-
 
     SPIPlanPtr countsPlan = SPI_prepare("insert into " MOLECULE_COUNTS_TABLE " (id, counts) values ($1,$2) "
             "ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id, counts=EXCLUDED.counts",
             2, (Oid[]) { INT4OID, INT2ARRAYOID });
 
-    if(unlikely(countsPlan == NULL))
-        elog(ERROR, "%s: SPI_prepare() failed", __func__);
-
-
     SPIPlanPtr fingerprintPlan = SPI_prepare("insert into " FINGERPRINT_TABLE " (id, bit_count, fp) values ($1,$2,$3) "
             "ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id, bit_count=EXCLUDED.bit_count, fp=EXCLUDED.fp",
             3, (Oid[]) { INT4OID, INT2OID, int8arrayOid });
-
-    if(unlikely(fingerprintPlan == NULL))
-        elog(ERROR, "%s: SPI_prepare() failed", __func__);
 
 
     Portal cursor = SPI_cursor_open_with_args(NULL, "select cmp.id, aud.stored, cmp.molfile from " COMPOUNDS_TABLE " cmp "
