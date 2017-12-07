@@ -13,10 +13,6 @@
  */
 package cz.iocb.orchem.load;
 
-import java.beans.PropertyVetoException;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
@@ -26,18 +22,11 @@ import org.postgresql.ds.PGPoolingDataSource;
 
 public class ConnectionPool
 {
-    private static PGPoolingDataSource connectionPool = null;
+    private PGPoolingDataSource connectionPool = null;
 
 
-    static synchronized void initConnectionPool()
-            throws FileNotFoundException, IOException, NumberFormatException, SQLException, PropertyVetoException
+    public ConnectionPool(Properties properties)
     {
-        if(connectionPool != null)
-            return;
-
-        Properties properties = new Properties();
-        properties.load(new FileInputStream("datasource.properties"));
-
         connectionPool = new PGPoolingDataSource();
         connectionPool.setDataSourceName("PubChem Data Source");
         connectionPool.setServerName(properties.getProperty("host"));
@@ -52,12 +41,8 @@ public class ConnectionPool
     }
 
 
-    public static Connection getConnection()
-            throws SQLException, NumberFormatException, FileNotFoundException, IOException, PropertyVetoException
+    public Connection getConnection() throws SQLException
     {
-        if(connectionPool == null)
-            initConnectionPool();
-
         return connectionPool.getConnection();
     }
 }

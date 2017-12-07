@@ -19,10 +19,20 @@ import java.util.zip.GZIPInputStream;
 public class CompoundLoader
 {
     private static final int batchSize = 1000;
+    private final Connection connection;
+    private final String idTag;
+    private final String idPrefix;
 
 
-    private static void parse(Connection connection, InputStream inputStream, String idTag, String idPrefix,
-            int version) throws Exception
+    protected CompoundLoader(Connection connection, String idTag, String idPrefix)
+    {
+        this.connection = connection;
+        this.idTag = idTag;
+        this.idPrefix = idPrefix;
+    }
+
+
+    private void parse(InputStream inputStream, int version) throws Exception
     {
         Reader decoder = new InputStreamReader(inputStream, "US-ASCII");
         BufferedReader reader = new BufferedReader(decoder);
@@ -78,7 +88,7 @@ public class CompoundLoader
     }
 
 
-    public static void loadDirectory(File directory, String idTag, String idPrefix) throws Exception
+    public void loadDirectory(File directory) throws Exception
     {
         final File[] files = directory.listFiles();
 
@@ -92,45 +102,39 @@ public class CompoundLoader
         });;
 
 
-        try (Connection connection = ConnectionPool.getConnection())
+        int version;
+
+        try (Statement statement = connection.createStatement())
         {
-            connection.setAutoCommit(false);
-            int version;
-
-            try (Statement statement = connection.createStatement())
+            try (ResultSet rs = statement.executeQuery("select max(version)+1 from compounds"))
             {
-                try (ResultSet rs = statement.executeQuery("select max(version)+1 from compounds"))
-                {
-                    rs.next();
-                    version = rs.getInt(1);
-                }
+                rs.next();
+                version = rs.getInt(1);
             }
+        }
 
 
-            for(int i = 0; i < files.length; i++)
-            {
-                File file = files[i];
+        for(int i = 0; i < files.length; i++)
+        {
+            File file = files[i];
 
-                if(!file.getName().endsWith(".gz"))
-                    continue;
+            if(!file.getName().endsWith(".gz"))
+                continue;
 
-                System.out.println(i + ": " + file.getName());
+            System.out.println(i + ": " + file.getName());
 
-                InputStream fileStream = new FileInputStream(file);
-                InputStream gzipStream = new GZIPInputStream(fileStream);
+            InputStream fileStream = new FileInputStream(file);
+            InputStream gzipStream = new GZIPInputStream(fileStream);
 
-                parse(connection, gzipStream, idTag, idPrefix, version);
+            parse(gzipStream, version);
 
-                gzipStream.close();
-            }
+            gzipStream.close();
+        }
 
-            try (PreparedStatement statement = connection.prepareStatement("delete from compounds where version < ?"))
-            {
-                statement.setInt(1, version);
-                statement.execute();
-            }
-
-            connection.commit();
+        try (PreparedStatement statement = connection.prepareStatement("delete from compounds where version < ?"))
+        {
+            statement.setInt(1, version);
+            statement.execute();
         }
     }
 }
