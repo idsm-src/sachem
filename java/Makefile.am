@@ -1,6 +1,6 @@
 bin_SCRIPTS = inchi/inchi-1
 
-jar_DATA = lib/cdk-2.0.jar orchem.jar
+jar_DATA = lib/cdk-2.0.jar orchem.jar lib/commons-net-3.6.jar lib/jdbc-postgresql.jar
 jardir = $(datadir)/$(PACKAGE)/jar
 
 orchem.jar: force-build
@@ -15,6 +15,7 @@ EXTRA_DIST = \
 	build.xml \
 	inchi/inchi-1 \
     lib/cdk-2.0.jar \
+    lib/commons-net-3.6.jar \
     lib/jdbc-postgresql.jar \
     src/cz/iocb/orchem/convert/ConvertMolecule.java \
     src/cz/iocb/orchem/fingerprint/bitpos/BitPosApi.java \
@@ -24,7 +25,9 @@ EXTRA_DIST = \
     src/cz/iocb/orchem/fingerprint/OrchemExtendedFingerprinter.java \
     src/cz/iocb/orchem/fingerprint/OrchemFingerprinter.java \
     src/cz/iocb/orchem/isomorphism/IsomorphismSort.java \
+    src/cz/iocb/orchem/load/ConfigurationProperties.java \
     src/cz/iocb/orchem/load/CompoundLoader.java \
+    src/cz/iocb/orchem/load/CompoundUpdater.java \
     src/cz/iocb/orchem/load/ConnectionPool.java \
     src/cz/iocb/orchem/load/ChebiCompoundLoader.java \
     src/cz/iocb/orchem/load/ChemblCompoundLoader.java \

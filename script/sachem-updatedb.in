@@ -1,0 +1,16 @@
+#!/bin/bash
+
+CLASSPATH=@CLASSPATH@
+
+if [ "$#" -ne 1 ]; then
+    echo usage:
+    echo sachem-updatedb configfile.properties
+    exit 1
+fi
+
+if [ ! -f "$1" ]; then
+    echo "$1" is missing
+    exit 1
+fi
+
+java -classpath $CLASSPATH/commons-net-3.6.jar:$CLASSPATH/jdbc-postgresql.jar:$CLASSPATH/orchem.jar cz.iocb.orchem.load.CompoundUpdater "$1"

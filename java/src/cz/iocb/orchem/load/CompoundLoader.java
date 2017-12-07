@@ -24,7 +24,7 @@ public class CompoundLoader
     private final String idPrefix;
 
 
-    protected CompoundLoader(Connection connection, String idTag, String idPrefix)
+    public CompoundLoader(Connection connection, String idTag, String idPrefix)
     {
         this.connection = connection;
         this.idTag = idTag;

@@ -98,5 +98,5 @@ AC_SUBST([RDKIT_CPPFLAGS])
 AC_SUBST([RDKIT_LDFLAGS])
 
 
-AC_CONFIG_FILES(Makefile src/Makefile src/fpsearch/Makefile java/Makefile lib/Makefile extension/Makefile)
+AC_CONFIG_FILES(Makefile src/Makefile src/fpsearch/Makefile java/Makefile lib/Makefile extension/Makefile script/Makefile)
 AC_OUTPUT

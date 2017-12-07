@@ -9,6 +9,14 @@ CREATE TABLE compounds (
     PRIMARY KEY (id)
 );
 
+CREATE TABLE compound_sources (
+    id                    SERIAL NOT NULL,
+    name                  TEXT NOT NULL,
+    size                  BIGINT NOT NULL,
+    timestamp             TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (id)
+);
+
 CREATE TABLE orchem_compound_audit (
     id                    INT NOT NULL,
     stored                BOOLEAN NOT NULL,
@@ -60,6 +68,13 @@ GRANT INSERT ON TABLE compounds TO PUBLIC;
 GRANT UPDATE ON TABLE compounds TO PUBLIC;
 GRANT DELETE ON TABLE compounds TO PUBLIC;
 GRANT TRUNCATE ON TABLE compounds TO PUBLIC;
+GRANT SELECT ON TABLE compound_sources TO PUBLIC;
+GRANT INSERT ON TABLE compound_sources TO PUBLIC;
+GRANT UPDATE ON TABLE compound_sources TO PUBLIC;
+GRANT DELETE ON TABLE compound_sources TO PUBLIC;
+GRANT TRUNCATE ON TABLE compound_sources TO PUBLIC;
+GRANT SELECT ON SEQUENCE compound_sources_id_seq TO PUBLIC;
+GRANT USAGE ON SEQUENCE compound_sources_id_seq TO PUBLIC;
 GRANT SELECT ON TABLE orchem_molecule_errors TO PUBLIC;
 
 
