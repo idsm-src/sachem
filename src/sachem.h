@@ -22,7 +22,7 @@
 #define PG_MEMCONTEXT_END()             MemoryContextSwitchTo(old);} while(0)
 
 
-inline void createBasePath()
+inline void createBasePath(void)
 {
     Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
 

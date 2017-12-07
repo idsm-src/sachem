@@ -89,7 +89,7 @@ typedef struct
 extern TimeoutId vf2TimeoutId;
 extern volatile bool vf2Timeouted;
 
-void vf2_timeout_handler();
+void vf2_timeout_handler(void);
 #endif
 
 
