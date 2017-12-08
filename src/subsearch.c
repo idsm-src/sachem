@@ -518,9 +518,6 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
     Portal seqidCursor = SPI_cursor_open_with_args(NULL, "select seqid from " MOLECULES_TABLE,
             0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
-    if(unlikely(seqidCursor == NULL))
-        elog(ERROR, "%s: SPI_cursor_open_with_args() failed", __func__);
-
     BitSet seqidSet;
     bitset_init_setted(&seqidSet, indexSize);
 
@@ -562,9 +559,6 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
     Portal fpCursor = SPI_cursor_open_with_args(NULL, "select mt.seqid, ft.fp from " FINGERPRINT_TABLE " ft, "
             MOLECULES_TABLE " mt where mt.id = ft.id", 0, NULL, NULL, NULL, false,
             CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
-
-    if(unlikely(fpCursor == NULL))
-        elog(ERROR, "%s: SPI_cursor_open_with_args() failed", __func__);
 
     while(true)
     {
@@ -621,9 +615,6 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
     Portal countCursor = SPI_cursor_open_with_args(NULL, "select mt.seqid, ct.counts from " MOLECULE_COUNTS_TABLE " ct, "
             MOLECULES_TABLE " mt where ct.id = mt.id", 0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
-
-    if(unlikely(countCursor == NULL))
-            elog(ERROR, "%s: SPI_cursor_open_with_args() failed", __func__);
 
 
     while(true)
@@ -700,9 +691,6 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
     Portal compoundCursor = SPI_cursor_open_with_args(NULL, "select cmp.id, cmp.molfile from " COMPOUNDS_TABLE " cmp, "
             AUDIT_TABLE " aud where cmp.id = aud.id and aud.stored",
             0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
-
-    if(unlikely(compoundCursor == NULL))
-            elog(ERROR, "%s: SPI_cursor_open_with_args() failed", __func__);
 
 
     MemoryContext originalMemoryContext = CurrentMemoryContext;

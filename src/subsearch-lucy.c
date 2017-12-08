@@ -482,9 +482,6 @@ Datum lucy_substructure_create_index(PG_FUNCTION_ARGS)
     Portal cursor = SPI_cursor_open_with_args(NULL, "select seqid, atoms, bonds from " MOLECULES_TABLE,
             0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
-    if(unlikely(cursor == NULL))
-            elog(ERROR, "%s: SPI_cursor_open_with_args() failed", __func__);
-
 
     int countOfThread = sysconf(_SC_NPROCESSORS_ONLN);
     int processed = 0;
