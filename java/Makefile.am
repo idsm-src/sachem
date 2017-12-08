@@ -1,9 +1,9 @@
 bin_SCRIPTS = inchi/inchi-1
 
-jar_DATA = lib/cdk-2.0.jar orchem.jar lib/commons-net-3.6.jar lib/jdbc-postgresql.jar
+jar_DATA = lib/cdk-2.0.jar sachem.jar lib/commons-net-3.6.jar lib/jdbc-postgresql.jar
 jardir = $(datadir)/$(PACKAGE)/jar
 
-orchem.jar: force-build
+sachem.jar: force-build
 
 force-build:
 		$(ANT) -f $(srcdir)/build.xml -Dbasedir=$(builddir) -Dbuild.dir=$(builddir) -Dsrc.dir=$(srcdir) build-jar

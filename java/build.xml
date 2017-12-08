@@ -21,11 +21,11 @@
         <include name="**/*.class"/>
       </fileset>
     </delete>
-    <delete file="${build.dir}/orchem.jar"/>
+    <delete file="${build.dir}/sachem.jar"/>
   </target>
 
   <target name="build-jar" depends="build">
-    <jar destfile="${build.dir}/orchem.jar" basedir="${build.dir}/classes" includes="**"/>
+    <jar destfile="${build.dir}/sachem.jar" basedir="${build.dir}/classes" includes="**"/>
   </target>
 
 </project>
