@@ -21,6 +21,7 @@
 #define FETCH_SIZE                1000
 #define FP_SIZE                   788
 #define COUNTS_SIZE               10
+#define SYNC_FETCH_SIZE           100000
 #define COMPOUNDS_TABLE           "compounds"
 #define AUDIT_TABLE               "orchem_compound_audit"
 #define INDEX_TABLE               "orchem_index"
@@ -693,19 +694,19 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
 
-    MemoryContext originalMemoryContext = CurrentMemoryContext;
+    VarChar **molfiles = palloc(SYNC_FETCH_SIZE * sizeof(VarChar *));
+    OrchemLoaderData *data = palloc(SYNC_FETCH_SIZE * sizeof(OrchemLoaderData));
     int currentSeqid = -1;
 
     while(true)
     {
-        SPI_cursor_fetch(compoundCursor, true, 100000);
+        SPI_cursor_fetch(compoundCursor, true, SYNC_FETCH_SIZE);
 
         if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
             elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
 
         if(SPI_processed == 0)
             break;
-
 
         int processed = SPI_processed;
         SPITupleTable *tuptable = SPI_tuptable;
@@ -714,77 +715,74 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
         {
             HeapTuple tuple = tuptable->vals[i];
 
+            Datum molfile = SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag);
+
+            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+            molfiles[i] = DatumGetVarCharP(molfile);
+        }
+
+
+        java_parse_orchem_data(processed, molfiles, data);
+
+
+        for(int i = 0; i < processed; i++)
+        {
+            HeapTuple tuple = tuptable->vals[i];
+
+            if((char *) molfiles[i] != DatumGetPointer(SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag)))
+                pfree(molfiles[i]);
+
+
             Datum id = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                 elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
-            Datum molfile = SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag);
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-
-            OrchemLoaderData data;
-            VarChar *mol = DatumGetVarCharP(molfile);
-            ErrorData *edata = NULL;
-
-            PG_TRY();
+            if(data[i].error)
             {
-                java_parse_orchem_data(&data, VARDATA(mol), VARSIZE(mol) - VARHDRSZ);
-            }
-            PG_CATCH();
-            {
-                MemoryContextSwitchTo(originalMemoryContext);
-                edata = CopyErrorData();
-                FlushErrorState();
-            }
-            PG_END_TRY();
+                char *message = text_to_cstring(data[i].error);
+                elog(NOTICE, "%i: %s", DatumGetInt32(id), message);
+                pfree(message);
 
-            if((char *) mol != DatumGetPointer(molfile))
-                pfree(mol);
+                Datum values[] = {Int32GetDatum(id), PointerGetDatum(data[i].error)};
 
-            if(edata != NULL)
-            {
-                elog(NOTICE, "%i: %s", DatumGetInt32(id), edata->message);
-                Datum message = CStringGetTextDatum(edata->message);
-
-                if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)", 2,
-                        (Oid[]) { INT4OID, TEXTOID }, (Datum[]) {Int32GetDatum(id), message}, NULL, false, 0) != SPI_OK_INSERT)
+                if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)",
+                        2, (Oid[]) { INT4OID, TEXTOID }, values, NULL, false, 0) != SPI_OK_INSERT)
                     elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
-                pfree(DatumGetPointer(message));
-                FreeErrorData(edata);
+                pfree(data[i].error);
                 continue;
             }
 
 
             currentSeqid = bitset_next_set_bit(&seqidSet, currentSeqid + 1);
-            Datum moleculesValues[] = {Int32GetDatum(currentSeqid), id, PointerGetDatum(data.atoms), PointerGetDatum(data.bonds)};
+            Datum moleculesValues[] = {Int32GetDatum(currentSeqid), id, PointerGetDatum(data[i].atoms), PointerGetDatum(data[i].bonds)};
 
             if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
                 elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
 
 #if USE_COUNT_FINGERPRINT
-            Datum countsValues[] = { id, PointerGetDatum(data.counts) };
+            Datum countsValues[] = { id, PointerGetDatum(data[i].counts) };
 
             if(SPI_execute_plan(countsPlan, countsValues, NULL, false, 0) != SPI_OK_INSERT)
                 elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
             for(int j = 0; j < COUNTS_SIZE; j++)
-                counts[currentSeqid][j] = ((int16 *) ARR_DATA_PTR(data.counts))[j];
+                counts[currentSeqid][j] = ((int16 *) ARR_DATA_PTR(data[i].counts))[j];
 #endif
 
-            Datum fingerprintValues[] = { id, Int16GetDatum(data.bitCount), PointerGetDatum(data.fp) };
+            Datum fingerprintValues[] = { id, Int16GetDatum(data[i].bitCount), PointerGetDatum(data[i].fp) };
 
             if(SPI_execute_plan(fingerprintPlan, fingerprintValues, NULL, false, 0) != SPI_OK_INSERT)
                 elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
 
-            int length = ARR_DIMS(data.fp)[0];
-            uint64_t *fpdata = (uint64_t *) ARR_DATA_PTR(data.fp);
+            int length = ARR_DIMS(data[i].fp)[0];
+            uint64_t *fpdata = (uint64_t *) ARR_DATA_PTR(data[i].fp);
 
             BitSet fp;
             bitset_init(&fp, fpdata, length);
@@ -793,10 +791,10 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
                 bitset_set(bitmap + j - 1, currentSeqid);
 
 
-            pfree(data.counts);
-            pfree(data.fp);
-            pfree(data.atoms);
-            pfree(data.bonds);
+            pfree(data[i].counts);
+            pfree(data[i].fp);
+            pfree(data[i].atoms);
+            pfree(data[i].bonds);
         }
 
         SPI_freetuptable(tuptable);

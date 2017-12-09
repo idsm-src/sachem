@@ -1,9 +1,8 @@
 package cz.iocb.orchem.search;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.BitSet;
-import org.openscience.cdk.exception.CDKException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import cz.iocb.orchem.fingerprint.OrchemExtendedFingerprinter;
 import cz.iocb.orchem.isomorphism.IsomorphismSort;
@@ -20,6 +19,7 @@ public class OrchemLoader
         public short[] counts;
         public byte[] atoms;
         public byte[] bonds;
+        public String exception;
     }
 
 
@@ -33,38 +33,74 @@ public class OrchemLoader
     };
 
 
-    public static OrchemData getIndexData(byte[] molfileArray) throws CDKException, IOException
+    public static OrchemData[] getIndexData(final byte[][] molfilesArray) throws InterruptedException
     {
-        String molfile = new String(molfileArray, StandardCharsets.ISO_8859_1);
-        OrchemData item = new OrchemData();
+        final int cores = Runtime.getRuntime().availableProcessors();
+        final AtomicInteger idx = new AtomicInteger(0);
+        final OrchemData[] result = new OrchemData[molfilesArray.length];
 
-        IAtomContainer readMolecule = MoleculeCreator.getMoleculeFromMolfile(molfile);
-        MoleculeCreator.configureMolecule(readMolecule);
+        Thread[] thread = new Thread[cores];
 
-        // calculate similarity fingerprint
-        BitSet fp = fingerPrinter.get().getBitFingerprint(readMolecule).asBitSet();
-        item.fp = fp.toLongArray();
+        for(int c = 0; c < cores; c++)
+        {
+            thread[c] = new Thread()
+            {
+                @Override
+                public void run()
+                {
+                    for(int i = idx.getAndIncrement(); i < molfilesArray.length; i = idx.getAndIncrement())
+                    {
+                        OrchemData item = new OrchemData();
 
-        // calculate molecule couts
-        MoleculeCounts counts = new MoleculeCounts(readMolecule);
-        item.counts = new short[10];
-        item.counts[0] = counts.molTripleBondCount;
-        item.counts[1] = counts.molSCount;
-        item.counts[2] = counts.molOCount;
-        item.counts[3] = counts.molNCount;
-        item.counts[4] = counts.molFCount;
-        item.counts[5] = counts.molClCount;
-        item.counts[6] = counts.molBrCount;
-        item.counts[7] = counts.molICount;
-        item.counts[8] = counts.molCCount;
-        item.counts[9] = counts.molPCount;
+                        try
+                        {
+                            String molfile = new String(molfilesArray[i], StandardCharsets.ISO_8859_1);
 
-        // calculate molecule binary representation
-        readMolecule.setAtoms(IsomorphismSort.atomsByFrequency(readMolecule));
-        OrchemMoleculeBuilder builder = new OrchemMoleculeBuilder(readMolecule);
-        item.atoms = builder.atomsAsBytes();
-        item.bonds = builder.bondsAsBytes();
+                            IAtomContainer readMolecule = MoleculeCreator.getMoleculeFromMolfile(molfile);
+                            MoleculeCreator.configureMolecule(readMolecule);
 
-        return item;
+                            // calculate similarity fingerprint
+                            BitSet fp = fingerPrinter.get().getBitFingerprint(readMolecule).asBitSet();
+                            item.fp = fp.toLongArray();
+
+                            // calculate molecule couts
+                            MoleculeCounts counts = new MoleculeCounts(readMolecule);
+                            item.counts = new short[10];
+                            item.counts[0] = counts.molTripleBondCount;
+                            item.counts[1] = counts.molSCount;
+                            item.counts[2] = counts.molOCount;
+                            item.counts[3] = counts.molNCount;
+                            item.counts[4] = counts.molFCount;
+                            item.counts[5] = counts.molClCount;
+                            item.counts[6] = counts.molBrCount;
+                            item.counts[7] = counts.molICount;
+                            item.counts[8] = counts.molCCount;
+                            item.counts[9] = counts.molPCount;
+
+                            // calculate molecule binary representation
+                            readMolecule.setAtoms(IsomorphismSort.atomsByFrequency(readMolecule));
+                            OrchemMoleculeBuilder builder = new OrchemMoleculeBuilder(readMolecule);
+                            item.atoms = builder.atomsAsBytes();
+                            item.bonds = builder.bondsAsBytes();
+                        }
+                        catch (Throwable e)
+                        {
+                            item.exception = e.getClass().getCanonicalName() + ": " + e.getMessage();
+                        }
+
+                        result[i] = item;
+                    }
+
+                }
+            };
+        }
+
+        for(int c = 0; c < cores; c++)
+            thread[c].start();
+
+        for(int c = 0; c < cores; c++)
+            thread[c].join();
+
+        return result;
     }
 }

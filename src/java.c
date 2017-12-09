@@ -62,6 +62,7 @@ static pthread_t mainThread;
 static JavaVM* jvm = NULL;
 static JNIEnv* env = NULL;
 static jclass exceptionClass = NULL;
+static jclass byteArrayClass = NULL;
 static jmethodID toStringMethod = NULL;
 
 static jclass substructureSearchClass = NULL;
@@ -82,6 +83,7 @@ static jmethodID orchemSimilarityQueryDataMethod = NULL;
 
 static jclass orchemLoaderClass = NULL;
 static jclass orchemLoaderDataClass = NULL;
+static jfieldID orchemLoaderExceptionField = NULL;
 static jfieldID orchemLoaderCountsField = NULL;
 static jfieldID orchemLoaderFpField = NULL;
 static jfieldID orchemLoaderAtomsField = NULL;
@@ -170,6 +172,9 @@ void java_module_init(void)
     exceptionClass = (*env)->FindClass(env, "java/lang/Throwable");
     java_check_exception(__func__);
 
+    byteArrayClass = (*env)->FindClass(env, "[B");
+    java_check_exception(__func__);
+
     toStringMethod = (*env)->GetMethodID(env, exceptionClass, "toString", "()Ljava/lang/String;");
     java_check_exception(__func__);
 
@@ -222,6 +227,9 @@ void java_module_init(void)
     orchemLoaderDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemLoader$OrchemData");
     java_check_exception(__func__);
 
+    orchemLoaderExceptionField = (*env)->GetFieldID(env, orchemLoaderDataClass, "exception", "Ljava/lang/String;");
+    java_check_exception(__func__);
+
     orchemLoaderCountsField = (*env)->GetFieldID(env, orchemLoaderDataClass, "counts", "[S");
     java_check_exception(__func__);
 
@@ -234,7 +242,7 @@ void java_module_init(void)
     orchemLoaderBondsField = (*env)->GetFieldID(env, orchemLoaderDataClass, "bonds", "[B");
     java_check_exception(__func__);
 
-    orchemLoaderDataMethod = (*env)->GetStaticMethodID(env, orchemLoaderClass, "getIndexData", "([B)Lcz/iocb/orchem/search/OrchemLoader$OrchemData;");
+    orchemLoaderDataMethod = (*env)->GetStaticMethodID(env, orchemLoaderClass, "getIndexData", "([[B)[Lcz/iocb/orchem/search/OrchemLoader$OrchemData;");
     java_check_exception(__func__);
 
 
@@ -558,14 +566,17 @@ int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t quer
 }
 
 
-void java_parse_orchem_data(OrchemLoaderData *data, char* molfile, size_t length)
+void java_parse_orchem_data(size_t count, VarChar **molfiles, OrchemLoaderData *data)
 {
     if(initialised == false)
         elog(ERROR, "%s: java module is not properly initialized", __func__);
 
 
+    jbyteArray molfileArrayArg = NULL;
+    jobjectArray resultArray = NULL;
     jbyteArray molfileArg = NULL;
-    jobject element = NULL;
+    jobject resultElement = NULL;
+    jstring exception = NULL;
     jshortArray countsArray = NULL;
     jlongArray fpArray = NULL;
     jbyteArray atomsArray = NULL;
@@ -578,83 +589,123 @@ void java_parse_orchem_data(OrchemLoaderData *data, char* molfile, size_t length
 
     PG_TRY();
     {
-        molfileArg = (*env)->NewByteArray(env, length);
+        molfileArrayArg = (*env)->NewObjectArray(env, count, byteArrayClass, NULL);
         java_check_exception(__func__);
 
-        (*env)->SetByteArrayRegion(env, molfileArg, 0, length, (jbyte*) molfile);
+        for(int i = 0; i < count; i++)
+        {
+            int length = VARSIZE(molfiles[i]) - VARHDRSZ;
+            molfileArg = (*env)->NewByteArray(env, length);
+            java_check_exception(__func__);
+
+            (*env)->SetByteArrayRegion(env, molfileArg, 0, length, (jbyte*) VARDATA(molfiles[i]));
+            (*env)->SetObjectArrayElement(env, molfileArrayArg, i, molfileArg);
+
+            JavaDeleteRef(molfileArg);
+        }
 
 
-        element = (*env)->CallStaticObjectMethod(env, orchemLoaderClass, orchemLoaderDataMethod, molfileArg);
+        resultArray = (*env)->CallStaticObjectMethod(env, orchemLoaderClass, orchemLoaderDataMethod, molfileArrayArg);
         java_check_exception(__func__);
 
-        JavaDeleteRef(molfileArg);
+        JavaDeleteRef(molfileArrayArg);
 
 
-        countsArray = (jshortArray) (*env)->GetObjectField(env, element, orchemLoaderCountsField);
-        fpArray = (jlongArray) (*env)->GetObjectField(env, element, orchemLoaderFpField);
-        atomsArray = (jbyteArray)  (*env)->GetObjectField(env, element, orchemLoaderAtomsField);
-        bondsArray = (jbyteArray)  (*env)->GetObjectField(env, element, orchemLoaderBondsField);
+        for(int i = 0; i < count; i++)
+        {
+            resultElement = (*env)->GetObjectArrayElement(env, resultArray, i);
+            exception = (*env)->GetObjectField(env, resultElement, orchemLoaderExceptionField);
 
-        jsize countsSize = (*env)->GetArrayLength(env, countsArray);
-        jsize fpSize = (*env)->GetArrayLength(env, fpArray);
-        jsize atomsSize = (*env)->GetArrayLength(env, atomsArray);
-        jsize bondsSize = (*env)->GetArrayLength(env, bondsArray);
+            if(exception)
+            {
+                jboolean isCopy;
+                const char *message = (*env)->GetStringUTFChars(env, exception, &isCopy);
+                data[i].error = cstring_to_text(message);
+                (*env)->ReleaseStringUTFChars(env, exception, message);
+                JavaDeleteRef(exception);
 
-        counts = (*env)->GetShortArrayElements(env, countsArray, NULL);
-        java_check_exception(__func__);
+                data[i].bitCount = -1;
+                data[i].fp = NULL;
+                data[i].counts = NULL;
+                data[i].atoms = NULL;
+                data[i].bonds = NULL;
+            }
+            else
+            {
+                countsArray = (jshortArray) (*env)->GetObjectField(env, resultElement, orchemLoaderCountsField);
+                fpArray = (jlongArray) (*env)->GetObjectField(env, resultElement, orchemLoaderFpField);
+                atomsArray = (jbyteArray)  (*env)->GetObjectField(env, resultElement, orchemLoaderAtomsField);
+                bondsArray = (jbyteArray)  (*env)->GetObjectField(env, resultElement, orchemLoaderBondsField);
 
-        fp = (*env)->GetLongArrayElements(env, fpArray, NULL);
-        java_check_exception(__func__);
+                jsize countsSize = (*env)->GetArrayLength(env, countsArray);
+                jsize fpSize = (*env)->GetArrayLength(env, fpArray);
+                jsize atomsSize = (*env)->GetArrayLength(env, atomsArray);
+                jsize bondsSize = (*env)->GetArrayLength(env, bondsArray);
 
-        atoms = (*env)->GetByteArrayElements(env, atomsArray, NULL);
-        java_check_exception(__func__);
+                counts = (*env)->GetShortArrayElements(env, countsArray, NULL);
+                java_check_exception(__func__);
 
-        bonds = (*env)->GetByteArrayElements(env, bondsArray, NULL);
-        java_check_exception(__func__);
+                fp = (*env)->GetLongArrayElements(env, fpArray, NULL);
+                java_check_exception(__func__);
 
+                atoms = (*env)->GetByteArrayElements(env, atomsArray, NULL);
+                java_check_exception(__func__);
 
-        data->fp = (ArrayType *) palloc(fpSize * sizeof(uint64_t) + ARR_OVERHEAD_NONULLS(1));
-        data->fp->ndim = 1;
-        data->fp->dataoffset = 0;
-        data->fp->elemtype = INT8OID;
-        memcpy(ARR_DATA_PTR(data->fp), fp, fpSize * sizeof(uint64_t));
-        *(ARR_DIMS(data->fp)) = fpSize;
-        *(ARR_LBOUND(data->fp)) = 1;
-        SET_VARSIZE(data->fp, fpSize * sizeof(uint64_t) + ARR_OVERHEAD_NONULLS(1));
-
-        BitSet bitset;
-        bitset_init(&bitset, fp, fpSize);
-        data->bitCount = bitset_cardinality(&bitset);
-
-        data->counts = (ArrayType *) palloc(countsSize * sizeof(int16) + ARR_OVERHEAD_NONULLS(1));
-        data->counts->ndim = 1;
-        data->counts->dataoffset = 0;
-        data->counts->elemtype = INT2OID;
-        memcpy(ARR_DATA_PTR(data->counts), counts, countsSize * sizeof(int16));
-        *(ARR_DIMS(data->counts)) = countsSize;
-        *(ARR_LBOUND(data->counts)) = 1;
-        SET_VARSIZE(data->counts, countsSize * sizeof(int16) + ARR_OVERHEAD_NONULLS(1));
-
-        data->atoms = (bytea *) palloc(VARHDRSZ + atomsSize);
-        SET_VARSIZE(data->atoms, VARHDRSZ + atomsSize);
-        memcpy(VARDATA(data->atoms), atoms, atomsSize);
-
-        data->bonds = (bytea *) palloc(VARHDRSZ + bondsSize);
-        SET_VARSIZE(data->bonds, VARHDRSZ + bondsSize);
-        memcpy(VARDATA(data->bonds), bonds, bondsSize);
+                bonds = (*env)->GetByteArrayElements(env, bondsArray, NULL);
+                java_check_exception(__func__);
 
 
-        JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
-        JavaDeleteLongArray(fpArray, fp, JNI_ABORT);
-        JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
-        JavaDeleteByteArray(bondsArray, bonds, JNI_ABORT);
+                data[i].fp = (ArrayType *) palloc(fpSize * sizeof(uint64_t) + ARR_OVERHEAD_NONULLS(1));
+                data[i].fp->ndim = 1;
+                data[i].fp->dataoffset = 0;
+                data[i].fp->elemtype = INT8OID;
+                memcpy(ARR_DATA_PTR(data[i].fp), fp, fpSize * sizeof(uint64_t));
+                *(ARR_DIMS(data[i].fp)) = fpSize;
+                *(ARR_LBOUND(data[i].fp)) = 1;
+                SET_VARSIZE(data[i].fp, fpSize * sizeof(uint64_t) + ARR_OVERHEAD_NONULLS(1));
 
-        JavaDeleteRef(element);
+                BitSet bitset;
+                bitset_init(&bitset, fp, fpSize);
+                data[i].bitCount = bitset_cardinality(&bitset);
+
+                data[i].counts = (ArrayType *) palloc(countsSize * sizeof(int16) + ARR_OVERHEAD_NONULLS(1));
+                data[i].counts->ndim = 1;
+                data[i].counts->dataoffset = 0;
+                data[i].counts->elemtype = INT2OID;
+                memcpy(ARR_DATA_PTR(data[i].counts), counts, countsSize * sizeof(int16));
+                *(ARR_DIMS(data[i].counts)) = countsSize;
+                *(ARR_LBOUND(data[i].counts)) = 1;
+                SET_VARSIZE(data[i].counts, countsSize * sizeof(int16) + ARR_OVERHEAD_NONULLS(1));
+
+                data[i].atoms = (bytea *) palloc(VARHDRSZ + atomsSize);
+                SET_VARSIZE(data[i].atoms, VARHDRSZ + atomsSize);
+                memcpy(VARDATA(data[i].atoms), atoms, atomsSize);
+
+                data[i].bonds = (bytea *) palloc(VARHDRSZ + bondsSize);
+                SET_VARSIZE(data[i].bonds, VARHDRSZ + bondsSize);
+                memcpy(VARDATA(data[i].bonds), bonds, bondsSize);
+
+                data[i].error = NULL;
+
+
+                JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
+                JavaDeleteLongArray(fpArray, fp, JNI_ABORT);
+                JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
+                JavaDeleteByteArray(bondsArray, bonds, JNI_ABORT);
+            }
+
+            JavaDeleteRef(resultElement);
+        }
+
+        JavaDeleteRef(resultArray);
     }
     PG_CATCH();
     {
+        JavaDeleteRef(molfileArrayArg);
+        JavaDeleteRef(resultArray);
         JavaDeleteRef(molfileArg);
-        JavaDeleteRef(element);
+        JavaDeleteRef(resultElement);
+        JavaDeleteRef(exception);
         JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
         JavaDeleteLongArray(fpArray, fp, JNI_ABORT);
         JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
