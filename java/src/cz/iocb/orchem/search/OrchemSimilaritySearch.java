@@ -42,7 +42,7 @@ public class OrchemSimilaritySearch
 
         MoleculeCreator.configureMolecule(molecule);
 
-        BitSet fp = fingerPrinter.get().getBitFingerprint(molecule, 10000).asBitSet();
+        BitSet fp = fingerPrinter.get().getFingerprint(molecule, 10000);
         return fp.toLongArray();
     }
 }

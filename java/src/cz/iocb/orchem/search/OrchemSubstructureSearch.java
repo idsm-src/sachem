@@ -63,7 +63,7 @@ public abstract class OrchemSubstructureSearch extends SubstructureSearch
             IAtom[] sortedAtoms = IsomorphismSort.atomsByFrequency(queryMolecule);
             queryMolecule.setAtoms(sortedAtoms);
 
-            BitSet fpbits = fingerPrinter.get().getBitFingerprint(queryMolecule, 10000).asBitSet();
+            BitSet fpbits = fingerPrinter.get().getFingerprint(queryMolecule, 10000);
 
             short[] fp = new short[fpbits.cardinality() - 1];
 

@@ -60,7 +60,7 @@ public class OrchemLoader
                             MoleculeCreator.configureMolecule(readMolecule);
 
                             // calculate similarity fingerprint
-                            BitSet fp = fingerPrinter.get().getBitFingerprint(readMolecule).asBitSet();
+                            BitSet fp = fingerPrinter.get().getFingerprint(readMolecule);
                             item.fp = fp.toLongArray();
 
                             // calculate molecule couts
