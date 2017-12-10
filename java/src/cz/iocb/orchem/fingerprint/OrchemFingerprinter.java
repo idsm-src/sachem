@@ -38,7 +38,6 @@ import org.openscience.cdk.interfaces.IRingSet;
 import org.openscience.cdk.ringsearch.AllRingsFinder;
 import org.openscience.cdk.ringsearch.AllRingsFinder.Threshold;
 import org.openscience.cdk.ringsearch.RingPartitioner;
-import org.openscience.cdk.silent.RingSet;
 import cz.iocb.orchem.fingerprint.bitpos.BitPosApi;
 import cz.iocb.orchem.fingerprint.bitpos.Neighbour;
 
@@ -49,8 +48,98 @@ import cz.iocb.orchem.fingerprint.bitpos.Neighbour;
  */
 public class OrchemFingerprinter implements IFingerprinter
 {
+    private class AllRingsFinderThread extends Thread
+    {
+        private IAtomContainer molecule;
+        private IRingSet result;
+        private CDKException exception;
+
+        public AllRingsFinderThread()
+        {
+            setDaemon(true);
+            start();
+        }
+
+        @Override
+        public void run()
+        {
+            while(true)
+            {
+                synchronized(this)
+                {
+                    if(molecule == null)
+                    {
+                        try
+                        {
+                            wait();
+                        }
+                        catch (InterruptedException e)
+                        {
+
+                        }
+                    }
+                }
+
+                IRingSet res = null;
+                CDKException exp = null;
+
+                try
+                {
+                    res = OrchemFingerprinter.findAllRingsInIsolatedRingSystem(molecule);
+                }
+                catch (CDKException e)
+                {
+                    exp = e;
+                }
+
+                synchronized(this)
+                {
+                    result = res;
+                    exception = exp;
+                    molecule = null;
+
+                    notify();
+                }
+            }
+        }
+
+        @SuppressWarnings("deprecation")
+        public synchronized IRingSet getRingSet(IAtomContainer input, int timeout) throws CDKException
+        {
+            molecule = input;
+            result = null;
+            exception = null;
+            notify();
+
+            try
+            {
+                wait(timeout);
+            }
+            catch (InterruptedException e)
+            {
+
+            }
+
+            if(exception == null && result == null)
+            {
+                System.err.println("AllRingsFinderThread timeouted");
+                stop();
+                allRingsFinderThread = null;
+
+                throw new CDKException("timeout");
+            }
+
+            if(exception != null)
+                throw exception;
+
+            return result;
+        }
+    }
+
+
     public final static int FINGERPRINT_SIZE = BitPosApi.bp.getFingerprintSize();
     private final int hashModulo = BitPosApi.bp.HASH_OFFSET;
+    private AllRingsFinderThread allRingsFinderThread = null;
     private IRingSet ringSet;
     List<IRingSet> rslist;
 
@@ -65,6 +154,12 @@ public class OrchemFingerprinter implements IFingerprinter
     @Override
     public BitSet getFingerprint(IAtomContainer molecule) throws CDKException
     {
+        return getFingerprint(molecule, 0);
+    }
+
+
+    public BitSet getFingerprint(IAtomContainer molecule, int timeout) throws CDKException
+    {
         BitSet fingerprint = new BitSet(FINGERPRINT_SIZE);
 
         /* Set a dummy default bit. This prevents compounds with 0 bits set, which in turn makes the similarity search unhappy*/
@@ -77,22 +172,23 @@ public class OrchemFingerprinter implements IFingerprinter
 
         try
         {
-            AllRingsFinder ringFinder = new AllRingsFinder();
-            AllRingsFinder.usingThreshold(Threshold.PubChem_994);
+            if(timeout <= 0)
+            {
+                ringSet = findAllRingsInIsolatedRingSystem(molecule);
+            }
+            else
+            {
+                if(allRingsFinderThread == null)
+                    allRingsFinderThread = new AllRingsFinderThread();
 
-            // fingerprinter prints up to 6; from 7 onwards bucky balls and such become quite expensive!
-            ringSet = ringFinder.findAllRingsInIsolatedRingSystem(molecule, Math.min(6, molecule.getAtomCount()));
-        }
-        catch (IllegalArgumentException e)
-        {
-            ringSet = new RingSet();
+                ringSet = allRingsFinderThread.getRingSet(molecule, timeout);
+            }
         }
         catch (Exception e)
         {
+            System.out.println("warning in ring detection, exception handled :" + e.getMessage());
             Cycles cycles = Cycles.sssr(molecule);
             ringSet = cycles.toRingSet();
-
-            System.out.println("warning in ring detection, exception handled :" + e.getMessage());
         }
 
         rings(ringSet, fingerprint);
@@ -102,6 +198,16 @@ public class OrchemFingerprinter implements IFingerprinter
         smilesPatterns(molecule, fingerprint);
 
         return fingerprint;
+    }
+
+
+    public static IRingSet findAllRingsInIsolatedRingSystem(IAtomContainer molecule) throws CDKException
+    {
+        AllRingsFinder ringFinder = new AllRingsFinder();
+        AllRingsFinder.usingThreshold(Threshold.PubChem_994);
+
+        // fingerprinter prints up to 6; from 7 onwards bucky balls and such become quite expensive!
+        return ringFinder.findAllRingsInIsolatedRingSystem(molecule, Math.min(6, molecule.getAtomCount()));
     }
 
 
@@ -1169,6 +1275,12 @@ public class OrchemFingerprinter implements IFingerprinter
     public IBitFingerprint getBitFingerprint(IAtomContainer molecule) throws CDKException
     {
         return new BitSetFingerprint(getFingerprint(molecule));
+    }
+
+
+    public IBitFingerprint getBitFingerprint(IAtomContainer molecule, int timeout) throws CDKException
+    {
+        return new BitSetFingerprint(getFingerprint(molecule, timeout));
     }
 
 

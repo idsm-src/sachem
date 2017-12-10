@@ -48,12 +48,19 @@ public class OrchemExtendedFingerprinter extends OrchemFingerprinter
     @Override
     public BitSet getFingerprint(IAtomContainer molecule) throws CDKException
     {
+        return getFingerprint(molecule, 0);
+    }
+
+
+    @Override
+    public BitSet getFingerprint(IAtomContainer molecule, int timeout) throws CDKException
+    {
         BitSet extendedFingerprint = new BitSet(FINGERPRINT_SIZE);
         Integer bitPos = null;
         String mapKey = null;
 
         /* Copy the basic fingerprint into the extended fingerprint */
-        BitSet basicFingerprint = super.getFingerprint(molecule);
+        BitSet basicFingerprint = super.getFingerprint(molecule, timeout);
 
         for(int i = 0; i < basicFingerprint.size(); i++)
             extendedFingerprint.set(i, basicFingerprint.get(i));
