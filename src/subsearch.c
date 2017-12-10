@@ -612,7 +612,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
      * load original count data
      */
 
-    int16 (*counts)[COUNTS_SIZE] = palloc0(indexSize * COUNTS_SIZE * sizeof(int16));
+    int16 (*counts)[COUNTS_SIZE] = palloc_extended(indexSize * COUNTS_SIZE * sizeof(int16), MCXT_ALLOC_HUGE | MCXT_ALLOC_ZERO);
 
     Portal countCursor = SPI_cursor_open_with_args(NULL, "select mt.seqid, ct.counts from " MOLECULE_COUNTS_TABLE " ct, "
             MOLECULES_TABLE " mt where ct.id = mt.id", 0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
