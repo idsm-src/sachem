@@ -452,6 +452,9 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(orchem_sync_data);
 Datum orchem_sync_data(PG_FUNCTION_ARGS)
 {
+    bool verbose = PG_GETARG_BOOL(0);
+
+
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
         elog(ERROR, "%s: SPI_connect() failed", __func__);
 
@@ -697,6 +700,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
     VarChar **molfiles = palloc(SYNC_FETCH_SIZE * sizeof(VarChar *));
     OrchemLoaderData *data = palloc(SYNC_FETCH_SIZE * sizeof(OrchemLoaderData));
     int currentSeqid = -1;
+    int count = 0;
 
     while(true)
     {
@@ -798,6 +802,12 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
         }
 
         SPI_freetuptable(tuptable);
+
+
+        count += processed;
+
+        if(verbose)
+            elog(NOTICE, "already processed: %i", count);
     }
 
     SPI_cursor_close(compoundCursor);
