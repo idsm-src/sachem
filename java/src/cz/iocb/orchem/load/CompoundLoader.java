@@ -13,6 +13,8 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 
 
@@ -118,17 +120,39 @@ public class CompoundLoader
         {
             File file = files[i];
 
-            if(!file.getName().endsWith(".gz"))
-                continue;
+            if(file.getName().endsWith(".sdf.gz"))
+            {
+                try (InputStream gzipStream = new GZIPInputStream(new FileInputStream(file)))
+                {
+                    System.out.println(i + ": " + file.getName());
+                    parse(gzipStream, version);
+                }
+            }
+            else if(file.getName().endsWith(".zip"))
+            {
+                try (ZipInputStream zipStream = new ZipInputStream(new FileInputStream(file)))
+                {
+                    System.out.println(i + ": " + file.getName());
+                    ZipEntry entry;
 
-            System.out.println(i + ": " + file.getName());
-
-            InputStream fileStream = new FileInputStream(file);
-            InputStream gzipStream = new GZIPInputStream(fileStream);
-
-            parse(gzipStream, version);
-
-            gzipStream.close();
+                    while((entry = zipStream.getNextEntry()) != null)
+                    {
+                        if(entry.getName().endsWith(".sdf"))
+                        {
+                            System.out.println("    " + entry.getName());
+                            parse(zipStream, version);
+                        }
+                    }
+                }
+            }
+            else if(file.getName().endsWith(".sdf"))
+            {
+                try (InputStream fileStream = new FileInputStream(file))
+                {
+                    System.out.println(i + ": " + file.getName());
+                    parse(fileStream, version);
+                }
+            }
         }
 
         try (PreparedStatement statement = connection.prepareStatement("delete from compounds where version < ?"))
