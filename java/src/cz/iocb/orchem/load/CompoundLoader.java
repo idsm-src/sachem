@@ -10,8 +10,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -34,15 +36,15 @@ public class CompoundLoader
     }
 
 
-    private void parse(InputStream inputStream, int version) throws Exception
+    private void parse(InputStream inputStream, List<Integer> oldIds) throws Exception
     {
         Reader decoder = new InputStreamReader(inputStream, "US-ASCII");
         BufferedReader reader = new BufferedReader(decoder);
         String line;
 
         try (PreparedStatement insertStatement = connection
-                .prepareStatement("insert into compounds (id, version, molfile) values (?,?,?) "
-                        + "on conflict (id) do update set version=EXCLUDED.version, molfile=EXCLUDED.molfile"))
+                .prepareStatement("insert into compounds (id, molfile) values (?,?) "
+                        + "on conflict (id) do update set molfile=EXCLUDED.molfile"))
         {
             int count = 0;
 
@@ -76,8 +78,7 @@ public class CompoundLoader
 
                 count++;
                 insertStatement.setInt(1, id);
-                insertStatement.setInt(2, version);
-                insertStatement.setString(3, sdf);
+                insertStatement.setString(2, sdf);
                 insertStatement.addBatch();
 
                 if(count % batchSize == 0)
@@ -104,14 +105,14 @@ public class CompoundLoader
         });;
 
 
-        int version;
+        List<Integer> oldIds = new ArrayList<Integer>();
 
         try (Statement statement = connection.createStatement())
         {
-            try (ResultSet rs = statement.executeQuery("select max(version)+1 from compounds"))
+            try (ResultSet rs = statement.executeQuery("select id from compounds"))
             {
-                rs.next();
-                version = rs.getInt(1);
+                while(rs.next())
+                    oldIds.add(rs.getInt(1));
             }
         }
 
@@ -125,7 +126,7 @@ public class CompoundLoader
                 try (InputStream gzipStream = new GZIPInputStream(new FileInputStream(file)))
                 {
                     System.out.println(i + ": " + file.getName());
-                    parse(gzipStream, version);
+                    parse(gzipStream, oldIds);
                 }
             }
             else if(file.getName().endsWith(".zip"))
@@ -140,7 +141,7 @@ public class CompoundLoader
                         if(entry.getName().endsWith(".sdf"))
                         {
                             System.out.println("    " + entry.getName());
-                            parse(zipStream, version);
+                            parse(zipStream, oldIds);
                         }
                     }
                 }
@@ -150,15 +151,28 @@ public class CompoundLoader
                 try (InputStream fileStream = new FileInputStream(file))
                 {
                     System.out.println(i + ": " + file.getName());
-                    parse(fileStream, version);
+                    parse(fileStream, oldIds);
                 }
             }
         }
 
-        try (PreparedStatement statement = connection.prepareStatement("delete from compounds where version < ?"))
+
+        try (PreparedStatement deleteStatement = connection.prepareStatement("delete from compounds where id = ?"))
         {
-            statement.setInt(1, version);
-            statement.execute();
+            int count = 0;
+
+            for(int id : oldIds)
+            {
+                count++;
+                deleteStatement.setInt(1, id);
+                deleteStatement.addBatch();
+
+                if(count % batchSize == 0)
+                    deleteStatement.executeBatch();
+            }
+
+            if(count % batchSize != 0)
+                deleteStatement.executeBatch();
         }
     }
 }

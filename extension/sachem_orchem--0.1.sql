@@ -4,7 +4,6 @@
 
 CREATE TABLE compounds (
     id                    INT NOT NULL,
-    version               INT NOT NULL,
     molfile               TEXT NOT NULL,
     PRIMARY KEY (id)
 );
