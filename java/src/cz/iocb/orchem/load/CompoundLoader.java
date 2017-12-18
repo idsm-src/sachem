@@ -31,7 +31,7 @@ public class CompoundLoader
     public CompoundLoader(Connection connection, String idTag, String idPrefix)
     {
         this.connection = connection;
-        this.idTag = idTag;
+        this.idTag = "> <" + idTag + ">";;
         this.idPrefix = idPrefix;
     }
 
