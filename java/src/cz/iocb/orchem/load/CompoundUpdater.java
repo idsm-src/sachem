@@ -69,6 +69,7 @@ public class CompoundUpdater
                     ftpClient.connect(ftpServer, ftpPort);
                     ftpClient.login(ftpUserName, ftpPassword);
                     ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
+                    ftpClient.enterLocalPassiveMode();
 
                     FTPFile[] files = ftpClient.listFiles(ftpPath);
                     
