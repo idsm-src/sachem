@@ -3,8 +3,7 @@
 CLASSPATH=@CLASSPATH@
 
 if [ "$#" -ne 1 ]; then
-    echo usage:
-    echo sachem-updatedb configfile.properties
+    echo usage: sachem-update-data configfile.properties
     exit 1
 fi
 

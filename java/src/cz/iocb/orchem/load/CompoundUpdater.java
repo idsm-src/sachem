@@ -23,11 +23,12 @@ public class CompoundUpdater
     {
         if(args.length != 1)
         {
-            System.err.println("usage: sachem-updatedb configfile.properties");
+            System.err.println("wrong number of parameters");
             System.exit(1);
         }
 
 
+        Date checkdate = new Date();
         ConfigurationProperties properties = new ConfigurationProperties(args[0]);
 
         String pgHost = properties.getProperty("postgres.host");
@@ -69,7 +70,12 @@ public class CompoundUpdater
                     ftpClient.login(ftpUserName, ftpPassword);
                     ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
 
-                    for(FTPFile file : ftpClient.listFiles(ftpPath))
+                    FTPFile[] files = ftpClient.listFiles(ftpPath);
+                    
+                    if(files.length == 0)
+                        throw new Exception("ftp directory is empty");
+                    
+                    for(FTPFile file : files)
                     {
                         if(!file.isDirectory() && file.getName().matches(filePattern))
                         {
@@ -112,7 +118,16 @@ public class CompoundUpdater
 
 
             if(!hasNewItem)
+            {
+                try(PreparedStatement statement = connection
+                        .prepareStatement("update compound_stats set checkdate=? where id = 0"))
+                {
+                    statement.setTimestamp(1, new Timestamp(checkdate.getTime()));
+                    statement.executeUpdate();
+                }
+                
                 return;
+            }
 
 
             connection.setAutoCommit(false);
@@ -144,6 +159,15 @@ public class CompoundUpdater
                 try (Statement statement = connection.createStatement())
                 {
                     statement.execute("select \"orchem_sync_data\"()");
+                }
+                
+                try(PreparedStatement statement = connection
+                        .prepareStatement("insert into compound_stats (id,size,checkdate) "
+                                + "values (0,(select count(*) from compounds),?) on conflict (id) do update set "
+                                + "size=EXCLUDED.size, checkdate=EXCLUDED.checkdate"))
+                {
+                    statement.setTimestamp(1, new Timestamp(checkdate.getTime()));
+                    statement.executeUpdate();
                 }
 
                 connection.commit();

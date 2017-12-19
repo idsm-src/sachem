@@ -1,9 +1,9 @@
 bin_SCRIPTS = \
-	sachem-updatedb \
+	sachem-update-data \
 	sachem-update-drugbank
 
 EXTRA_DIST = \
-	sachem-updatedb.in \
+	sachem-update-data.in \
 	sachem-update-drugbank.in
 
 CLEANFILES = $(bin_SCRIPTS)
