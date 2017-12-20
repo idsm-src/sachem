@@ -91,7 +91,7 @@ public class CompoundLoader
     }
 
 
-    public void loadDirectory(File directory) throws Exception
+    public void loadDirectory(File directory, boolean removeOld) throws Exception
     {
         final File[] files = directory.listFiles();
 
@@ -107,12 +107,15 @@ public class CompoundLoader
 
         List<Integer> oldIds = new ArrayList<Integer>();
 
-        try (Statement statement = connection.createStatement())
+        if(removeOld)
         {
-            try (ResultSet rs = statement.executeQuery("select id from compounds"))
+            try (Statement statement = connection.createStatement())
             {
-                while(rs.next())
-                    oldIds.add(rs.getInt(1));
+                try (ResultSet rs = statement.executeQuery("select id from compounds"))
+                {
+                    while(rs.next())
+                        oldIds.add(rs.getInt(1));
+                }
             }
         }
 
@@ -157,22 +160,31 @@ public class CompoundLoader
         }
 
 
-        try (PreparedStatement deleteStatement = connection.prepareStatement("delete from compounds where id = ?"))
+        if(removeOld)
         {
-            int count = 0;
-
-            for(int id : oldIds)
+            try (PreparedStatement deleteStatement = connection.prepareStatement("delete from compounds where id = ?"))
             {
-                count++;
-                deleteStatement.setInt(1, id);
-                deleteStatement.addBatch();
+                int count = 0;
 
-                if(count % batchSize == 0)
+                for(int id : oldIds)
+                {
+                    count++;
+                    deleteStatement.setInt(1, id);
+                    deleteStatement.addBatch();
+
+                    if(count % batchSize == 0)
+                        deleteStatement.executeBatch();
+                }
+
+                if(count % batchSize != 0)
                     deleteStatement.executeBatch();
             }
-
-            if(count % batchSize != 0)
-                deleteStatement.executeBatch();
         }
+    }
+
+
+    public void loadDirectory(File directory) throws Exception
+    {
+        loadDirectory(directory, true);
     }
 }
