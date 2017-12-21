@@ -77,6 +77,7 @@ public class CompoundLoader
                 while((line = reader.readLine()) != null);
 
                 count++;
+                oldIds.remove(id);
                 insertStatement.setInt(1, id);
                 insertStatement.setString(2, sdf);
                 insertStatement.addBatch();
