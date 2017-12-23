@@ -268,7 +268,7 @@ public class PubChemCompoundUpdater
                 try(PreparedStatement statement = connection
                         .prepareStatement("insert into compound_stats (id,version,size,checkdate) "
                                 + "values (0,?,(select count(*) from compounds),?) on conflict (id) do update set "
-                                + "size=EXCLUDED.size, checkdate=EXCLUDED.checkdate"))
+                                + "version=EXCLUDED.version, size=EXCLUDED.size, checkdate=EXCLUDED.checkdate"))
                 {
                     statement.setString(1, finalVersion);
                     statement.setTimestamp(2, new Timestamp(checkdate.getTime()));
