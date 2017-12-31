@@ -49,7 +49,7 @@ public class DrugbankCompoundUpdater
         String workdir = properties.getProperty("sdf.directory");
         String fileName = properties.getProperty("sdf.file");
         String idTag = properties.getProperty("sdf.idtag");
-        String idPrefix = properties.getProperty("sdf.idprefix", "");
+        String idPrefix = properties.getProperty("sdf.idprefix");
 
 
         String pgUrl = "jdbc:postgresql://" + pgHost + ":" + pgPort + "/" + pgDatabase;

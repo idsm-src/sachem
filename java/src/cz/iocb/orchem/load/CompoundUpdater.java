@@ -46,7 +46,7 @@ public class CompoundUpdater
         String filePattern = properties.getProperty("sdf.pattern");
         String workdir = properties.getProperty("sdf.directory");
         String idTag = properties.getProperty("sdf.idtag");
-        String idPrefix = properties.getProperty("sdf.idprefix", "");
+        String idPrefix = properties.getProperty("sdf.idprefix");
 
 
         String pgUrl = "jdbc:postgresql://" + pgHost + ":" + pgPort + "/" + pgDatabase;
