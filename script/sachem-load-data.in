@@ -1,0 +1,20 @@
+#!/bin/bash
+
+CLASSPATH=@CLASSPATH@
+
+if [ "$#" -ne 2 ]; then
+    echo usage: sachem-load-data configfile.properties sdf_directory
+    exit 1
+fi
+
+if [ ! -f "$1" ]; then
+    echo "$1" is missing
+    exit 1
+fi
+
+if [ ! -d "$2" ]; then
+    echo "$2" is missing
+    exit 1
+fi
+
+java -classpath $CLASSPATH/commons-net-3.6.jar:$CLASSPATH/jdbc-postgresql.jar:$CLASSPATH/sachem.jar cz.iocb.orchem.load.GeneralCompoundLoader "$1" "$2"

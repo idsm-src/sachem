@@ -1,9 +1,11 @@
 bin_SCRIPTS = \
+	sachem-load-data \
 	sachem-update-data \
 	sachem-update-drugbank \
 	sachem-update-pubchem
 
 EXTRA_DIST = \
+	sachem-load-data.in \
 	sachem-update-data.in \
 	sachem-update-drugbank.in \
 	sachem-update-pubchem.in
