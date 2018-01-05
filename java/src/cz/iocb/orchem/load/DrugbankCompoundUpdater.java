@@ -32,7 +32,7 @@ public class DrugbankCompoundUpdater
             System.exit(1);
         }
 
-        
+
         Date checkdate = new Date();
         ConfigurationProperties properties = new ConfigurationProperties(args[0]);
 
@@ -115,7 +115,7 @@ public class DrugbankCompoundUpdater
             authConnection.setInstanceFollowRedirects(false);
             authConnection.setRequestProperty("Authorization", "Basic " + authStringEnc);
             String location = authConnection.getHeaderField("Location");
-            
+
             URL downloadUrl = new URL(location);
             HttpURLConnection downloadConnection = (HttpURLConnection) downloadUrl.openConnection();
 
@@ -175,7 +175,7 @@ public class DrugbankCompoundUpdater
 
                 connection.commit();
             }
-            catch (Throwable e)
+            catch(Throwable e)
             {
                 connection.rollback();
                 throw e;

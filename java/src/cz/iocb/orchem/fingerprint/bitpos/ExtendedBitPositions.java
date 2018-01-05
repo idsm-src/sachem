@@ -4,7 +4,7 @@
  * any later version. All we ask is that proper credit is given for our work, which includes - but is not limited to -
  * adding the above copyright notice to the beginning of your source code files, and to any copyright notice that you
  * may distribute with programs based on this work.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
  * details.

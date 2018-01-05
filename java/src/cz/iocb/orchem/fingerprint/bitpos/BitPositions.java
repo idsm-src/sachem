@@ -1,13 +1,13 @@
 /*
  * Copyright (C) 2017-2017 Jakub Galgonek   galgonek@uochb.cas.cz
  * Copyright (C) 2008-2009 Mark Rijnbeek    markr@ebi.ac.uk
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General
  * Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option)
  * any later version. All we ask is that proper credit is given for our work, which includes - but is not limited to -
  * adding the above copyright notice to the beginning of your source code files, and to any copyright notice that you
  * may distribute with programs based on this work.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
  * details.
@@ -26,7 +26,7 @@ import org.openscience.cdk.interfaces.IBond;
 /**
  * Holds maps with fingerprint information used to determine which bit number to set for which chemical aspect. Access
  * to this class should be done through singleton {@link BitPosApi}
- * 
+ *
  * Several maps are set up, each containing a pair (information,bit position). For example, the map elementCntBits holds
  * data related to element counts. It may have an entry (C32,n) with n being some number - this data will be used by
  * {@link cz.iocb.orchem.fingerprint.OrchemFingerprinter} to determine which bit position (n) to set when a compound has
@@ -106,10 +106,10 @@ public class BitPositions
      */
     public BitPositions()
     {
-        /* 
+        /*
          * Position 0 is reserved !
          * bit0 is ALWAYS set and thus prevents division by zero in the similarity search (weakness of algorithm)
-         * 
+         *
          */
 
         bitpos = HASH_OFFSET;

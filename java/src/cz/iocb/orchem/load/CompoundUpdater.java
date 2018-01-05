@@ -57,13 +57,13 @@ public class CompoundUpdater
         boolean hasNewItem = false;
 
 
-        try (Connection connection = DriverManager.getConnection(pgUrl, pgUserName, pgPassword))
+        try(Connection connection = DriverManager.getConnection(pgUrl, pgUserName, pgPassword))
         {
             FTPClient ftpClient = new FTPClient();
 
             try
             {
-                try (PreparedStatement statement = connection
+                try(PreparedStatement statement = connection
                         .prepareStatement("select id from compound_sources where name=? and size=? and timestamp=?"))
                 {
                     ftpClient.connect(ftpServer, ftpPort);
@@ -72,10 +72,10 @@ public class CompoundUpdater
                     ftpClient.enterLocalPassiveMode();
 
                     FTPFile[] files = ftpClient.listFiles(ftpPath);
-                    
+
                     if(files.length == 0)
                         throw new Exception("ftp directory is empty");
-                    
+
                     for(FTPFile file : files)
                     {
                         if(!file.isDirectory() && file.getName().matches(filePattern))
@@ -86,7 +86,7 @@ public class CompoundUpdater
 
                             sdfFiles.add(file);
 
-                            try (ResultSet result = statement.executeQuery())
+                            try(ResultSet result = statement.executeQuery())
                             {
                                 if(!result.next())
                                     hasNewItem = true;
@@ -103,7 +103,7 @@ public class CompoundUpdater
                     {
                         String name = sdfFile.getName();
 
-                        try (FileOutputStream output = new FileOutputStream(path + "/" + name))
+                        try(FileOutputStream output = new FileOutputStream(path + "/" + name))
                         {
                             if(!ftpClient.retrieveFile(ftpPath + "/" + name, output))
                                 throw new Exception("cannot download: " + ftpPath + "/" + name);
@@ -126,7 +126,7 @@ public class CompoundUpdater
                     statement.setTimestamp(1, new Timestamp(checkdate.getTime()));
                     statement.executeUpdate();
                 }
-                
+
                 return;
             }
 
@@ -138,12 +138,12 @@ public class CompoundUpdater
                 CompoundLoader loader = new CompoundLoader(connection, idTag, idPrefix);
                 loader.loadDirectory(directory);
 
-                try (Statement statement = connection.createStatement())
+                try(Statement statement = connection.createStatement())
                 {
                     statement.execute("delete from compound_sources");
                 }
 
-                try (PreparedStatement statement = connection
+                try(PreparedStatement statement = connection
                         .prepareStatement("insert into compound_sources (name, size, timestamp) values(?,?,?)"))
                 {
                     for(FTPFile sdfFile : sdfFiles)
@@ -157,11 +157,11 @@ public class CompoundUpdater
                     statement.executeBatch();
                 }
 
-                try (Statement statement = connection.createStatement())
+                try(Statement statement = connection.createStatement())
                 {
                     statement.execute("select \"orchem_sync_data\"()");
                 }
-                
+
                 try(PreparedStatement statement = connection
                         .prepareStatement("insert into compound_stats (id,size,checkdate) "
                                 + "values (0,(select count(*) from compounds),?) on conflict (id) do update set "
@@ -173,7 +173,7 @@ public class CompoundUpdater
 
                 connection.commit();
             }
-            catch (Throwable e)
+            catch(Throwable e)
             {
                 connection.rollback();
                 throw e;

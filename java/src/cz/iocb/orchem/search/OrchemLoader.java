@@ -83,7 +83,7 @@ public class OrchemLoader
                             item.atoms = builder.atomsAsBytes();
                             item.bonds = builder.bondsAsBytes();
                         }
-                        catch (Throwable e)
+                        catch(Throwable e)
                         {
                             item.exception = e.getClass().getCanonicalName() + ": " + e.getMessage();
                         }

@@ -1,13 +1,13 @@
 /*
  * Copyright (C) 2015-2017 Jakub Galgonek   galgonek@uochb.cas.cz
  * Copyright (C) 2009-2009 Mark Rijnbeek    markr@ebi.ac.uk
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General
  * Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option)
  * any later version. All we ask is that proper credit is given for our work, which includes - but is not limited to -
  * adding the above copyright notice to the beginning of your source code files, and to any copyright notice that you
  * may distribute with programs based on this work.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
  * details.
@@ -38,17 +38,17 @@ public class IsomorphismSort
      * <li>the frequency of atom symbols</li>
      * <li>the connectivity of the atoms</li>
      * </ul>
-     * 
+     *
      * This type of sort benefits algorithms like VF2, sorting the query container before a subgraph match. The
      * algorithm will then start with atoms that are quite likely hardest to match.
-     * 
+     *
      * Example usage:
-     * 
+     *
      * <pre>
      * IAtom[] sortedAtoms = cz.iocb.orchem.IsomorphismSort.atomsByFrequency(queryMolecule);
      * queryMolecule.setAtoms(sortedAtoms);
      * </pre>
-     * 
+     *
      * @param iac input {@link IAtomContainer}
      * @return a sorted array of atoms for that {@link IAtomContainer}
      */

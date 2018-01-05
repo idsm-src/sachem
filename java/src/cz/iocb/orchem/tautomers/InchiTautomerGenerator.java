@@ -1,15 +1,15 @@
 /*
  * Copyright (C) 2015-2017 Jakub Galgonek   galgonek@uochb.cas.cz
  * Copyright (C) 2011-2011 Mark Rijnbeek    markr@ebi.ac.uk
- * 
+ *
  * Contact: cdk-devel@lists.sourceforge.net
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General
  * Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option)
  * any later version. All we ask is that proper credit is given for our work, which includes - but is not limited to -
  * adding the above copyright notice to the beginning of your source code files, and to any copyright notice that you
  * may distribute with programs based on this work.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
  * details.
@@ -235,7 +235,7 @@ public class InchiTautomerGenerator
 
     /**
      * Get tautomers for an input molecule with the InChI already provided as input argument.
-     * 
+     *
      * @param inputMolecule and input molecule for which to generate tautomers
      * @param fragment InChI for the inpute molecule
      * @param aux
@@ -306,7 +306,7 @@ public class InchiTautomerGenerator
     /**
      * Parses the InChI's formula (ignoring hydrogen) and returns a map with with a position for each atom, increasing
      * in the order of the elements as listed in the formula.
-     * 
+     *
      * @param inputInchi user input InChI
      * @param inputMolecule user input molecule
      * @return <Integer,IAtom> map indicating position and atom
@@ -350,7 +350,7 @@ public class InchiTautomerGenerator
 
     /**
      * Pops and pushes its ways through the InChI connection table to build up a simple molecule.
-     * 
+     *
      * @param inputInchi user input InChI
      * @param inputMolecule user input molecule
      * @param inchiAtomsByPosition
@@ -444,7 +444,7 @@ public class InchiTautomerGenerator
     /**
      * Atom-atom mapping of the input molecule to the bare container constructed from the InChI connection table. This
      * makes it possible to map the positions of the mobile hydrogens in the InChI back to the input molecule.
-     * 
+     *
      * @param inchiMolGraph molecule (bare) as defined in InChI
      * @param inputMolecule user input molecule
      * @throws CDKException
@@ -569,7 +569,7 @@ public class InchiTautomerGenerator
 
     /**
      * Parses mobile H group(s) in an InChI String.
-     * 
+     *
      * Multiple InChI sequences of mobile hydrogens are joined into a single sequence (list), see step 1 of algorithm in
      * paper. Mobile H group has syntax (H[n][-[m]],a1,a2[,a3[,a4...]]) Brackets [ ] surround optional terms.
      * <ul>
@@ -578,7 +578,7 @@ public class InchiTautomerGenerator
      * <li>a1,a2[,a3[,a4...]] are canonical numbers of atoms in the mobile H group.</li>
      * <li>no two mobile H groups may have an atom (a canonical number) in common.</li>
      * </ul>
-     * 
+     *
      * @param mobHydrAttachPositions list of positions where mobile H can attach
      * @param inputInchi InChI input
      * @return overall count of hydrogens to be dispersed over the positions
@@ -696,7 +696,7 @@ public class InchiTautomerGenerator
 
     /**
      * Constructs tautomers following (most) steps of the algorithm in {@cdk.cite Thalheim2010}.
-     * 
+     *
      * @param inputMolecule input molecule
      * @param valency
      * @param mobHydrAttachPositions mobile H positions
@@ -873,7 +873,7 @@ public class InchiTautomerGenerator
 
     /**
      * Makes combinations recursively of all possible mobile Hydrogen positions.
-     * 
+     *
      * @param taken positions taken by hydrogen
      * @param combinations combinations made so far
      * @param skeleton container to work on
@@ -1236,7 +1236,7 @@ public class InchiTautomerGenerator
 
     /**
      * Sums the number of bonds (counting order) an atom is hooked up with.
-     * 
+     *
      * @param atom
      * @param container
      * @return

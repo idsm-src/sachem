@@ -42,7 +42,7 @@ public class CompoundLoader
         BufferedReader reader = new BufferedReader(decoder);
         String line;
 
-        try (PreparedStatement insertStatement = connection
+        try(PreparedStatement insertStatement = connection
                 .prepareStatement("insert into compounds (id, molfile) values (?,?) "
                         + "on conflict (id) do update set molfile=EXCLUDED.molfile"))
         {
@@ -110,9 +110,9 @@ public class CompoundLoader
 
         if(removeOld)
         {
-            try (Statement statement = connection.createStatement())
+            try(Statement statement = connection.createStatement())
             {
-                try (ResultSet rs = statement.executeQuery("select id from compounds"))
+                try(ResultSet rs = statement.executeQuery("select id from compounds"))
                 {
                     while(rs.next())
                         oldIds.add(rs.getInt(1));
@@ -127,7 +127,7 @@ public class CompoundLoader
 
             if(file.getName().endsWith(".sdf.gz"))
             {
-                try (InputStream gzipStream = new GZIPInputStream(new FileInputStream(file)))
+                try(InputStream gzipStream = new GZIPInputStream(new FileInputStream(file)))
                 {
                     System.out.println(i + ": " + file.getName());
                     parse(gzipStream, oldIds);
@@ -135,7 +135,7 @@ public class CompoundLoader
             }
             else if(file.getName().endsWith(".zip"))
             {
-                try (ZipInputStream zipStream = new ZipInputStream(new FileInputStream(file)))
+                try(ZipInputStream zipStream = new ZipInputStream(new FileInputStream(file)))
                 {
                     System.out.println(i + ": " + file.getName());
                     ZipEntry entry;
@@ -152,7 +152,7 @@ public class CompoundLoader
             }
             else if(file.getName().endsWith(".sdf"))
             {
-                try (InputStream fileStream = new FileInputStream(file))
+                try(InputStream fileStream = new FileInputStream(file))
                 {
                     System.out.println(i + ": " + file.getName());
                     parse(fileStream, oldIds);
@@ -163,7 +163,7 @@ public class CompoundLoader
 
         if(removeOld)
         {
-            try (PreparedStatement deleteStatement = connection.prepareStatement("delete from compounds where id = ?"))
+            try(PreparedStatement deleteStatement = connection.prepareStatement("delete from compounds where id = ?"))
             {
                 int count = 0;
 

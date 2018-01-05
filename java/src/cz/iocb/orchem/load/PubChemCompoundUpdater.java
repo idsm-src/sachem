@@ -277,7 +277,7 @@ public class PubChemCompoundUpdater
 
                 connection.commit();
             }
-            catch (Throwable e)
+            catch(Throwable e)
             {
                 connection.rollback();
                 throw e;

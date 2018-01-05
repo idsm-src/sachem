@@ -13,7 +13,7 @@ public class ConfigurationProperties extends Properties
 {
     public ConfigurationProperties(String fileName) throws FileNotFoundException, IOException
     {
-        try (FileInputStream stream = new FileInputStream(fileName))
+        try(FileInputStream stream = new FileInputStream(fileName))
         {
             load(stream);
         }
@@ -38,7 +38,7 @@ public class ConfigurationProperties extends Properties
         {
             return Integer.parseInt(getProperty(key));
         }
-        catch (NumberFormatException e)
+        catch(NumberFormatException e)
         {
             throw new InvalidParameterException("wrong value for key " + key);
         }
