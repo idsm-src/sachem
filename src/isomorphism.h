@@ -45,7 +45,6 @@
 
 typedef struct
 {
-    int target_range_len;
     int target_selector;
     int target_idx;
 } VF2Undo;
@@ -66,22 +65,14 @@ typedef struct
     int *restrict core_target;
     int core_len;
 
-    bool *restrict query_range_flags;
-    bool *restrict query_range_flag;
     int *restrict query_order;
-    int *restrict query_range_lens;
-    int query_range_len;
+    int *restrict query_parents;
     int query_idx;
 
-    bool *restrict target_range_flag;
-    int *restrict target_range_stack;
-    int target_range_len;
     int target_selector;
     int target_idx;
 
     VF2Undo *undos;
-
-    bool *restrict empty_flags;
 } VF2State;
 
 
@@ -134,76 +125,63 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
     vf2state->query = query;
     vf2state->queryAtomCount = queryAtomCount;
     vf2state->core_len = 0;
+    vf2state->core_query = (int *) palloc(queryAtomCount * sizeof(int));
     vf2state->query_order = (int *) palloc(queryAtomCount * sizeof(int));
-    vf2state->query_range_lens = (int *) palloc(queryAtomCount * sizeof(int));
-    vf2state->query_range_len = 0;
+    vf2state->query_parents = (int *) palloc(queryAtomCount * sizeof(int));
     vf2state->undos = (VF2Undo *) palloc(queryAtomCount * sizeof(VF2Undo));
 
 
-    vf2state->core_query = (int *) palloc(queryAtomCount * sizeof(int));
+    for(int i = 0; i < queryAtomCount; i++)
+        vf2state->query_parents[i] = -1;
+
+    uint8_t query_flags[queryAtomCount];
 
     for(int i = 0; i < queryAtomCount; i++)
-        vf2state->core_query[i] = UNDEFINED_CORE;
+        query_flags[i] = 0;
 
-
-    vf2state->query_range_flags = (bool *) palloc((queryAtomCount + 1) * queryAtomCount * sizeof(bool));
-    vf2state->query_range_flag = vf2state->query_range_flags;
-
-    for(int i = 0; i < queryAtomCount; i++)
-        vf2state->query_range_flag[i] = 0;
-
-    for(int core = 0; core < queryAtomCount; core++)
+    for(int idx = 0; idx < queryAtomCount; idx++)
     {
-        memcpy(vf2state->query_range_flag + queryAtomCount, vf2state->query_range_flag, sizeof(bool) * queryAtomCount);
-        vf2state->query_range_flag += queryAtomCount;
+        int selected = -1;
+        int fallback = -1;
 
-        int idx = 0;
-
-        if(vf2state->query_range_len > core)
+        for(int i = 0; i < queryAtomCount; i++)
         {
-            while(idx < queryAtomCount && (is_core_defined(vf2state->core_query[idx]) || !vf2state->query_range_flag[idx]))
-                idx++;
-        }
-        else
-        {
-            while(idx < queryAtomCount && is_core_defined(vf2state->core_query[idx]))
-                idx++;
-        }
+            if(selected == -1 && query_flags[i] == 1)
+            {
+                selected = i;
+                break;
+            }
 
-        vf2state->query_order[core] = idx;
-        vf2state->core_query[idx] = 0;
-
-        if(!vf2state->query_range_flag[idx])
-        {
-            vf2state->query_range_flag[idx] = true;
-            vf2state->query_range_len++;
+            if(fallback == -1 && query_flags[i] == 0)
+                fallback = i;
         }
 
+        if(selected == -1)
+            selected = fallback;
 
-        int *restrict queryBondList = molecule_get_bond_list(query, idx);
-        int queryBondListSize = molecule_get_bond_list_size(query, idx);
+
+        int *restrict queryBondList = molecule_get_bond_list(query, selected);
+        int queryBondListSize = molecule_get_bond_list_size(query, selected);
+
+        query_flags[selected] = 2;
 
         for(int i = 0; i < queryBondListSize; i++)
         {
-            int other = queryBondList[i];
+            int idx = queryBondList[i];
 
-            if(!vf2state->query_range_flag[other])
+            if(query_flags[idx] == 0)
             {
-                vf2state->query_range_flag[other] = true;
-                vf2state->query_range_len++;
+                query_flags[idx] = 1;
+                vf2state->query_parents[idx] = selected;
             }
         }
 
-        vf2state->query_range_lens[core] = vf2state->query_range_len;
+        vf2state->query_order[idx] = selected;
     }
 
 
     if(unlikely(exact))
-    {
-        vf2state->target_range_flag = (bool *) palloc(queryAtomCount * sizeof(bool));
-        vf2state->target_range_stack = (int *) palloc(queryAtomCount * sizeof(int));
         vf2state->core_target = (int *) palloc(queryAtomCount * sizeof(int));
-    }
 }
 
 
@@ -222,47 +200,31 @@ inline bool vf2state_next_query(VF2State *const restrict vf2state)
 
 inline bool vf2state_next_target(VF2State *const restrict vf2state)
 {
-    if(vf2state->query_range_len > vf2state->core_len)
-    {
-        vf2state->target_selector++;
+    int query_parent = vf2state->query_parents[vf2state->query_idx];
 
-        while(vf2state->target_selector < vf2state->target_range_len)
+    if(likely(query_parent >= 0))
+    {
+        int target_parent = vf2state->core_query[query_parent];
+        int *restrict targetBondList = molecule_get_bond_list(vf2state->target, target_parent);
+        int targetBondListSize = molecule_get_bond_list_size(vf2state->target, target_parent);
+
+        for(vf2state->target_selector++; vf2state->target_selector < targetBondListSize; vf2state->target_selector++)
         {
-            if(!is_target_masked(vf2state->target_range_stack[vf2state->target_selector]))
+            int target_id = targetBondList[vf2state->target_selector];
+
+            if(!is_core_defined(vf2state->core_target[target_id]))
             {
-                vf2state->target_idx = vf2state->target_range_stack[vf2state->target_selector];
+                vf2state->target_idx = target_id;
                 return true;
             }
-
-            vf2state->target_selector++;
         }
     }
     else
     {
-        vf2state->target_idx++;
-
-        while(vf2state->target_idx < vf2state->targetAtomCount)
+        for(vf2state->target_idx++; vf2state->target_idx < vf2state->targetAtomCount; vf2state->target_idx++)
         {
             if(!is_core_defined(vf2state->core_target[vf2state->target_idx]))
-            {
-                vf2state->target_selector = vf2state->target_range_len;
-
-                if(vf2state->target_range_flag[vf2state->target_idx])
-                {
-                    for(int i = 0; i < vf2state->target_range_len; i++)
-                    {
-                        if(vf2state->target_range_stack[i] == vf2state->target_idx)
-                        {
-                            vf2state->target_selector = i;
-                            break;
-                        }
-                    }
-                }
-
                 return true;
-            }
-
-            vf2state->target_idx++;
         }
     }
 
@@ -353,9 +315,7 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
     }
 
 
-    int terminQuery = 0;
     int newQuery = 0;
-    int terminTarget = 0;
     int newTarget = 0;
 
     int *restrict queryBondList = molecule_get_bond_list(vf2state->query, vf2state->query_idx);
@@ -374,10 +334,7 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
         }
         else
         {
-            if(vf2state->query_range_flag[other1])
-                terminQuery++;
-            else
-                newQuery++;
+            newQuery++;
         }
     }
 
@@ -401,17 +358,14 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
         }
         else
         {
-            if(vf2state->target_range_flag[other2])
-                terminTarget++;
-            else
-                newTarget++;
+            newTarget++;
         }
     }
 
     if(unlikely(vf2state->exact))
-        return terminQuery == terminTarget && newQuery == newTarget;
+        return newQuery == newTarget;
     else
-        return terminQuery <= terminTarget && terminQuery + newQuery <= terminTarget + newTarget;
+        return newQuery <= newTarget;
 }
 
 
@@ -424,22 +378,8 @@ inline void vf2state_undo_add_pair(VF2State *const restrict vf2state)
     vf2state->core_query[vf2state->query_idx] = UNDEFINED_CORE;
     vf2state->core_target[undo->target_idx] = UNDEFINED_CORE;
 
-    vf2state->target_range_stack[undo->target_selector] = undo->target_idx;
-
-    for(int i = undo->target_range_len; i < vf2state->target_range_len; i++)
-    {
-        if(is_core_defined(vf2state->target_range_stack[i]))
-            vf2state->target_range_flag[vf2state->target_range_stack[i]] = false;
-        else
-            vf2state->target_range_flag[undo->target_idx] = false;
-    }
-
-    vf2state->target_range_len = undo->target_range_len;
     vf2state->target_selector = undo->target_selector;
     vf2state->target_idx = undo->target_idx;
-
-    vf2state->query_range_len = vf2state->core_len > 0 ? vf2state->query_range_lens[vf2state->core_len - 1] : 0;
-    vf2state->query_range_flag = vf2state->query_range_flags + vf2state->queryAtomCount * vf2state->core_len;
 }
 
 
@@ -447,39 +387,12 @@ inline void vf2state_add_pair(VF2State *const restrict vf2state)
 {
     VF2Undo *restrict undo = &vf2state->undos[vf2state->core_len];
 
-    vf2state->query_range_len = vf2state->query_range_lens[vf2state->core_len];
-    vf2state->query_range_flag = vf2state->query_range_flags + vf2state->queryAtomCount * (vf2state->core_len + 1);
-
     vf2state->core_len++;
     vf2state->core_query[vf2state->query_idx] = vf2state->target_idx;
     vf2state->core_target[vf2state->target_idx] = vf2state->query_idx;
 
-    undo->target_range_len = vf2state->target_range_len;
     undo->target_selector = vf2state->target_selector;
     undo->target_idx = vf2state->target_idx;
-
-    if(!vf2state->target_range_flag[vf2state->target_idx])
-    {
-        vf2state->target_range_flag[vf2state->target_idx] = true;
-        vf2state->target_selector = vf2state->target_range_len++;
-    }
-
-    vf2state->target_range_stack[vf2state->target_selector] = MASKED_TARGET;
-
-
-    int *restrict targetBondList = molecule_get_bond_list(vf2state->target, vf2state->target_idx);
-    int targetBondListSize = molecule_get_bond_list_size(vf2state->target, vf2state->target_idx);
-
-    for(int i = 0; i < targetBondListSize; i++)
-    {
-        int other = targetBondList[i];
-
-        if(!vf2state->target_range_flag[other])
-        {
-            vf2state->target_range_flag[other] = true;
-            vf2state->target_range_stack[vf2state->target_range_len++] = other;
-        }
-    }
 }
 
 
@@ -678,7 +591,7 @@ inline bool vf2state_match_core(VF2State *const restrict vf2state)
             goto recursion_return;
         }
 
-        if(vf2state->query_range_len > vf2state->target_range_len || !vf2state_next_query(vf2state))
+        if(!vf2state_next_query(vf2state))
             goto recursion_return;
 
 
@@ -731,19 +644,9 @@ inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *co
     vf2state->target = target;
     vf2state->targetAtomCount = targetAtomCount;
     vf2state->core_len = 0;
-    vf2state->query_range_flag = vf2state->query_range_flags;
-    vf2state->query_range_len = 0;
-    vf2state->target_range_len = 0;
 
     if(likely(!vf2state->exact))
-    {
-        vf2state->target_range_flag = (bool *) palloc(targetAtomCount * sizeof(bool));
-        vf2state->target_range_stack = (int *) palloc(targetAtomCount * sizeof(int));
         vf2state->core_target = (int *) palloc(targetAtomCount * sizeof(int));
-    }
-
-    for(int i = 0; i < targetAtomCount; i++)
-        vf2state->target_range_flag[i] = false;
 
     for(int i = 0; i < targetAtomCount; i++)
         vf2state->core_target[i] = UNDEFINED_CORE;
