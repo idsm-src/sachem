@@ -512,7 +512,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
         elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
-    int32_t indexSize = seqidCount > moleculesCount + auditCount ? seqidCount : moleculesCount + auditCount;
+    int32_t maxIndexSize = seqidCount > moleculesCount + auditCount ? seqidCount : moleculesCount + auditCount;
 
 
     /*
@@ -523,7 +523,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
     BitSet seqidSet;
-    bitset_init_setted(&seqidSet, indexSize);
+    bitset_init_setted(&seqidSet, maxIndexSize);
 
     while(true)
     {
@@ -557,7 +557,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
     BitSet bitmap[FP_SIZE];
 
     for(int i = 0; i < FP_SIZE; i++)
-        bitset_init_empty(bitmap + i, indexSize);
+        bitset_init_empty(bitmap + i, maxIndexSize);
 
 
     Portal fpCursor = SPI_cursor_open_with_args(NULL, "select mt.seqid, ft.fp from " FINGERPRINT_TABLE " ft, "
@@ -615,7 +615,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
      * load original count data
      */
 
-    int16 (*counts)[COUNTS_SIZE] = palloc_extended(indexSize * COUNTS_SIZE * sizeof(int16), MCXT_ALLOC_HUGE | MCXT_ALLOC_ZERO);
+    int16 (*counts)[COUNTS_SIZE] = palloc_extended(maxIndexSize * COUNTS_SIZE * sizeof(int16), MCXT_ALLOC_HUGE | MCXT_ALLOC_ZERO);
 
     Portal countCursor = SPI_cursor_open_with_args(NULL, "select mt.seqid, ct.counts from " MOLECULE_COUNTS_TABLE " ct, "
             MOLECULES_TABLE " mt where ct.id = mt.id", 0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
@@ -700,6 +700,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
     VarChar **molfiles = palloc(SYNC_FETCH_SIZE * sizeof(VarChar *));
     OrchemLoaderData *data = palloc(SYNC_FETCH_SIZE * sizeof(OrchemLoaderData));
     int currentSeqid = -1;
+    int notIndexed = 0;
     int count = 0;
 
     while(true)
@@ -747,6 +748,8 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
             if(data[i].error)
             {
+                notIndexed++;
+
                 char *message = text_to_cstring(data[i].error);
                 elog(NOTICE, "%i: %s", DatumGetInt32(id), message);
                 pfree(message);
@@ -864,6 +867,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
     PG_TRY();
     {
         uint64_t offset = FP_SIZE + 1;
+        int indexSize = maxIndexSize - notIndexed;
 
 #if USE_COUNT_FINGERPRINT
         offset += (indexSize * COUNTS_SIZE * sizeof(uint16) + sizeof(uint64_t) - 1) / sizeof(uint64_t);
