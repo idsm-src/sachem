@@ -353,7 +353,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                 if(unlikely(SPI_execute_plan(mainQueryPlan, values, NULL, true, 0) != SPI_OK_SELECT))
                     elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
-                if(unlikely(SPI_processed != count || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 4))
+                if(unlikely(/*SPI_processed != count ||*/ SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 4))
                     elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
                 info->table = SPI_tuptable;
