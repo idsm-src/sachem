@@ -1,6 +1,6 @@
 bin_SCRIPTS = inchi/inchi-1
 
-jar_DATA = lib/cdk-2.0.jar sachem.jar lib/commons-net-3.6.jar lib/jdbc-postgresql.jar
+jar_DATA = lib/cdk-2.1.1.jar sachem.jar lib/commons-net-3.6.jar lib/jdbc-postgresql.jar
 jardir = $(datadir)/$(PACKAGE)/jar
 
 sachem.jar: force-build
@@ -14,7 +14,7 @@ clean-local:
 EXTRA_DIST = \
 	build.xml \
 	inchi/inchi-1 \
-    lib/cdk-2.0.jar \
+    lib/cdk-2.1.1.jar \
     lib/commons-net-3.6.jar \
     lib/jdbc-postgresql.jar \
     src/cz/iocb/orchem/convert/ConvertMolecule.java \
