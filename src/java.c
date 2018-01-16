@@ -67,8 +67,7 @@ static jmethodID toStringMethod = NULL;
 
 static jclass substructureSearchClass = NULL;
 static jclass substructureQueryDataClass = NULL;
-static jfieldID atomsField = NULL;
-static jfieldID bondsField = NULL;
+static jfieldID moleculeField = NULL;
 static jfieldID restHField = NULL;
 static jmethodID substructureQueryDataMethod = NULL;
 
@@ -86,8 +85,7 @@ static jclass orchemLoaderDataClass = NULL;
 static jfieldID orchemLoaderExceptionField = NULL;
 static jfieldID orchemLoaderCountsField = NULL;
 static jfieldID orchemLoaderFpField = NULL;
-static jfieldID orchemLoaderAtomsField = NULL;
-static jfieldID orchemLoaderBondsField = NULL;
+static jfieldID orchemLoaderMoleculeField = NULL;
 static jmethodID orchemLoaderDataMethod = NULL;
 
 
@@ -185,16 +183,13 @@ void java_module_init(void)
     substructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/SubstructureSearch$QueryData");
     java_check_exception(__func__);
 
-    atomsField = (*env)->GetFieldID(env, substructureQueryDataClass, "atoms", "[B");
-    java_check_exception(__func__);
-
-    bondsField = (*env)->GetFieldID(env, substructureQueryDataClass, "bonds", "[B");
+    moleculeField = (*env)->GetFieldID(env, substructureQueryDataClass, "molecule", "[B");
     java_check_exception(__func__);
 
     restHField = (*env)->GetFieldID(env, substructureQueryDataClass, "restH", "[Z");
     java_check_exception(__func__);
 
-    substructureQueryDataMethod = (*env)->GetStaticMethodID(env, substructureSearchClass, "getQueryData", "([BLjava/lang/String;Z)[Lcz/iocb/orchem/search/SubstructureSearch$QueryData;");
+    substructureQueryDataMethod = (*env)->GetStaticMethodID(env, substructureSearchClass, "getQueryData", "([BLjava/lang/String;ZZ)[Lcz/iocb/orchem/search/SubstructureSearch$QueryData;");
     java_check_exception(__func__);
 
 
@@ -210,7 +205,7 @@ void java_module_init(void)
     fpField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "fp", "[S");
     java_check_exception(__func__);
 
-    orchemSubstructureQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSubstructureSearchClass, "getQueryData", "([BLjava/lang/String;Z)[Lcz/iocb/orchem/search/OrchemSubstructureSearch$OrchemQueryData;");
+    orchemSubstructureQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSubstructureSearchClass, "getQueryData", "([BLjava/lang/String;ZZ)[Lcz/iocb/orchem/search/OrchemSubstructureSearch$OrchemQueryData;");
     java_check_exception(__func__);
 
 
@@ -236,10 +231,7 @@ void java_module_init(void)
     orchemLoaderFpField = (*env)->GetFieldID(env, orchemLoaderDataClass, "fp", "[J");
     java_check_exception(__func__);
 
-    orchemLoaderAtomsField = (*env)->GetFieldID(env, orchemLoaderDataClass, "atoms", "[B");
-    java_check_exception(__func__);
-
-    orchemLoaderBondsField = (*env)->GetFieldID(env, orchemLoaderDataClass, "bonds", "[B");
+    orchemLoaderMoleculeField = (*env)->GetFieldID(env, orchemLoaderDataClass, "molecule", "[B");
     java_check_exception(__func__);
 
     orchemLoaderDataMethod = (*env)->GetStaticMethodID(env, orchemLoaderClass, "getIndexData", "([[B)[Lcz/iocb/orchem/search/OrchemLoader$OrchemData;");
@@ -257,7 +249,7 @@ void java_module_finish(void)
 }
 
 
-int java_parse_substructure_query(SubstructureQueryData **data, char* query, size_t queryLength, char *type, bool tautomers)
+int java_parse_substructure_query(SubstructureQueryData **data, char* query, size_t queryLength, char *type, bool implicitHydrogens, bool tautomers)
 {
     if(initialised == false)
         elog(ERROR, "%s: java module is not properly initialized", __func__);
@@ -269,11 +261,9 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
     jobject element = NULL;
     jshortArray countsArray = NULL;
     jshortArray fpArray = NULL;
-    jbyteArray atomsArray = NULL;
-    jbyteArray bondsArray = NULL;
+    jbyteArray moleculeArray = NULL;
     jbooleanArray  restHArray = NULL;
-    jbyte *atoms = NULL;
-    jbyte *bonds = NULL;
+    jbyte *molecule = NULL;
     jboolean *restH = NULL;
     jsize length = -1;
 
@@ -290,7 +280,7 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
         java_check_exception(__func__);
 
 
-        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, substructureSearchClass, substructureQueryDataMethod, queryArg, typeArg, (jboolean) tautomers);
+        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, substructureSearchClass, substructureQueryDataMethod, queryArg, typeArg, (jboolean) implicitHydrogens, (jboolean) tautomers);
         java_check_exception(__func__);
 
         JavaDeleteRef(queryArg);
@@ -304,29 +294,21 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
         {
             element = (*env)->GetObjectArrayElement(env, result, i);
 
-            atomsArray = (jbyteArray)  (*env)->GetObjectField(env, element, atomsField);
-            bondsArray = (jbyteArray)  (*env)->GetObjectField(env, element, bondsField);
+            moleculeArray = (jbyteArray)  (*env)->GetObjectField(env, element, moleculeField);
             restHArray = (jbooleanArray)   (*env)->GetObjectField(env, element, restHField);
 
-            jsize atomsSize = (*env)->GetArrayLength(env, atomsArray);
-            jsize bondsSize = (*env)->GetArrayLength(env, bondsArray);
+            jsize moleculeSize = (*env)->GetArrayLength(env, moleculeArray);
             jsize restHSize = restHArray ? (*env)->GetArrayLength(env, restHArray) : -1;
 
-            atoms = (*env)->GetByteArrayElements(env, atomsArray, NULL);
-            java_check_exception(__func__);
-
-            bonds = (*env)->GetByteArrayElements(env, bondsArray, NULL);
+            molecule = (*env)->GetByteArrayElements(env, moleculeArray, NULL);
             java_check_exception(__func__);
 
             restH = restHArray ? (*env)->GetBooleanArrayElements (env, restHArray, NULL) : 0;
             java_check_exception(__func__);
 
 
-            results[i].atoms = (char *) palloc(atomsSize);
-            memcpy(results[i].atoms, atoms, atomsSize);
-
-            results[i].bonds = (char *) palloc(bondsSize);
-            memcpy(results[i].bonds, bonds, bondsSize);
+            results[i].molecule = (char *) palloc(moleculeSize);
+            memcpy(results[i].molecule, molecule, moleculeSize);
 
 
             if(restHArray)
@@ -339,11 +321,7 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
                 results[i].restH = NULL;
             }
 
-            results[i].atomLength = atomsSize;
-            results[i].bondLength = bondsSize;
-
-            JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
-            JavaDeleteByteArray(bondsArray, bonds, JNI_ABORT);
+            JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
             JavaDeleteBooleanArray(restHArray, restH, JNI_ABORT);
 
             JavaDeleteRef(element);
@@ -359,8 +337,7 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
         JavaDeleteRef(typeArg);
         JavaDeleteRef(result);
         JavaDeleteRef(element);
-        JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
-        JavaDeleteByteArray(bondsArray, bonds, JNI_ABORT);
+        JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
         JavaDeleteBooleanArray(restHArray, restH, JNI_ABORT);
 
         PG_RE_THROW();
@@ -371,7 +348,7 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
 }
 
 
-int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, char* query, size_t queryLength, char *type, bool tautomers)
+int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, char* query, size_t queryLength, char *type, bool implicitHydrogens, bool tautomers)
 {
     if(initialised == false)
         elog(ERROR, "%s: java module is not properly initialized", __func__);
@@ -383,13 +360,11 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
     jobject element = NULL;
     jshortArray countsArray = NULL;
     jshortArray fpArray = NULL;
-    jbyteArray atomsArray = NULL;
-    jbyteArray bondsArray = NULL;
+    jbyteArray moleculeArray = NULL;
     jbooleanArray  restHArray = NULL;
     jshort *counts = NULL;
     jshort *fp = NULL;
-    jbyte *atoms = NULL;
-    jbyte *bonds = NULL;
+    jbyte *molecule = NULL;
     jboolean *restH = NULL;
     jsize length = -1;
 
@@ -406,7 +381,7 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
         java_check_exception(__func__);
 
 
-        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, orchemSubstructureSearchClass, orchemSubstructureQueryDataMethod, queryArg, typeArg, (jboolean) tautomers);
+        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, orchemSubstructureSearchClass, orchemSubstructureQueryDataMethod, queryArg, typeArg, (jboolean) implicitHydrogens, (jboolean) tautomers);
         java_check_exception(__func__);
 
         JavaDeleteRef(queryArg);
@@ -422,14 +397,12 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
 
             countsArray = (jshortArray) (*env)->GetObjectField(env, element, countsField);
             fpArray = (jshortArray) (*env)->GetObjectField(env, element, fpField);
-            atomsArray = (jbyteArray)  (*env)->GetObjectField(env, element, atomsField);
-            bondsArray = (jbyteArray)  (*env)->GetObjectField(env, element, bondsField);
+            moleculeArray = (jbyteArray)  (*env)->GetObjectField(env, element, moleculeField);
             restHArray = (jbooleanArray)   (*env)->GetObjectField(env, element, restHField);
 
             jsize countsSize = (*env)->GetArrayLength(env, countsArray);
             jsize fpSize = (*env)->GetArrayLength(env, fpArray);
-            jsize atomsSize = (*env)->GetArrayLength(env, atomsArray);
-            jsize bondsSize = (*env)->GetArrayLength(env, bondsArray);
+            jsize moleculeSize = (*env)->GetArrayLength(env, moleculeArray);
             jsize restHSize = restHArray ? (*env)->GetArrayLength(env, restHArray) : -1;
 
             counts = (*env)->GetShortArrayElements(env, countsArray, NULL);
@@ -438,10 +411,7 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
             fp = (*env)->GetShortArrayElements(env, fpArray, NULL);
             java_check_exception(__func__);
 
-            atoms = (*env)->GetByteArrayElements(env, atomsArray, NULL);
-            java_check_exception(__func__);
-
-            bonds = (*env)->GetByteArrayElements(env, bondsArray, NULL);
+            molecule = (*env)->GetByteArrayElements(env, moleculeArray, NULL);
             java_check_exception(__func__);
 
             restH = restHArray ? (*env)->GetBooleanArrayElements (env, restHArray, NULL) : 0;
@@ -454,11 +424,8 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
             results[i].fp = (jshort *) palloc(fpSize * sizeof(jshort));
             memcpy(results[i].fp, fp, fpSize * sizeof(jshort));
 
-            results[i].atoms = (char *) palloc(atomsSize);
-            memcpy(results[i].atoms, atoms, atomsSize);
-
-            results[i].bonds = (char *) palloc(bondsSize);
-            memcpy(results[i].bonds, bonds, bondsSize);
+            results[i].molecule = (char *) palloc(moleculeSize);
+            memcpy(results[i].molecule, molecule, moleculeSize);
 
 
             if(restHArray)
@@ -472,13 +439,10 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
             }
 
             results[i].fpLength = fpSize;
-            results[i].atomLength = atomsSize;
-            results[i].bondLength = bondsSize;
 
             JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
             JavaDeleteShortArray(fpArray, fp, JNI_ABORT);
-            JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
-            JavaDeleteByteArray(bondsArray, bonds, JNI_ABORT);
+            JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
             JavaDeleteBooleanArray(restHArray, restH, JNI_ABORT);
 
             JavaDeleteRef(element);
@@ -496,8 +460,7 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
         JavaDeleteRef(element);
         JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
         JavaDeleteShortArray(fpArray, fp, JNI_ABORT);
-        JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
-        JavaDeleteByteArray(bondsArray, bonds, JNI_ABORT);
+        JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
         JavaDeleteBooleanArray(restHArray, restH, JNI_ABORT);
 
         PG_RE_THROW();
@@ -579,12 +542,10 @@ void java_parse_orchem_data(size_t count, VarChar **molfiles, OrchemLoaderData *
     jstring exception = NULL;
     jshortArray countsArray = NULL;
     jlongArray fpArray = NULL;
-    jbyteArray atomsArray = NULL;
-    jbyteArray bondsArray = NULL;
+    jbyteArray moleculeArray = NULL;
     jshort *counts = NULL;
     jlong *fp = NULL;
-    jbyte *atoms = NULL;
-    jbyte *bonds = NULL;
+    jbyte *molecule = NULL;
 
 
     PG_TRY();
@@ -627,20 +588,17 @@ void java_parse_orchem_data(size_t count, VarChar **molfiles, OrchemLoaderData *
                 data[i].bitCount = -1;
                 data[i].fp = NULL;
                 data[i].counts = NULL;
-                data[i].atoms = NULL;
-                data[i].bonds = NULL;
+                data[i].molecule = NULL;
             }
             else
             {
                 countsArray = (jshortArray) (*env)->GetObjectField(env, resultElement, orchemLoaderCountsField);
                 fpArray = (jlongArray) (*env)->GetObjectField(env, resultElement, orchemLoaderFpField);
-                atomsArray = (jbyteArray)  (*env)->GetObjectField(env, resultElement, orchemLoaderAtomsField);
-                bondsArray = (jbyteArray)  (*env)->GetObjectField(env, resultElement, orchemLoaderBondsField);
+                moleculeArray = (jbyteArray)  (*env)->GetObjectField(env, resultElement, orchemLoaderMoleculeField);
 
                 jsize countsSize = (*env)->GetArrayLength(env, countsArray);
                 jsize fpSize = (*env)->GetArrayLength(env, fpArray);
-                jsize atomsSize = (*env)->GetArrayLength(env, atomsArray);
-                jsize bondsSize = (*env)->GetArrayLength(env, bondsArray);
+                jsize moleculeSize = (*env)->GetArrayLength(env, moleculeArray);
 
                 counts = (*env)->GetShortArrayElements(env, countsArray, NULL);
                 java_check_exception(__func__);
@@ -648,10 +606,7 @@ void java_parse_orchem_data(size_t count, VarChar **molfiles, OrchemLoaderData *
                 fp = (*env)->GetLongArrayElements(env, fpArray, NULL);
                 java_check_exception(__func__);
 
-                atoms = (*env)->GetByteArrayElements(env, atomsArray, NULL);
-                java_check_exception(__func__);
-
-                bonds = (*env)->GetByteArrayElements(env, bondsArray, NULL);
+                molecule = (*env)->GetByteArrayElements(env, moleculeArray, NULL);
                 java_check_exception(__func__);
 
 
@@ -677,21 +632,16 @@ void java_parse_orchem_data(size_t count, VarChar **molfiles, OrchemLoaderData *
                 *(ARR_LBOUND(data[i].counts)) = 1;
                 SET_VARSIZE(data[i].counts, countsSize * sizeof(int16) + ARR_OVERHEAD_NONULLS(1));
 
-                data[i].atoms = (bytea *) palloc(VARHDRSZ + atomsSize);
-                SET_VARSIZE(data[i].atoms, VARHDRSZ + atomsSize);
-                memcpy(VARDATA(data[i].atoms), atoms, atomsSize);
-
-                data[i].bonds = (bytea *) palloc(VARHDRSZ + bondsSize);
-                SET_VARSIZE(data[i].bonds, VARHDRSZ + bondsSize);
-                memcpy(VARDATA(data[i].bonds), bonds, bondsSize);
+                data[i].molecule = (bytea *) palloc(VARHDRSZ + moleculeSize);
+                SET_VARSIZE(data[i].molecule, VARHDRSZ + moleculeSize);
+                memcpy(VARDATA(data[i].molecule), molecule, moleculeSize);
 
                 data[i].error = NULL;
 
 
                 JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
                 JavaDeleteLongArray(fpArray, fp, JNI_ABORT);
-                JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
-                JavaDeleteByteArray(bondsArray, bonds, JNI_ABORT);
+                JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
             }
 
             JavaDeleteRef(resultElement);
@@ -708,8 +658,7 @@ void java_parse_orchem_data(size_t count, VarChar **molfiles, OrchemLoaderData *
         JavaDeleteRef(exception);
         JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
         JavaDeleteLongArray(fpArray, fp, JNI_ABORT);
-        JavaDeleteByteArray(atomsArray, atoms, JNI_ABORT);
-        JavaDeleteByteArray(bondsArray, bonds, JNI_ABORT);
+        JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
 
         PG_RE_THROW();
     }

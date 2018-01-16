@@ -151,6 +151,14 @@ public class IsomorphismSort
             if(!e1.iatom.getSymbol().equals("H") && e2.iatom.getSymbol().equals("H"))
                 return -1;
 
+
+            if(e1.iatom.getSymbol().equals("C") && !e2.iatom.getSymbol().equals("C"))
+                return 1;
+
+            if(!e1.iatom.getSymbol().equals("C") && e2.iatom.getSymbol().equals("C"))
+                return -1;
+
+
             if(e1.overallElementCount.compareTo(e2.overallElementCount) == 0)
                 return e2.atomBondParticipationCount.compareTo(e1.atomBondParticipationCount);
             else

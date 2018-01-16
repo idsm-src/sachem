@@ -168,25 +168,26 @@ static void open_searcher (fpsearch_data&d)
 	d.searcher = IxSearcher_new ( (Obj*) (d.folder));
 }
 
-static inline RDKit::Bond::BondType bondtype_jg2rd (int multiplicity,
-                                                    bool isAromatic)
+static inline RDKit::Bond::BondType bondtype_jg2rd(int type)
 {
-	if (isAromatic) return RDKit::Bond::AROMATIC;
-	switch (multiplicity) {
-	case 1:
-		return RDKit::Bond::SINGLE;
-	case 2:
-		return RDKit::Bond::DOUBLE;
-	case 3:
-		return RDKit::Bond::TRIPLE;
-	case 4:
-		return RDKit::Bond::QUADRUPLE;
-	case 5:
-		return RDKit::Bond::QUINTUPLE;
-	case 6:
-		return RDKit::Bond::HEXTUPLE;
-	default:
-		return RDKit::Bond::UNSPECIFIED;
+	switch (type)
+	{
+        case BOND_SINGLE:
+            return RDKit::Bond::SINGLE;
+        case BOND_DOUBLE:
+            return RDKit::Bond::DOUBLE;
+        case BOND_TRIPLE:
+            return RDKit::Bond::TRIPLE;
+        case BOND_QUADRUPLE:
+            return RDKit::Bond::QUADRUPLE;
+        case BOND_QUINTUPLE:
+            return RDKit::Bond::QUINTUPLE;
+        case BOND_SEXTUPLE:
+            return RDKit::Bond::HEXTUPLE;
+        case BOND_AROMATIC:
+            return RDKit::Bond::AROMATIC;
+        default:
+            return RDKit::Bond::UNSPECIFIED;
 	}
 }
 
@@ -212,14 +213,11 @@ static RDKit::ROMol* JGMol2RDMol (const Molecule*m)
 			for (int j = 0; j < nbs; ++j) {
 				int otherAtom = molecule_get_bond_list (m, i) [j];
 				if (otherAtom <= i) continue;
-				int bondData = molecule_get_bond_data
+				int bondData = molecule_get_bond_type
 				               (m, molecule_get_bond
 				                (m, i, otherAtom));
-				bool isAromatic = bondData & 0xc0;
-				int multiplicity = (bondData & 0x7c) >> 3;
 				rwm.addBond (atomMap[i], atomMap[otherAtom],
-				             bondtype_jg2rd (multiplicity,
-				                             isAromatic));
+				             bondtype_jg2rd (bondData));
 			}
 		}
 

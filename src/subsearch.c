@@ -101,7 +101,7 @@ static void orchem_subsearch_init(void)
     /* main query plan */
     if(unlikely(mainQueryPlan == NULL))
     {
-        SPIPlanPtr plan = SPI_prepare("select id, seqid, atoms, bonds from " MOLECULES_TABLE " where seqid = any($1)", 1, (Oid[]) { INT4ARRAYOID });
+        SPIPlanPtr plan = SPI_prepare("select id, seqid, molecule from " MOLECULES_TABLE " where seqid = any($1)", 1, (Oid[]) { INT4ARRAYOID });
 
         if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
             elog(ERROR, "%s: SPI_keepplan() failed", __func__);
@@ -224,7 +224,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
         info->exact = exact;
         info->vf2_timeout = vf2_timeout;
 
-        info->queryDataCount = java_parse_orchem_substructure_query(&info->queryData, VARDATA(query), VARSIZE(query) - VARHDRSZ, typeStr, tautomers);
+        info->queryDataCount = java_parse_orchem_substructure_query(&info->queryData, VARDATA(query), VARSIZE(query) - VARHDRSZ, typeStr, exact, tautomers);
 
         PG_FREE_IF_COPY(query, 0);
         PG_FREE_IF_COPY(type, 1);
@@ -300,7 +300,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                     MemoryContextReset(info->isomorphismContext);
 
                     PG_MEMCONTEXT_BEGIN(info->isomorphismContext);
-                    molecule_init(&info->queryMolecule, data->atomLength, data->atoms, data->bondLength, data->bonds, data->restH, !info->exact);
+                    molecule_init(&info->queryMolecule, data->molecule, data->restH);
                     vf2state_init(&info->vf2state, &info->queryMolecule, info->strictStereo, info->exact);
                     PG_MEMCONTEXT_END();
 
@@ -353,7 +353,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                 if(unlikely(SPI_execute_plan(mainQueryPlan, values, NULL, true, 0) != SPI_OK_SELECT))
                     elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
-                if(unlikely(/*SPI_processed != count ||*/ SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 4))
+                if(unlikely(/*SPI_processed != count ||*/ SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 3))
                     elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
                 info->table = SPI_tuptable;
@@ -380,13 +380,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                 elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
-            Datum atoms = SPI_getbinval(tuple, tupdesc, 3, &isNullFlag);
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-
-            Datum bonds = SPI_getbinval(tuple, tupdesc, 4, &isNullFlag);
+            Datum molecule = SPI_getbinval(tuple, tupdesc, 3, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                 elog(ERROR, "%s: SPI_getbinval() failed", __func__);
@@ -395,23 +389,12 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
             info->candidateCount++;
 #endif
 
-            bytea *atomsData = DatumGetByteaP(atoms);
-            bytea *bondsData = DatumGetByteaP(bonds);
-
-            int atomsize = (VARSIZE(atomsData) - VARHDRSZ) / ATOM_BLOCK_SIZE;
-            int bondsize = (VARSIZE(bondsData) - VARHDRSZ) / BOND_BLOCK_SIZE;
-
-            if(atomsize < info->queryMolecule.atomCount)
-                continue;
-
-            if(bondsize < info->queryMolecule.bondCount)
-                continue;
-
+            bytea *moleculeData = DatumGetByteaP(molecule);
             bool match;
 
             PG_MEMCONTEXT_BEGIN(info->targetContext);
             Molecule target;
-            molecule_init(&target, VARSIZE(atomsData) - VARHDRSZ, VARDATA(atomsData), VARSIZE(bondsData) - VARHDRSZ, VARDATA(bondsData), NULL, false);
+            molecule_init(&target, VARDATA(moleculeData), NULL);
             match = vf2state_match(&info->vf2state, &target, info->vf2_timeout);
             PG_MEMCONTEXT_END();
             MemoryContextReset(info->targetContext);
@@ -682,7 +665,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
         elog(ERROR, "%s: cannot determine bigint[] oid", __func__);
 
 
-    SPIPlanPtr moleculesPlan = SPI_prepare("insert into " MOLECULES_TABLE " (seqid, id, atoms, bonds) values ($1,$2,$3,$4)",
+    SPIPlanPtr moleculesPlan = SPI_prepare("insert into " MOLECULES_TABLE " (seqid, id, molecule) values ($1,$2,$3)",
             4, (Oid[]) { INT4OID, INT4OID, BYTEAOID, BYTEAOID });
 
     SPIPlanPtr countsPlan = SPI_prepare("insert into " MOLECULE_COUNTS_TABLE " (id, counts) values ($1,$2)",
@@ -766,7 +749,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
 
             currentSeqid = bitset_next_set_bit(&seqidSet, currentSeqid + 1);
-            Datum moleculesValues[] = {Int32GetDatum(currentSeqid), id, PointerGetDatum(data[i].atoms), PointerGetDatum(data[i].bonds)};
+            Datum moleculesValues[] = {Int32GetDatum(currentSeqid), id, PointerGetDatum(data[i].molecule)};
 
             if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
                 elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
@@ -800,8 +783,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
             pfree(data[i].counts);
             pfree(data[i].fp);
-            pfree(data[i].atoms);
-            pfree(data[i].bonds);
+            pfree(data[i].molecule);
         }
 
         SPI_freetuptable(tuptable);

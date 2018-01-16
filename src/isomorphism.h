@@ -276,7 +276,7 @@ inline bool vf2state_bond_matches(const VF2State *const restrict vf2state, int q
     if(likely(targetbond < 0))
         return false;
 
-    if(likely(molecule_get_bond_data(vf2state->query, queryBond) != molecule_get_bond_data(vf2state->target, targetbond)))
+    if(likely(molecule_get_bond_type(vf2state->query, queryBond) != molecule_get_bond_type(vf2state->target, targetbond)))
         return false;
 
     return true;
@@ -415,12 +415,12 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
         int targetAtomIdx = vf2state->core_query[queryAtomIdx];
         int targetStereo = molecule_get_atom_stereo(target, targetAtomIdx);
 
-        if(queryStereo != NONE_STEREO && queryStereo != UNDEF_STEREO)
+        if(queryStereo != TETRAHEDRAL_STEREO_NONE && queryStereo != TETRAHEDRAL_STEREO_UNDEFINED)
         {
-            if(targetStereo == NONE_STEREO)
+            if(targetStereo == TETRAHEDRAL_STEREO_NONE)
                 continue;
 
-            if(targetStereo == UNDEF_STEREO)
+            if(targetStereo == TETRAHEDRAL_STEREO_UNDEFINED)
                 return false;
 
 
@@ -462,12 +462,12 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
         int targetBondIdx = molecule_get_bond(target, targetBondAtom0, targetBondAtom1);
         int targetStereo = molecule_get_bond_stereo(target, targetBondIdx);
 
-        if(queryStereo != NONE_STEREO && queryStereo != UNDEF_STEREO)
+        if(queryStereo != BOND_STEREO_NONE && queryStereo != BOND_STEREO_UNDEFINED)
         {
-            if(targetStereo == NONE_STEREO)
+            if(targetStereo == BOND_STEREO_NONE)
                 continue;
 
-            if(targetStereo == UNDEF_STEREO)
+            if(targetStereo == BOND_STEREO_UNDEFINED)
                 return false;
 
 

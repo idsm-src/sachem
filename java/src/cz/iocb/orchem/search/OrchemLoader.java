@@ -17,8 +17,7 @@ public class OrchemLoader
     {
         public long[] fp;
         public short[] counts;
-        public byte[] atoms;
-        public byte[] bonds;
+        public byte[] molecule;
         public String exception;
     }
 
@@ -80,8 +79,7 @@ public class OrchemLoader
                             // calculate molecule binary representation
                             readMolecule.setAtoms(IsomorphismSort.atomsByFrequency(readMolecule));
                             OrchemMoleculeBuilder builder = new OrchemMoleculeBuilder(readMolecule);
-                            item.atoms = builder.atomsAsBytes();
-                            item.bonds = builder.bondsAsBytes();
+                            item.molecule = builder.asBytes(true);
                         }
                         catch(Throwable e)
                         {

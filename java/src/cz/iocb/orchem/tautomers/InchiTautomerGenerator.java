@@ -98,7 +98,7 @@ public class InchiTautomerGenerator
         InChI inchi = new InChI(kekuleMDL);
 
         //Process the molecule based on the molfile input file
-        AtomContainer molecule = MoleculeCreator.getMoleculeFromMolfile(kekuleMDL);
+        IAtomContainer molecule = MoleculeCreator.getMoleculeFromMolfile(kekuleMDL);
         AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(molecule);
         CDKHydrogenAdder.getInstance(molecule.getBuilder()).addImplicitHydrogens(molecule);
 
@@ -187,7 +187,7 @@ public class InchiTautomerGenerator
     }
 
 
-    private void assignAtomLabel(AtomContainer molecule, String auxInfo)
+    private void assignAtomLabel(IAtomContainer molecule, String auxInfo)
     {
         if(auxInfo.matches("AuxInfo=1/[0-9]*/N:.*"))
         {
@@ -213,7 +213,7 @@ public class InchiTautomerGenerator
     }
 
 
-    private List<IBond> getCrossBondLabels(AtomContainer molecule)
+    private List<IBond> getCrossBondLabels(IAtomContainer molecule)
     {
         ArrayList<IBond> selectedBonds = new ArrayList<IBond>();
 

@@ -65,7 +65,7 @@ public class MoleculeCreator
      * @throws CDKException
      * @throws IOException
      */
-    public static AtomContainer getMoleculeFromMolfile(String mol) throws CDKException, IOException
+    public static IAtomContainer getMoleculeFromMolfile(String mol) throws CDKException, IOException
     {
         DefaultChemObjectReader mdlReader = null;
 
@@ -74,7 +74,7 @@ public class MoleculeCreator
         else
             mdlReader = new MDLV2000Reader();
 
-        AtomContainer readMolecule = new AtomContainer();
+        IAtomContainer readMolecule = new AtomContainer();
         mdlReader.setReader(new StringReader(mol));
 
         readMolecule = mdlReader.read(readMolecule);

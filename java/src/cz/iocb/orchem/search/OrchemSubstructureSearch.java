@@ -49,7 +49,8 @@ public abstract class OrchemSubstructureSearch extends SubstructureSearch
     };
 
 
-    public static OrchemQueryData[] getQueryData(byte[] queryArray, String type, boolean tautomers)
+    public static OrchemQueryData[] getQueryData(byte[] queryArray, String type, boolean implicitHydrogens,
+            boolean tautomers)
             throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException
     {
         String query = new String(queryArray, StandardCharsets.ISO_8859_1);
@@ -72,8 +73,7 @@ public abstract class OrchemSubstructureSearch extends SubstructureSearch
                 fp[p++] = (short) (i - 1);
 
             OrchemMoleculeBuilder builder = new OrchemMoleculeBuilder(queryMolecule);
-            byte[] atomBytes = builder.atomsAsBytes();
-            byte[] bondBytes = builder.bondsAsBytes();
+            byte[] moleculeBytes = builder.asBytes(implicitHydrogens);
 
             MoleculeCounts counts = new MoleculeCounts(queryMolecule);
 
@@ -103,8 +103,7 @@ public abstract class OrchemSubstructureSearch extends SubstructureSearch
             data[idx].counts[9] = counts.molPCount;
 
             data[idx].fp = fp;
-            data[idx].atoms = atomBytes;
-            data[idx].bonds = bondBytes;
+            data[idx].molecule = moleculeBytes;
             data[idx].restH = restH;
         }
 

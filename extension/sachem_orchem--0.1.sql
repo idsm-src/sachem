@@ -39,8 +39,7 @@ CREATE TABLE orchem_index (
 CREATE TABLE orchem_molecules (
     id                    INT NOT NULL,
     seqid                 INT NOT NULL,
-    atoms                 BYTEA NOT NULL,
-    bonds                 BYTEA NOT NULL,
+    molecule              BYTEA NOT NULL,
     PRIMARY KEY (id)
 );
 
