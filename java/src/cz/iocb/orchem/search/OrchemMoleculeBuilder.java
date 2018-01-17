@@ -120,6 +120,7 @@ public class OrchemMoleculeBuilder
     }
 
 
+    private static String BOND_NUMBER = "BOND_NUMBER";
     private static int[] validReorder = { 0x1234, 0x1423, 0x1342, 0x2314, 0x2431, 0x2143, 0x3124, 0x3412, 0x3241,
             0x4213, 0x4321, 0x4132 };
 
@@ -275,6 +276,7 @@ public class OrchemMoleculeBuilder
 
         /* write bonds */
         int heavyAtomCount = cAtomCount + xAtomCount;
+        int bondNumber = 0;
 
         for(IBond b : molecule.bonds())
         {
@@ -288,6 +290,8 @@ public class OrchemMoleculeBuilder
             if((a1idx < heavyAtomCount || molecule.getConnectedBondsCount(a1) > 1)
                     && (a2idx < heavyAtomCount || molecule.getConnectedBondsCount(a2) > 1))
             {
+                b.setProperty(BOND_NUMBER, bondNumber++);
+
                 stream.write(a1idx % 256);
                 stream.write(a1idx / 256 << 4 | a2idx / 256);
                 stream.write(a2idx % 256);
@@ -420,8 +424,10 @@ public class OrchemMoleculeBuilder
                 if(stereo != null)
                     flag = getDoubleBondStereoType(bond, stereo.getBonds(), doubleBondStereo[idx].getStereo());
 
-                stream.write(SpecialRecordType.BOND_STEREO.getValue() << 4 | idx / 256);
-                stream.write(idx % 256);
+                int index = bond.getProperty(BOND_NUMBER);
+                System.out.println(index);
+                stream.write(SpecialRecordType.BOND_STEREO.getValue() << 4 | index / 256);
+                stream.write(index % 256);
                 stream.write(flag.getValue());
             }
         }
@@ -632,18 +638,15 @@ public class OrchemMoleculeBuilder
     private TetrahedralStereoType getChiralityValue(IAtom center, IAtom[] ligands, Stereo stereo)
     {
         assert ligands.length == 4;
-
-        ligands = ligands.clone();
-
-        for(int i = 0; i < 4; i++)
-            if(ligands[i].getSymbol().equals("H"))
-                ligands[i] = center;
-
-
         int[] indexes = new int[4];
 
         for(int i = 0; i < 4; i++)
-            indexes[i] = molecule.indexOf(ligands[i]);
+        {
+            if(ligands[i] != center)
+                indexes[i] = molecule.indexOf(ligands[i]);
+            else
+                indexes[i] = Integer.MAX_VALUE;
+        }
 
         int order = 0;
 
@@ -674,29 +677,13 @@ public class OrchemMoleculeBuilder
     private BondStereoType getDoubleBondStereoType(IBond bond, IBond[] bonds, Conformation conformation)
     {
         if(!bonds[0].contains(bond.getAtom(0)))
-        {
-            bonds = bonds.clone();
-
-            IBond tmp = bonds[0];
-            bonds[0] = bonds[1];
-            bonds[1] = tmp;
-        }
+            bonds = new IBond[] { bonds[1], bonds[0] };
 
         int[] ligands = new int[4];
-
-        IAtom a0 = bonds[0].getOther(bond.getAtom(0));
-        IAtom a1 = bonds[1].getOther(bond.getAtom(1));
-
-        if(a0.getSymbol().equals("H"))
-            a0 = bond.getAtom(0);
-
-        if(a1.getSymbol().equals("H"))
-            a1 = bond.getAtom(1);
-
-        ligands[0] = molecule.indexOf(a0);
-        ligands[1] = molecule.indexOf(bond.getAtom(0));
-        ligands[2] = molecule.indexOf(a1);
-        ligands[3] = molecule.indexOf(bond.getAtom(1));
+        ligands[0] = molecule.indexOf(bonds[0].getOther(bond.getAtom(0)));
+        ligands[1] = Integer.MAX_VALUE;
+        ligands[2] = molecule.indexOf(bonds[1].getOther(bond.getAtom(1)));
+        ligands[3] = Integer.MAX_VALUE;
 
 
         for(IBond b : molecule.bonds())
@@ -705,20 +692,10 @@ public class OrchemMoleculeBuilder
                 continue;
 
             if(b.contains(bond.getAtom(0)))
-            {
-                IAtom other = b.getOther(bond.getAtom(0));
-
-                if(!other.getSymbol().equals("H"))
-                    ligands[1] = molecule.indexOf(other);
-            }
+                ligands[1] = molecule.indexOf(b.getOther(bond.getAtom(0)));
 
             if(b.contains(bond.getAtom(1)))
-            {
-                IAtom other = b.getOther(bond.getAtom(1));
-
-                if(!other.getSymbol().equals("H"))
-                    ligands[3] = molecule.indexOf(other);
-            }
+                ligands[3] = molecule.indexOf(b.getOther(bond.getAtom(1)));
         }
 
 

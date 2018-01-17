@@ -431,15 +431,18 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
                 queryAtoms[i] = molecule_get_bond_list(query, queryAtomIdx)[i];
 
             if(listSize == 3)
-                queryAtoms[3] = queryAtomIdx;
+                queryAtoms[3] = INT_MAX;
 
             sort_stereo_atoms(queryAtoms);
 
 
             int targetAtoms[4];
 
-            for(int i = 0; i < 4; i++)
+            for(int i = 0; i < listSize; i++)
                 targetAtoms[i] = vf2state->core_query[queryAtoms[i]];
+
+            if(listSize == 3)
+                targetAtoms[3] = molecule_get_last_chiral_ligand(target, vf2state->core_query[queryAtomIdx], targetAtoms);
 
             if(normalize_atom_stereo(targetAtoms, targetStereo) != queryStereo)
                 return false;
@@ -483,7 +486,7 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
                     queryAtoms[idx++] = bondList0[i];
 
             if(listSize0 == 2)
-                queryAtoms[idx++] = queryBondAtoms[0];
+                queryAtoms[idx++] = INT_MAX;
 
             int *bondList1 = molecule_get_bond_list(query, queryBondAtoms[1]);
             int listSize1 = molecule_get_bond_list_size(query, queryBondAtoms[1]);
@@ -493,7 +496,7 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
                     queryAtoms[idx++] = bondList1[i];
 
             if(listSize1 == 2)
-                queryAtoms[idx] = queryBondAtoms[1];
+                queryAtoms[idx] =  INT_MAX;
 
             sort_bond_atoms(queryAtoms);
 
@@ -501,7 +504,14 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
             int targetAtoms[4];
 
             for(int i = 0; i < 4; i++)
-                targetAtoms[i] = vf2state->core_query[queryAtoms[i]];
+                if(queryAtoms[i] != INT_MAX)
+                    targetAtoms[i] = vf2state->core_query[queryAtoms[i]];
+
+            if(queryAtoms[1] == INT_MAX)
+                targetAtoms[1] = molecule_get_last_stereo_bond_ligand(target, targetBondAtom0, targetBondIdx, targetAtoms[0]);
+
+            if(queryAtoms[3] == INT_MAX)
+                targetAtoms[3] = molecule_get_last_stereo_bond_ligand(target, targetBondAtom1, targetBondIdx, targetAtoms[2]);
 
             if(normalize_bond_stereo(targetAtoms, targetStereo) != queryStereo)
                 return false;

@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <limits.h>
 #include "sachem.h"
 
 #define Q_ATOM_NUMBER   (-'Q')
@@ -301,6 +302,22 @@ inline int molecule_get_bond_connected_atom(const Molecule *const restrict molec
 }
 
 
+inline int molecule_get_atom_connected_bond(const Molecule *const restrict molecule, int i, int b)
+{
+    if(molecule_get_bond_list_size(molecule, i) != 2)
+        return -1;
+
+    int *bonds = molecule_get_bond_list(molecule, i);
+
+    if(bonds[0] == b)
+        return bonds[1];
+    else if(bonds[1] == b)
+        return bonds[0];
+    else
+        return -1;
+}
+
+
 inline int molecule_get_bond(const Molecule *const restrict molecule, int i, int j)
 {
     return molecule->bondMatrix[i * molecule->atomCount + j];
@@ -328,6 +345,110 @@ inline uint8_t molecule_get_bond_stereo(const Molecule *const restrict molecule,
         return BOND_STEREO_NONE;
 
     return molecule->bondStereo[i];
+}
+
+
+inline int molecule_get_last_stereo_bond_ligand(const Molecule *const restrict molecule, int atom, int bond, int ligand)
+{
+    int listSize = molecule_get_bond_list_size(molecule, atom);
+
+    if(listSize == 2)
+    {
+        return INT_MAX;
+    }
+    else if(listSize == 3)
+    {
+        for(int i = 0; i < 3; i++)
+        {
+            int b = molecule_get_bond_list(molecule, atom)[i];
+
+            if(b == bond)
+                continue;
+
+            int a = molecule_get_bond_connected_atom(molecule, b, atom);
+
+            if(a == ligand)
+                continue;
+
+            return a;
+        }
+    }
+
+    elog(NOTICE, "unexpected branch: %s: %i", __FILE__, __LINE__);
+    return INT_MAX;
+}
+
+
+inline int molecule_get_last_chiral_ligand(const Molecule *const restrict molecule, int centre, int *ligands)
+{
+    int listSize = molecule_get_bond_list_size(molecule, centre);
+
+    if(listSize == 3)
+    {
+        return INT_MAX;
+    }
+    else if(listSize == 4)
+    {
+        for(int i = 0; i < 4; i++)
+        {
+            int ligand = molecule_get_bond_list(molecule, centre)[i];
+            bool contains = false;
+
+            for(int j = 0; j < 3; j++)
+                if(ligands[j] == ligand)
+                    contains = true;
+
+            if(!contains)
+                return ligand;
+        }
+    }
+    else if(listSize == 2)
+    {
+        for(int i = 0; i < 2; i++)
+        {
+            int atom = centre;
+            int bond = molecule_get_bond_list(molecule, centre)[i];
+
+            while(true)
+            {
+                atom = molecule_get_bond_connected_atom(molecule, bond, atom);
+                int newListSize = molecule_get_bond_list_size(molecule, atom);
+
+                if(newListSize == 3)
+                {
+                    for(int j = 0; j < 3; j++)
+                    {
+                        int b = molecule_get_bond_list(molecule, atom)[j];
+
+                        if(b == bond)
+                            continue;
+
+                        int a = molecule_get_bond_connected_atom(molecule, b, atom);
+
+                        if(a != ligands[0] && a != ligands[1] && a != ligands[2])
+                            return a;
+                    }
+
+                    break;
+                }
+                else if(newListSize == 2)
+                {
+                    bond = molecule_get_atom_connected_bond(molecule, atom, bond);
+
+                    if(molecule_get_bond_type(molecule, bond) != BOND_DOUBLE)
+                        return INT_MAX;
+                }
+                else
+                {
+                    elog(NOTICE, "unexpected branch: %s: %i", __FILE__, __LINE__);
+                    return INT_MAX;
+                }
+            }
+        }
+    }
+
+    elog(NOTICE, "unexpected branch: %s: %i", __FILE__, __LINE__);
+    return INT_MAX;
 }
 
 
