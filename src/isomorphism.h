@@ -276,10 +276,34 @@ inline bool vf2state_bond_matches(const VF2State *const restrict vf2state, int q
     if(likely(targetbond < 0))
         return false;
 
-    if(likely(molecule_get_bond_type(vf2state->query, queryBond) != molecule_get_bond_type(vf2state->target, targetbond)))
-        return false;
+    int queryBondType = molecule_get_bond_type(vf2state->query, queryBond);
+    int targetbondType = molecule_get_bond_type(vf2state->target, targetbond);
 
-    return true;
+    if(likely(queryBondType <= BOND_AROMATIC && targetbondType <= BOND_AROMATIC))
+        return queryBondType == targetbondType;
+
+    if(queryBondType > BOND_AROMATIC && targetbondType > BOND_AROMATIC)
+        return true;
+
+    if(queryBondType == BOND_ANY)
+        return true;
+    else if(queryBondType == BOND_SINGLE_OR_DOUBLE)
+        return targetbondType == BOND_SINGLE || targetbondType == BOND_DOUBLE;
+    else if(queryBondType == BOND_SINGLE_OR_AROMATIC)
+        return targetbondType == BOND_SINGLE || targetbondType == BOND_AROMATIC;
+    else if(queryBondType == BOND_DOUBLE_OR_AROMATIC)
+        return targetbondType == BOND_DOUBLE || targetbondType == BOND_AROMATIC;
+
+    if(targetbondType == BOND_ANY)
+        return true;
+    else if(targetbondType == BOND_SINGLE_OR_DOUBLE)
+        return queryBondType == BOND_SINGLE || queryBondType == BOND_DOUBLE;
+    else if(targetbondType == BOND_SINGLE_OR_AROMATIC)
+        return queryBondType == BOND_SINGLE || queryBondType == BOND_AROMATIC;
+    else if(targetbondType == BOND_DOUBLE_OR_AROMATIC)
+        return queryBondType == BOND_DOUBLE || queryBondType == BOND_AROMATIC;
+
+    return false;
 }
 
 
