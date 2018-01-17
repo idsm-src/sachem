@@ -731,7 +731,7 @@ public class OrchemMoleculeBuilder
             reverse = !reverse;
 
         if(reverse)
-            return conformation == Conformation.OPPOSITE ? BondStereoType.OPPOSITE : BondStereoType.TOGETHER;
+            return conformation == Conformation.TOGETHER ? BondStereoType.OPPOSITE : BondStereoType.TOGETHER;
         else
             return conformation == Conformation.TOGETHER ? BondStereoType.TOGETHER : BondStereoType.OPPOSITE;
     }
