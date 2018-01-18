@@ -300,7 +300,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                     MemoryContextReset(info->isomorphismContext);
 
                     PG_MEMCONTEXT_BEGIN(info->isomorphismContext);
-                    molecule_init(&info->queryMolecule, data->molecule, data->restH);
+                    molecule_init(&info->queryMolecule, data->molecule, data->restH, false);
                     vf2state_init(&info->vf2state, &info->queryMolecule, info->strictStereo, info->exact);
                     PG_MEMCONTEXT_END();
 
@@ -394,7 +394,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
             PG_MEMCONTEXT_BEGIN(info->targetContext);
             Molecule target;
-            molecule_init(&target, VARDATA(moleculeData), NULL);
+            molecule_init(&target, VARDATA(moleculeData), NULL, false);
             match = vf2state_match(&info->vf2state, &target, info->vf2_timeout);
             PG_MEMCONTEXT_END();
             MemoryContextReset(info->targetContext);

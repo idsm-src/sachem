@@ -81,7 +81,7 @@ typedef struct
 } Molecule;
 
 
-inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH)
+inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, bool extended)
 {
     int xAtomCount = *data << 8 | *(data + 1);
     data += 2;
@@ -99,8 +99,22 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH)
     data += 2;
 
 
+    int heavyAtomCount = xAtomCount + cAtomCount;
     int atomCount = xAtomCount + cAtomCount;
     int bondCount = xBondCount;
+
+    if(extended)
+    {
+        atomCount += hAtomCount;
+        bondCount += hAtomCount;
+
+        if(restH != NULL)
+        {
+            bool *extendedRestH = (bool *) palloc0(atomCount * sizeof(bool));
+            memcpy(extendedRestH, restH, heavyAtomCount * sizeof(bool));
+            restH = extendedRestH;
+        }
+    }
 
     uint8_t *atomNumbers = (uint8_t *) palloc(atomCount);
     uint8_t *atomHydrogens = (uint8_t *) palloc0(atomCount);
@@ -130,14 +144,13 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH)
     for(int i = 0; i < xAtomCount; i++)
         atomNumbers[i] = data[i];
 
-    for(int i = xAtomCount; i < xAtomCount + cAtomCount; i++)
+    for(int i = xAtomCount; i < heavyAtomCount; i++)
         atomNumbers[i] = C_ATOM_NUMBER;
 
+    for(int i = heavyAtomCount; i < atomCount; i++)
+        atomNumbers[i] = H_ATOM_NUMBER;
+
     data += xAtomCount;
-
-
-    for(int i = 0; i < xBondCount; i++)
-        bondTypes[i] = data[BOND_BLOCK_SIZE * i + 3];
 
 
     for(int i = 0; i < atomCount * atomCount; i++)
@@ -156,14 +169,14 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH)
         int x = b0 | b1 << 4 & 0xF00;
         int y = b2 | b1 << 8 & 0xF00;
 
+        if(x >= heavyAtomCount && y < atomCount)
+            atomHydrogens[y]++;
+
+        if(y >= heavyAtomCount && x < atomCount)
+            atomHydrogens[x]++;
+
         if(x >= atomCount || y >= atomCount)
         {
-            if(x < atomCount)
-                atomHydrogens[x]++;
-
-            if(y < atomCount)
-                atomHydrogens[y]++;
-
             molecule->bondCount--;
             continue;
         }
@@ -184,17 +197,51 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH)
     data += xBondCount * BOND_BLOCK_SIZE;
 
 
+    int boundIdx = xBondCount;
+
     for(int i = 0; i < hAtomCount; i++)
     {
         int offset = i * HBOND_BLOCK_SIZE;
         int value = data[offset + 0] * 256 | data[offset + 1];
 
-        if(value != 0)
+        if(value == 0)
         {
-            int idx = value & 0xFFF;
+            if(extended)
+                molecule->bondCount--;
 
-            if(idx < atomCount)
-                atomHydrogens[idx]++;
+            continue;
+        }
+
+
+        int idx = value & 0xFFF;
+
+        if(idx < atomCount)
+            atomHydrogens[idx]++;
+
+
+        if(extended)
+        {
+            int idy = heavyAtomCount + i;
+
+            if(idx >= heavyAtomCount)
+                atomHydrogens[idy]++;
+
+            bondTypes[boundIdx] = data[offset] >> 4;
+
+
+            molecule->bondLists[idx * BOND_LIST_BASE_SIZE + molecule->bondListSizes[idx]++] = idy;
+            molecule->bondLists[idy * BOND_LIST_BASE_SIZE + molecule->bondListSizes[idy]++] = idx;
+
+            if(unlikely(molecule->bondListSizes[idx] == BOND_LIST_BASE_SIZE || molecule->bondListSizes[idy] == BOND_LIST_BASE_SIZE))
+                elog(ERROR, "%s: too high atom valence", __func__);
+
+            molecule->bondMatrix[idx * molecule->atomCount + idy] = boundIdx;
+            molecule->bondMatrix[idy * molecule->atomCount + idx] = boundIdx;
+
+            molecule->contains[boundIdx][0] = idx;
+            molecule->contains[boundIdx][1] = idy;
+
+            boundIdx++;
         }
     }
 
@@ -222,7 +269,7 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH)
                     atomStereo[idx] = data[offset + 2];
 
             case RECORD_BOND_STEREO:
-                if(idx < bondCount)
+                if(idx < xBondCount) // not for H bond
                     bondStereo[idx] = data[offset + 2];
         }
     }
