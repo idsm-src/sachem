@@ -260,18 +260,22 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, 
             case RECORD_CHARGE:
                 if(withCharges && idx < atomCount)
                     atomCharges[idx] = (int8_t) data[offset + 2];
+                break;
 
             case RECORD_ISOTOPE:
                 if(withMasses && idx < atomCount)
                     atomMasses[idx] = data[offset + 2];
+                break;
 
             case RECORD_TETRAHEDRAL_STEREO:
                 if(withStereo && idx < atomCount)
                     atomStereo[idx] = data[offset + 2];
+                break;
 
             case RECORD_BOND_STEREO:
                 if(withStereo && idx < xBondCount) // not for H bond
                     bondStereo[idx] = data[offset + 2];
+                break;
         }
     }
 }
