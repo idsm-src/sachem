@@ -28,6 +28,7 @@ typedef struct
     int32_t topN;
     bool strictStereo;
     bool exact;
+    bool extended;
     ChargeMode chargeMode;
     IsotopeMode isotopeMode;
     int32_t vf2_timeout;
@@ -235,7 +236,8 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
                     MemoryContextReset(info->isomorphismContext);
 
                     PG_MEMCONTEXT_BEGIN(info->isomorphismContext);
-                    molecule_init(&info->queryMolecule, data->molecule, data->restH, false, info->strictStereo,
+                    info->extended = molecule_is_extended_search_needed(data->molecule, info->chargeMode, info->isotopeMode);
+                    molecule_init(&info->queryMolecule, data->molecule, data->restH, info->extended, info->strictStereo,
                             info->chargeMode, info->isotopeMode);
                     vf2state_init(&info->vf2state, &info->queryMolecule, info->strictStereo, info->exact,
                             info->chargeMode, info->isotopeMode);
@@ -319,7 +321,8 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 
             PG_MEMCONTEXT_BEGIN(info->targetContext);
             Molecule target;
-            molecule_init(&target, VARDATA(moleculeData), NULL, false, info->strictStereo, info->chargeMode, info->isotopeMode);
+            molecule_init(&target, VARDATA(moleculeData), NULL, info->extended, info->strictStereo, info->chargeMode,
+                    info->isotopeMode);
             match = vf2state_match(&info->vf2state, &target, info->vf2_timeout);
             PG_MEMCONTEXT_END();
             MemoryContextReset(info->targetContext);

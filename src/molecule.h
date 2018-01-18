@@ -281,6 +281,60 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, 
 }
 
 
+inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, bool withMasses)
+{
+    int xAtomCount = *data << 8 | *(data + 1);
+    data += 2;
+
+    int cAtomCount = *data << 8 | *(data + 1);
+    data += 2;
+
+    int hAtomCount = *data << 8 | *(data + 1);
+    data += 2;
+
+    int xBondCount = *data << 8 | *(data + 1);
+    data += 2;
+
+    int specialCount = *data << 8 | *(data + 1);
+    data += 2;
+
+    for(int i = 0; i < xAtomCount; i++)
+        if(((int8_t) data[i]) < 0)
+            return true;
+
+
+    if(!withCharges && !withMasses)
+        return false;
+
+    data += xAtomCount;
+    data += xBondCount * BOND_BLOCK_SIZE;
+    data += hAtomCount * HBOND_BLOCK_SIZE;
+
+
+    for(int i = 0; i < specialCount; i++)
+    {
+        int offset = i * SPECIAL_BLOCK_SIZE;
+        int value = data[offset + 0] * 256 | data[offset + 1];
+        int idx = value & 0xFFF;
+
+        switch(data[offset] >> 4)
+        {
+            case RECORD_CHARGE:
+                if(withCharges && idx >= xAtomCount + cAtomCount)
+                    return true;
+                break;
+
+            case RECORD_ISOTOPE:
+                if(withMasses && idx >= xAtomCount + cAtomCount)
+                    return true;
+                break;
+        }
+    }
+
+    return false;
+}
+
+
 inline bool molecule_is_pseudo_atom(const Molecule *const restrict molecule, int i)
 {
     return ((int8_t) molecule->atomNumbers[i]) < 0;
