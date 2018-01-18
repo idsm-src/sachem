@@ -425,7 +425,6 @@ public class OrchemMoleculeBuilder
                     flag = getDoubleBondStereoType(bond, stereo.getBonds(), doubleBondStereo[idx].getStereo());
 
                 int index = bond.getProperty(BOND_NUMBER);
-                System.out.println(index);
                 stream.write(SpecialRecordType.BOND_STEREO.getValue() << 4 | index / 256);
                 stream.write(index % 256);
                 stream.write(flag.getValue());
