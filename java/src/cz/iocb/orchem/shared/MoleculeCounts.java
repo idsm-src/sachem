@@ -14,11 +14,13 @@
  */
 package cz.iocb.orchem.shared;
 
-import org.openscience.cdk.Bond;
-import org.openscience.cdk.CDKConstants;
+import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IBond;
+import org.openscience.cdk.interfaces.IPseudoAtom;
+import cz.iocb.orchem.search.OrchemMoleculeBuilder;
+import cz.iocb.orchem.search.OrchemMoleculeBuilder.BondType;
 
 
 
@@ -43,42 +45,87 @@ public class MoleculeCounts
     public short molAtomCount;
 
 
-    public MoleculeCounts(IAtomContainer iac)
+    public MoleculeCounts(IAtomContainer iac, boolean isTarget) throws CDKException
     {
         for(IAtom atom : iac.atoms())
         {
-            molAtomCount++;
+            if(!(atom instanceof IPseudoAtom))
+            {
+                molAtomCount++;
 
-            if(atom.getSymbol().equals("S"))
+                if(atom.getSymbol().equals("S"))
+                    molSCount++;
+                else if(atom.getSymbol().equals("N"))
+                    molNCount++;
+                else if(atom.getSymbol().equals("O"))
+                    molOCount++;
+                else if(atom.getSymbol().equals("F"))
+                    molFCount++;
+                else if(atom.getSymbol().equals("Cl"))
+                    molClCount++;
+                else if(atom.getSymbol().equals("Br"))
+                    molBrCount++;
+                else if(atom.getSymbol().equals("I"))
+                    molICount++;
+                else if(atom.getSymbol().equals("C"))
+                    molCCount++;
+                else if(atom.getSymbol().equals("P"))
+                    molPCount++;
+            }
+            else if(isTarget)
+            {
+                molAtomCount++;
                 molSCount++;
-            else if(atom.getSymbol().equals("N"))
                 molNCount++;
-            else if(atom.getSymbol().equals("O"))
                 molOCount++;
-            else if(atom.getSymbol().equals("F"))
                 molFCount++;
-            else if(atom.getSymbol().equals("Cl"))
                 molClCount++;
-            else if(atom.getSymbol().equals("Br"))
                 molBrCount++;
-            else if(atom.getSymbol().equals("I"))
                 molICount++;
-            else if(atom.getSymbol().equals("C"))
                 molCCount++;
-            else if(atom.getSymbol().equals("P"))
                 molPCount++;
+            }
         }
 
+        
         for(IBond bond : iac.bonds())
         {
-            if(bond.getFlag(CDKConstants.ISAROMATIC))
+            BondType type = OrchemMoleculeBuilder.getBondType(bond);
+
+            if(type == BondType.AROMATIC)
                 molAromaticBondCount++;
-            else if(bond.getOrder() == Bond.Order.SINGLE)
+            else if(type == BondType.SINGLE)
                 molSingleBondCount++;
-            else if(bond.getOrder() == Bond.Order.DOUBLE)
+            else if(type == BondType.DOUBLE)
                 molDoubleBondCount++;
-            else if(bond.getOrder() == Bond.Order.TRIPLE)
+            else if(type == BondType.TRIPLE)
                 molTripleBondCount++;
+
+            if(isTarget)
+            {
+                if(type == BondType.SINGLE_OR_DOUBLE)
+                {
+                    molSingleBondCount++;
+                    molDoubleBondCount++;
+                }
+                else if(type == BondType.SINGLE_OR_AROMATIC)
+                {
+                    molSingleBondCount++;
+                    molAromaticBondCount++;
+                }
+                else if(type == BondType.DOUBLE_OR_AROMATIC)
+                {
+                    molDoubleBondCount++;
+                    molAromaticBondCount++;
+                }
+                else if(type == BondType.ANY)
+                {
+                    molSingleBondCount++;
+                    molDoubleBondCount++;
+                    molTripleBondCount++;
+                    molAromaticBondCount++;
+                }
+            }
         }
     }
 }

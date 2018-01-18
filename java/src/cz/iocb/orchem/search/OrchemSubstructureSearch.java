@@ -75,7 +75,7 @@ public abstract class OrchemSubstructureSearch extends SubstructureSearch
             OrchemMoleculeBuilder builder = new OrchemMoleculeBuilder(queryMolecule);
             byte[] moleculeBytes = builder.asBytes(implicitHydrogens);
 
-            MoleculeCounts counts = new MoleculeCounts(queryMolecule);
+            MoleculeCounts counts = new MoleculeCounts(queryMolecule, false);
 
             boolean[] restH = new boolean[queryMolecule.getAtomCount()];
 

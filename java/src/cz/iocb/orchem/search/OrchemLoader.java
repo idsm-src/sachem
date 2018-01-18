@@ -63,7 +63,7 @@ public class OrchemLoader
                             item.fp = fp.toLongArray();
 
                             // calculate molecule couts
-                            MoleculeCounts counts = new MoleculeCounts(readMolecule);
+                            MoleculeCounts counts = new MoleculeCounts(readMolecule, true);
                             item.counts = new short[10];
                             item.counts[0] = counts.molTripleBondCount;
                             item.counts[1] = counts.molSCount;

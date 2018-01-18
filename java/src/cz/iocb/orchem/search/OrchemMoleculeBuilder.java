@@ -37,7 +37,7 @@ import org.openscience.cdk.tools.periodictable.PeriodicTable;
 
 public class OrchemMoleculeBuilder
 {
-    static enum BondType
+    public static enum BondType
     {
         NONE(0),
         SINGLE(1),
@@ -440,7 +440,7 @@ public class OrchemMoleculeBuilder
     }
 
 
-    BondType getBondType(IBond bond) throws CDKException
+    public static BondType getBondType(IBond bond) throws CDKException
     {
         if(bond.isAromatic())
             return BondType.AROMATIC;
