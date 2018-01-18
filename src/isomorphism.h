@@ -43,6 +43,22 @@
 #define is_target_masked(value)     ((value) < 0)
 
 
+typedef enum
+{
+    CHARGE_IGNORE = 0,
+    CHARGE_DEFAULT_AS_UNCHARGED = 1,
+    CHARGE_DEFAULT_AS_ANY = 2
+} ChargeMode;
+
+
+typedef enum
+{
+    ISOTOPE_IGNORE = 0,
+    ISOTOPE_DEFAULT_AS_STANDARD = 1,
+    ISOTOPE_DEFAULT_AS_ANY = 2
+} IsotopeMode;
+
+
 typedef struct
 {
     int target_selector;
@@ -52,6 +68,8 @@ typedef struct
 
 typedef struct
 {
+    ChargeMode chargeMode;
+    IsotopeMode isotopeMode;
     bool strictStereo;
     bool exact;
 
@@ -111,7 +129,8 @@ inline void sort_bond_atoms(int array[4])
 }
 
 
-inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *const restrict query, bool strictStereo, bool exact)
+inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *const restrict query, bool strictStereo,
+        bool exact, ChargeMode chargeMode, IsotopeMode isotopeMode)
 {
 #if USE_VF2_TIMEOUT
     if(unlikely(vf2TimeoutId == MAX_TIMEOUTS))
@@ -121,6 +140,8 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
     int queryAtomCount = query->atomCount;
 
     vf2state->strictStereo = strictStereo;
+    vf2state->chargeMode = chargeMode;
+    vf2state->isotopeMode = isotopeMode;
     vf2state->exact = exact;
     vf2state->query = query;
     vf2state->queryAtomCount = queryAtomCount;
@@ -312,13 +333,29 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
     if(likely(!vf2state_atom_matches(vf2state, vf2state->query_idx, vf2state->target_idx)))
         return false;
 
+
+    if(vf2state->chargeMode != CHARGE_IGNORE)
+    {
+        int queryCharge = molecule_get_formal_charge(vf2state->query, vf2state->query_idx);
+        int targetCharge = molecule_get_formal_charge(vf2state->target, vf2state->target_idx);
+
+        if(queryCharge != targetCharge && (queryCharge != 0 || vf2state->chargeMode == CHARGE_DEFAULT_AS_UNCHARGED))
+            return false;
+    }
+
+
+    if(vf2state->isotopeMode != ISOTOPE_IGNORE)
+    {
+        int queryMass = molecule_get_atom_mass(vf2state->query, vf2state->query_idx);
+        int targetMass = molecule_get_atom_mass(vf2state->target, vf2state->target_idx);
+
+        if(queryMass != targetMass && (queryMass != 0 || vf2state->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD))
+            return false;
+    }
+
+
     if(likely(!vf2state->exact))
     {
-        if(unlikely(molecule_get_formal_charge(vf2state->query, vf2state->query_idx) != 0 &&
-                molecule_get_formal_charge(vf2state->query, vf2state->query_idx) !=
-                molecule_get_formal_charge(vf2state->target, vf2state->target_idx)))
-            return false;
-
         if(unlikely(molecule_get_hydrogen_count(vf2state->query, vf2state->query_idx) >
                 molecule_get_hydrogen_count(vf2state->target, vf2state->target_idx) &&
                 !molecule_is_pseudo_atom(vf2state->query, vf2state->query_idx) &&
@@ -327,10 +364,6 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
     }
     else
     {
-        if(unlikely(molecule_get_formal_charge(vf2state->query, vf2state->query_idx) !=
-                molecule_get_formal_charge(vf2state->target, vf2state->target_idx)))
-            return false;
-
         if(unlikely(molecule_get_hydrogen_count(vf2state->query, vf2state->query_idx) !=
                 molecule_get_hydrogen_count(vf2state->target, vf2state->target_idx) &&
                 !molecule_is_pseudo_atom(vf2state->query, vf2state->query_idx) &&
@@ -578,27 +611,30 @@ inline bool vf2state_is_match_valid(const VF2State *const restrict vf2state)
           if so,discard it.
     */
 
-    for(int i = 0; i < queryAtomCount; i++)
+    if(molecule_has_restH_flags(query))
     {
-        if(molecule_get_atom_restH_flag(query, i) == true)
+        for(int i = 0; i < queryAtomCount; i++)
         {
-            int targetAtomIdx = vf2state->core_query[i];
+            if(molecule_get_atom_restH_flag(query, i) == true)
+            {
+                int targetAtomIdx = vf2state->core_query[i];
 
-            int queryConnectivityCount = 0;
-            int targetConnectivityCount = 0;
+                int queryConnectivityCount = 0;
+                int targetConnectivityCount = 0;
 
-            for(int b = 0; b < queryBondCount; b++)
-                if(molecule_bond_contains(query, b, i) &&
-                        !(molecule_get_atom_number(query, molecule_get_bond_connected_atom(query, b, i)) == H_ATOM_NUMBER))
-                    queryConnectivityCount++;
+                for(int b = 0; b < queryBondCount; b++)
+                    if(molecule_bond_contains(query, b, i) &&
+                            !(molecule_get_atom_number(query, molecule_get_bond_connected_atom(query, b, i)) == H_ATOM_NUMBER))
+                        queryConnectivityCount++;
 
-            for(int b = 0; b < targetBondCount; b++)
-                if(molecule_bond_contains(target, b, targetAtomIdx) &&
-                        !(molecule_get_atom_number(target, molecule_get_bond_connected_atom(target, b, targetAtomIdx)) == H_ATOM_NUMBER))
-                    targetConnectivityCount++;
+                for(int b = 0; b < targetBondCount; b++)
+                    if(molecule_bond_contains(target, b, targetAtomIdx) &&
+                            !(molecule_get_atom_number(target, molecule_get_bond_connected_atom(target, b, targetAtomIdx)) == H_ATOM_NUMBER))
+                        targetConnectivityCount++;
 
-            if(targetConnectivityCount > queryConnectivityCount)
-                return false;
+                if(targetConnectivityCount > queryConnectivityCount)
+                    return false;
+            }
         }
     }
 

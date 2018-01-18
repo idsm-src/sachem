@@ -81,7 +81,8 @@ typedef struct
 } Molecule;
 
 
-inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, bool extended)
+inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, bool extended,
+        bool withStereo, bool withCharges, bool withMasses)
 {
     int xAtomCount = *data << 8 | *(data + 1);
     data += 2;
@@ -118,11 +119,11 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, 
 
     uint8_t *atomNumbers = (uint8_t *) palloc(atomCount);
     uint8_t *atomHydrogens = (uint8_t *) palloc0(atomCount);
-    int8_t  *atomCharges = (int8_t *) palloc0(atomCount);
-    uint8_t *atomMasses = (uint8_t *) palloc0(atomCount);
-    uint8_t *atomStereo = (uint8_t *) palloc0(atomCount);
     uint8_t *bondTypes = (uint8_t *) palloc(bondCount);
-    uint8_t *bondStereo = (uint8_t *) palloc0(bondCount);
+    int8_t  *atomCharges = withCharges ? (int8_t *) palloc0(atomCount) : NULL;
+    uint8_t *atomMasses = withMasses ? (uint8_t *) palloc0(atomCount) : NULL;
+    uint8_t *atomStereo = withStereo ? (uint8_t *) palloc0(atomCount) : NULL;
+    uint8_t *bondStereo = withStereo ? (uint8_t *) palloc0(bondCount) : NULL;
 
     molecule->atomCount = atomCount;
     molecule->bondCount = bondCount;
@@ -257,19 +258,19 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, 
         switch(data[offset] >> 4)
         {
             case RECORD_CHARGE:
-                if(idx < atomCount)
+                if(withCharges && idx < atomCount)
                     atomCharges[idx] = (int8_t) data[offset + 2];
 
             case RECORD_ISOTOPE:
-                if(idx < atomCount)
+                if(withMasses && idx < atomCount)
                     atomMasses[idx] = data[offset + 2];
 
             case RECORD_TETRAHEDRAL_STEREO:
-                if(idx < atomCount)
+                if(withStereo && idx < atomCount)
                     atomStereo[idx] = data[offset + 2];
 
             case RECORD_BOND_STEREO:
-                if(idx < xBondCount) // not for H bond
+                if(withStereo && idx < xBondCount) // not for H bond
                     bondStereo[idx] = data[offset + 2];
         }
     }
@@ -290,19 +291,19 @@ inline int8_t molecule_get_atom_number(const Molecule *const restrict molecule, 
 
 inline uint8_t molecule_get_hydrogen_count(const Molecule *const restrict molecule, int i)
 {
-    if(!molecule->atomHydrogens)
-        return 0;
-
     return molecule->atomHydrogens[i];
 }
 
 
 inline int8_t molecule_get_formal_charge(const Molecule *const restrict molecule, int i)
 {
-    if(!molecule->atomCharges)
-        return 0;
-
     return molecule->atomCharges[i];
+}
+
+
+inline int8_t molecule_get_atom_mass(const Molecule *const restrict molecule, int i)
+{
+    return molecule->atomMasses[i];
 }
 
 
@@ -318,11 +319,14 @@ inline int molecule_get_bond_list_size(const Molecule *const restrict molecule, 
 }
 
 
+inline bool molecule_has_restH_flags(const Molecule *const restrict molecule)
+{
+    return molecule->restH != NULL;
+}
+
+
 inline bool molecule_get_atom_restH_flag(const Molecule *const restrict molecule, int i)
 {
-    if(likely(!molecule->restH))
-        return false;
-
     return molecule->restH[i];
 }
 
@@ -379,18 +383,12 @@ inline uint8_t molecule_get_bond_type(const Molecule *const restrict molecule, i
 
 inline uint8_t molecule_get_atom_stereo(const Molecule *const restrict molecule, int i)
 {
-    if(likely(!molecule->atomStereo))
-        return TETRAHEDRAL_STEREO_NONE;
-
     return molecule->atomStereo[i];
 }
 
 
 inline uint8_t molecule_get_bond_stereo(const Molecule *const restrict molecule, int i)
 {
-    if(likely(!molecule->bondStereo))
-        return BOND_STEREO_NONE;
-
     return molecule->bondStereo[i];
 }
 
