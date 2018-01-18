@@ -20,7 +20,7 @@
 #define USE_COUNT_FINGERPRINT     1
 #define FETCH_SIZE                1000
 #define FP_SIZE                   788
-#define COUNTS_SIZE               10
+#define COUNTS_SIZE               13
 #define SYNC_FETCH_SIZE           100000
 #define COMPOUNDS_TABLE           "compounds"
 #define AUDIT_TABLE               "orchem_compound_audit"

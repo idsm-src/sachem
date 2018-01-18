@@ -64,17 +64,20 @@ public class OrchemLoader
 
                             // calculate molecule couts
                             MoleculeCounts counts = new MoleculeCounts(readMolecule, true);
-                            item.counts = new short[10];
-                            item.counts[0] = counts.molTripleBondCount;
-                            item.counts[1] = counts.molSCount;
-                            item.counts[2] = counts.molOCount;
-                            item.counts[3] = counts.molNCount;
-                            item.counts[4] = counts.molFCount;
-                            item.counts[5] = counts.molClCount;
-                            item.counts[6] = counts.molBrCount;
-                            item.counts[7] = counts.molICount;
-                            item.counts[8] = counts.molCCount;
-                            item.counts[9] = counts.molPCount;
+                            item.counts = new short[13];
+                            item.counts[0] = counts.molSingleBondCount;
+                            item.counts[1] = counts.molDoubleBondCount;
+                            item.counts[2] = counts.molTripleBondCount;
+                            item.counts[3] = counts.molAromaticBondCount;
+                            item.counts[4] = counts.molSCount;
+                            item.counts[5] = counts.molOCount;
+                            item.counts[6] = counts.molNCount;
+                            item.counts[7] = counts.molFCount;
+                            item.counts[8] = counts.molClCount;
+                            item.counts[9] = counts.molBrCount;
+                            item.counts[10] = counts.molICount;
+                            item.counts[11] = counts.molCCount;
+                            item.counts[12] = counts.molPCount;
 
                             // calculate molecule binary representation
                             readMolecule.setAtoms(IsomorphismSort.atomsByFrequency(readMolecule));

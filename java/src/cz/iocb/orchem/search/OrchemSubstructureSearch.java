@@ -90,17 +90,22 @@ public abstract class OrchemSubstructureSearch extends SubstructureSearch
 
             data[idx] = new OrchemQueryData();
 
-            data[idx].counts = new short[10];
-            data[idx].counts[0] = counts.molTripleBondCount;
-            data[idx].counts[1] = counts.molSCount;
-            data[idx].counts[2] = counts.molOCount;
-            data[idx].counts[3] = counts.molNCount;
-            data[idx].counts[4] = counts.molFCount;
-            data[idx].counts[5] = counts.molClCount;
-            data[idx].counts[6] = counts.molBrCount;
-            data[idx].counts[7] = counts.molICount;
-            data[idx].counts[8] = counts.molCCount;
-            data[idx].counts[9] = counts.molPCount;
+            data[idx].counts = new short[13];
+            data[idx].counts[0] = counts.molSingleBondCount;
+            data[idx].counts[1] = counts.molDoubleBondCount;
+            data[idx].counts[2] = counts.molTripleBondCount;
+            data[idx].counts[3] = counts.molAromaticBondCount;
+            data[idx].counts[4] = counts.molSCount;
+            data[idx].counts[5] = counts.molOCount;
+            data[idx].counts[6] = counts.molNCount;
+            data[idx].counts[7] = counts.molFCount;
+            data[idx].counts[8] = counts.molClCount;
+            data[idx].counts[9] = counts.molBrCount;
+            data[idx].counts[10] = counts.molICount;
+            data[idx].counts[11] = counts.molCCount;
+            data[idx].counts[12] = counts.molPCount;
+
+
 
             data[idx].fp = fp;
             data[idx].molecule = moleculeBytes;
