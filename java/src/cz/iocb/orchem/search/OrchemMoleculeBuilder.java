@@ -481,9 +481,13 @@ public class OrchemMoleculeBuilder
                             return BondType.ANY;
                     }
                 }
+                else
+                {
+                    return BondType.ANY;
+                }
         }
 
-        throw new CDKException("unknown atom type");
+        throw new CDKException("unknown bond type");
     }
 
 
