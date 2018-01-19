@@ -7,6 +7,8 @@
 #include "sachem.h"
 
 #define Q_ATOM_NUMBER   (-'Q')
+#define M_ATOM_NUMBER   (-'M')
+#define X_ATOM_NUMBER   (-'X')
 #define H_ATOM_NUMBER        1
 #define C_ATOM_NUMBER        6
 
@@ -344,6 +346,24 @@ inline bool molecule_is_pseudo_atom(const Molecule *const restrict molecule, int
 inline int8_t molecule_get_atom_number(const Molecule *const restrict molecule, int i)
 {
     return molecule->atomNumbers[i];
+}
+
+
+inline bool molecule_is_metal(const Molecule *const restrict molecule, int i)
+{
+    int number = molecule_get_atom_number(molecule, i);
+
+    return  (number > 2 && number < 5) || (number > 10 && number < 14) ||
+            (number > 18 && number < 32) || (number > 36 && number < 51) ||
+            (number > 54 && number < 85) || number > 86;
+}
+
+
+inline bool molecule_is_halogen(const Molecule *const restrict molecule, int i)
+{
+    int number = molecule_get_atom_number(molecule, i);
+
+    return number == 9 || number == 17 || number == 35 || number == 53 || number == 85;
 }
 
 

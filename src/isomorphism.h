@@ -263,26 +263,42 @@ inline bool vf2state_atom_matches(const VF2State *const restrict vf2state, int q
 
     if(unlikely(molecule_is_pseudo_atom(vf2state->query, queryAtom)))
     {
-        if(unlikely(molecule_is_pseudo_atom(vf2state->target, targetAtom)))
-            return true;
-        else if(queryAtomNumber != Q_ATOM_NUMBER) // "Q" is a heteroatom (i.e. any atom except C or H)
-            return true;
-        else if(targetAtomNumber == C_ATOM_NUMBER || targetAtomNumber == H_ATOM_NUMBER)
-            return false;
-        else
-            return true;
+        switch(queryAtomNumber)
+        {
+            case Q_ATOM_NUMBER:
+                return targetAtomNumber != C_ATOM_NUMBER && targetAtomNumber != H_ATOM_NUMBER;
+
+            case M_ATOM_NUMBER:
+                return molecule_is_metal(vf2state->target, targetAtom) ||
+                        molecule_is_pseudo_atom(vf2state->target, targetAtom) && targetAtom != X_ATOM_NUMBER;
+
+            case X_ATOM_NUMBER:
+                return molecule_is_halogen(vf2state->target, targetAtom) ||
+                        molecule_is_pseudo_atom(vf2state->target, targetAtom) && targetAtom != M_ATOM_NUMBER;
+
+            default:
+                return true;
+        }
     }
 
     if(unlikely(molecule_is_pseudo_atom(vf2state->target, targetAtom)))
     {
-        if(unlikely(molecule_is_pseudo_atom(vf2state->query, queryAtom)))
-            return true;
-        else if(targetAtomNumber != Q_ATOM_NUMBER) // "Q" is a heteroatom (i.e. any atom except C or H)
-            return true;
-        else if(queryAtomNumber == C_ATOM_NUMBER || queryAtomNumber == H_ATOM_NUMBER)
-            return false;
-        else
-            return true;
+        switch(targetAtomNumber)
+        {
+            case Q_ATOM_NUMBER:
+                return queryAtomNumber != C_ATOM_NUMBER && queryAtomNumber != H_ATOM_NUMBER;
+
+            case M_ATOM_NUMBER:
+                return molecule_is_metal(vf2state->query, queryAtom) ||
+                        molecule_is_pseudo_atom(vf2state->query, queryAtom) && queryAtom != X_ATOM_NUMBER;
+
+            case X_ATOM_NUMBER:
+                return molecule_is_halogen(vf2state->query, queryAtom) ||
+                        molecule_is_pseudo_atom(vf2state->query, queryAtom) && queryAtom != M_ATOM_NUMBER;
+
+            default:
+                return true;
+        }
     }
 
     return false;
