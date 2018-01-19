@@ -93,6 +93,10 @@ public class MoleculeCreator
 
     public static void configureAromaticity(IAtomContainer molecule) throws CDKException
     {
+        for(IBond bond : molecule.bonds())
+            if(bond.isAromatic())
+                return;
+
         aromaticity.get().apply(molecule);
     }
 
