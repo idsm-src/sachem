@@ -367,7 +367,10 @@ public class OrchemMoleculeBuilder
 
             if(a.getMassNumber() != null)
             {
-                int mass = a.getMassNumber();
+                int mass = a.getMassNumber() - a.getAtomicNumber() + 1;
+
+                if(mass < 1)
+                    throw new CDKException("wrong isotope number");
 
                 if(mass > 256)
                     throw new CDKException("too high isotope number");
