@@ -612,15 +612,15 @@ public class OrchemMoleculeBuilder
 
     private boolean isDoubleBondStereochemistry(int index)
     {
+        IBond bond = molecule.getBond(index);
+
+        if(bond.getOrder() != Order.DOUBLE || bond.isAromatic())
+            return false;
+
         if(doubleBondStereo[index] != null)
             return true;
 
         if(centers == null)
-            return false;
-
-        IBond bond = molecule.getBond(index);
-
-        if(bond.getOrder() != Order.DOUBLE)
             return false;
 
         for(IAtom atom : bond.atoms())
