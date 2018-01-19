@@ -77,7 +77,9 @@ public class OrchemExtendedFingerprinter extends OrchemFingerprinter
                 extendedFingerprint.set(bitPos, true);
 
             /* Atom count related fingerprinting */
-            atomCount++;
+            if(!atom.getSymbol().equals("H"))
+                atomCount++;
+
             mapKey = BitPosApi.bpExtended.atomCountMoreThan + atomCount;
             bitPos = BitPosApi.bpExtended.basicStuff.get(mapKey);
 

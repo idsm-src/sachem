@@ -51,7 +51,8 @@ public class MoleculeCounts
         {
             if(!(atom instanceof IPseudoAtom))
             {
-                molAtomCount++;
+                if(!atom.getSymbol().equals("H"))
+                    molAtomCount++;
 
                 if(atom.getSymbol().equals("S"))
                     molSCount++;
@@ -87,9 +88,15 @@ public class MoleculeCounts
             }
         }
 
-        
+
+        bondLoop:
         for(IBond bond : iac.bonds())
         {
+            for(IAtom atom : bond.atoms())
+                if(atom.getSymbol().equals("H"))
+                    continue bondLoop;
+
+
             BondType type = OrchemMoleculeBuilder.getBondType(bond);
 
             if(type == BondType.AROMATIC)
