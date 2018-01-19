@@ -3,7 +3,11 @@ package cz.iocb.orchem.search;
 import java.nio.charset.StandardCharsets;
 import java.util.BitSet;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
+import org.openscience.cdk.interfaces.IBond;
+import org.openscience.cdk.interfaces.IPseudoAtom;
+import org.openscience.cdk.isomorphism.matchers.CTFileQueryBond;
 import cz.iocb.orchem.fingerprint.OrchemExtendedFingerprinter;
 import cz.iocb.orchem.isomorphism.IsomorphismSort;
 import cz.iocb.orchem.shared.MoleculeCounts;
@@ -59,8 +63,18 @@ public class OrchemLoader
                             MoleculeCreator.configureMolecule(readMolecule);
 
                             // calculate similarity fingerprint
-                            BitSet fp = fingerPrinter.get().getFingerprint(readMolecule);
-                            item.fp = fp.toLongArray();
+                            if(canBeIndexed(readMolecule))
+                            {
+                                BitSet fp = fingerPrinter.get().getFingerprint(readMolecule);
+                                item.fp = fp.toLongArray();
+                            }
+                            else
+                            {
+                                BitSet fp = new BitSet(fingerPrinter.get().getSize());
+                                fp.set(0, fingerPrinter.get().getSize());
+                                item.fp = fp.toLongArray();
+                                item.exception = "warning: cannot be fully indexed";
+                            }
 
                             // calculate molecule couts
                             MoleculeCounts counts = new MoleculeCounts(readMolecule, true);
@@ -86,7 +100,7 @@ public class OrchemLoader
                         }
                         catch(Throwable e)
                         {
-                            item.exception = e.getClass().getCanonicalName() + ": " + e.getMessage();
+                            item.exception = "error: " + e.getClass().getCanonicalName() + ": " + e.getMessage();
                         }
 
                         result[i] = item;
@@ -103,5 +117,19 @@ public class OrchemLoader
             thread[c].join();
 
         return result;
+    }
+
+
+    private static boolean canBeIndexed(IAtomContainer molecule)
+    {
+        for(IAtom atom : molecule.atoms())
+            if(atom instanceof IPseudoAtom)
+                return false;
+
+        for(IBond bond : molecule.bonds())
+            if(bond instanceof CTFileQueryBond && !bond.isAromatic())
+                return false;
+
+        return true;
     }
 }

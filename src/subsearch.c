@@ -742,8 +742,6 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
             if(data[i].error)
             {
-                notIndexed++;
-
                 char *message = text_to_cstring(data[i].error);
                 elog(NOTICE, "%i: %s", DatumGetInt32(id), message);
                 pfree(message);
@@ -755,6 +753,11 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
                     elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
                 pfree(data[i].error);
+            }
+
+            if(data[i].molecule == NULL || data[i].counts == NULL || data[i].fp == NULL)
+            {
+                notIndexed++;
                 continue;
             }
 
