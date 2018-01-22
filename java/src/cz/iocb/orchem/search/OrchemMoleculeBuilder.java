@@ -617,7 +617,7 @@ public class OrchemMoleculeBuilder
     {
         IBond bond = molecule.getBond(index);
 
-        if(bond.getOrder() != Order.DOUBLE || bond.isAromatic())
+        if(bond.isAromatic())
             return false;
 
         if(doubleBondStereo[index] != null)
