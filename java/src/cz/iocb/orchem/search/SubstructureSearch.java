@@ -98,12 +98,17 @@ public abstract class SubstructureSearch
      * @throws CloneNotSupportedException
      * @throws TimeoutException
      */
-    protected static List<IAtomContainer> translateUserQuery(String query, int queryType, boolean tautomers)
+    protected static List<IAtomContainer> translateUserQuery(String query, int queryTypeIdx, boolean tautomers)
             throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException
     {
+        QueryFormat queryType = QueryFormat.values()[queryTypeIdx];
         List<IAtomContainer> userQueries = null;
 
-        if(queryType == QueryFormat.RGROUP.ordinal())
+        if(queryType == QueryFormat.UNSPECIFIED)
+            queryType = QueryFormat.detect(query);
+
+
+        if(queryType == QueryFormat.RGROUP)
         {
             InputStream ins = new ByteArrayInputStream(query.getBytes());
 
@@ -115,7 +120,7 @@ public abstract class SubstructureSearch
 
             //TODO: add support for tautomers
         }
-        else if(queryType == QueryFormat.MOLFILE.ordinal())
+        else if(queryType == QueryFormat.MOLFILE)
         {
             if(!tautomers)
             {
@@ -130,7 +135,7 @@ public abstract class SubstructureSearch
                 userQueries = tautomerGenerator.getTautomers(query);
             }
         }
-        else if(queryType == QueryFormat.SMILES.ordinal())
+        else if(queryType == QueryFormat.SMILES)
         {
             if(!tautomers)
             {

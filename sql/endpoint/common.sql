@@ -4,9 +4,10 @@ $$
   begin
     select into value 
       case iri
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/SMILES' then 0
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/MolFile' then 1
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/RGroup' then 2
+        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/UnspecifiedFormat' then 0
+        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/SMILES' then 1
+        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/MolFile' then 2
+        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/RGroup' then 3
       end::integer AS retval;
     return value.retval;
   end;

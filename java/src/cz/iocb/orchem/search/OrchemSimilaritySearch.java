@@ -24,17 +24,22 @@ public class OrchemSimilaritySearch
     };
 
 
-    public static long[] getQueryData(byte[] queryArray, int queryType) throws CDKException, IOException
+    public static long[] getQueryData(byte[] queryArray, int queryTypeIdx) throws CDKException, IOException
     {
+        QueryFormat queryType = QueryFormat.values()[queryTypeIdx];
         String query = new String(queryArray, StandardCharsets.ISO_8859_1);
         IAtomContainer molecule = null;
 
-        if(queryType == QueryFormat.MOLFILE.ordinal())
+        if(queryType == QueryFormat.UNSPECIFIED)
+            queryType = QueryFormat.detect(query);
+
+
+        if(queryType == QueryFormat.MOLFILE)
             molecule = MoleculeCreator.getMoleculeFromMolfile(query);
-        else if(queryType == QueryFormat.SMILES.ordinal())
+        else if(queryType == QueryFormat.SMILES)
             molecule = new SmilesParser(SilentChemObjectBuilder.getInstance()).parseSmiles(query);
         else
-            return null;
+            throw new CDKException("unsupported format");
 
         MoleculeCreator.configureMolecule(molecule);
 
