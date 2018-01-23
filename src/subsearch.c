@@ -881,8 +881,9 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
 
 #if USE_COUNT_FINGERPRINT
-        if(write(fd, counts, indexSize * COUNTS_SIZE * sizeof(int16)) != indexSize * COUNTS_SIZE * sizeof(int16))
-            elog(ERROR, "%s: write() failed", __func__);
+        for(int i = 0; i < COUNTS_SIZE; i++)
+            if(write(fd, (int16 *) counts + i * indexSize, indexSize * sizeof(int16)) != indexSize * sizeof(int16))
+                elog(ERROR, "%s: write() failed", __func__);
 
 
         uint64_t zero = 0;
