@@ -189,7 +189,7 @@ void java_module_init(void)
     restHField = (*env)->GetFieldID(env, substructureQueryDataClass, "restH", "[Z");
     java_check_exception(__func__);
 
-    substructureQueryDataMethod = (*env)->GetStaticMethodID(env, substructureSearchClass, "getQueryData", "([BLjava/lang/String;ZZ)[Lcz/iocb/orchem/search/SubstructureSearch$QueryData;");
+    substructureQueryDataMethod = (*env)->GetStaticMethodID(env, substructureSearchClass, "getQueryData", "([BIZZ)[Lcz/iocb/orchem/search/SubstructureSearch$QueryData;");
     java_check_exception(__func__);
 
 
@@ -205,14 +205,14 @@ void java_module_init(void)
     fpField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "fp", "[S");
     java_check_exception(__func__);
 
-    orchemSubstructureQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSubstructureSearchClass, "getQueryData", "([BLjava/lang/String;ZZ)[Lcz/iocb/orchem/search/OrchemSubstructureSearch$OrchemQueryData;");
+    orchemSubstructureQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSubstructureSearchClass, "getQueryData", "([BIZZ)[Lcz/iocb/orchem/search/OrchemSubstructureSearch$OrchemQueryData;");
     java_check_exception(__func__);
 
 
     orchemSimilaritySearchClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemSimilaritySearch");
     java_check_exception(__func__);
 
-    orchemSimilarityQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSimilaritySearchClass, "getQueryData", "([BLjava/lang/String;)[J");
+    orchemSimilarityQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSimilaritySearchClass, "getQueryData", "([BI)[J");
     java_check_exception(__func__);
 
 
@@ -249,14 +249,13 @@ void java_module_finish(void)
 }
 
 
-int java_parse_substructure_query(SubstructureQueryData **data, char* query, size_t queryLength, char *type, bool implicitHydrogens, bool tautomers)
+int java_parse_substructure_query(SubstructureQueryData **data, char* query, size_t queryLength, int32_t type, bool implicitHydrogens, bool tautomers)
 {
     if(initialised == false)
         elog(ERROR, "%s: java module is not properly initialized", __func__);
 
 
     jbyteArray queryArg = NULL;
-    jstring typeArg = NULL;
     jobjectArray result = NULL;
     jobject element = NULL;
     jshortArray countsArray = NULL;
@@ -276,15 +275,10 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
         (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte*) query);
 
 
-        typeArg = (*env)->NewStringUTF(env, type);
-        java_check_exception(__func__);
-
-
-        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, substructureSearchClass, substructureQueryDataMethod, queryArg, typeArg, (jboolean) implicitHydrogens, (jboolean) tautomers);
+        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, substructureSearchClass, substructureQueryDataMethod, queryArg, (jint) type, (jboolean) implicitHydrogens, (jboolean) tautomers);
         java_check_exception(__func__);
 
         JavaDeleteRef(queryArg);
-        JavaDeleteRef(typeArg);
 
 
         length = (*env)->GetArrayLength(env, result);
@@ -334,7 +328,6 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
     PG_CATCH();
     {
         JavaDeleteRef(queryArg);
-        JavaDeleteRef(typeArg);
         JavaDeleteRef(result);
         JavaDeleteRef(element);
         JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
@@ -348,14 +341,13 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
 }
 
 
-int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, char* query, size_t queryLength, char *type, bool implicitHydrogens, bool tautomers)
+int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, char* query, size_t queryLength, int32_t type, bool implicitHydrogens, bool tautomers)
 {
     if(initialised == false)
         elog(ERROR, "%s: java module is not properly initialized", __func__);
 
 
     jbyteArray queryArg = NULL;
-    jstring typeArg = NULL;
     jobjectArray result = NULL;
     jobject element = NULL;
     jshortArray countsArray = NULL;
@@ -377,15 +369,10 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
         (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte*) query);
 
 
-        typeArg = (*env)->NewStringUTF(env, type);
-        java_check_exception(__func__);
-
-
-        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, orchemSubstructureSearchClass, orchemSubstructureQueryDataMethod, queryArg, typeArg, (jboolean) implicitHydrogens, (jboolean) tautomers);
+        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, orchemSubstructureSearchClass, orchemSubstructureQueryDataMethod, queryArg, (jint) type, (jboolean) implicitHydrogens, (jboolean) tautomers);
         java_check_exception(__func__);
 
         JavaDeleteRef(queryArg);
-        JavaDeleteRef(typeArg);
 
 
         length = (*env)->GetArrayLength(env, result);
@@ -455,7 +442,6 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
     PG_CATCH();
     {
         JavaDeleteRef(queryArg);
-        JavaDeleteRef(typeArg);
         JavaDeleteRef(result);
         JavaDeleteRef(element);
         JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
@@ -471,13 +457,12 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
 }
 
 
-int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t queryLength, char *type)
+int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t queryLength, int32_t type)
 {
     if(initialised == false)
         elog(ERROR, "%s: java module is not properly initialized", __func__);
 
     jbyteArray queryArg = NULL;
-    jstring typeArg = NULL;
     jlongArray result = NULL;
     jlong *words = NULL;
     jsize length = -1;
@@ -490,14 +475,10 @@ int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t quer
 
         (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte*) query);
 
-        typeArg = (*env)->NewStringUTF(env, type);
-        java_check_exception(__func__);
-
-        result = (jlongArray) (*env)->CallStaticObjectMethod(env, orchemSimilaritySearchClass, orchemSimilarityQueryDataMethod, queryArg, typeArg);
+        result = (jlongArray) (*env)->CallStaticObjectMethod(env, orchemSimilaritySearchClass, orchemSimilarityQueryDataMethod, queryArg, (jint) type);
         java_check_exception(__func__);
 
         JavaDeleteRef(queryArg);
-        JavaDeleteRef(typeArg);
 
         if(result != NULL)
         {
@@ -518,7 +499,6 @@ int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t quer
     PG_CATCH();
     {
         JavaDeleteRef(queryArg);
-        JavaDeleteRef(typeArg);
         JavaDeleteLongArray(result, words, JNI_ABORT);
 
         PG_RE_THROW();

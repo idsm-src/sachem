@@ -37,6 +37,7 @@ EXTRA_DIST = \
     src/cz/iocb/orchem/search/OrchemSimilaritySearch.java \
     src/cz/iocb/orchem/search/OrchemSubstructureSearch.java \
     src/cz/iocb/orchem/search/SubstructureSearch.java \
+    src/cz/iocb/orchem/search/QueryFormat.java \
     src/cz/iocb/orchem/shared/MoleculeCounts.java \
     src/cz/iocb/orchem/shared/MoleculeCreator.java \
     src/cz/iocb/orchem/tautomers/CombinationCountException.java \

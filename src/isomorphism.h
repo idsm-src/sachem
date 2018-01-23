@@ -45,6 +45,13 @@
 
 typedef enum
 {
+    GRAPH_SUBSTRUCTURE = 0,
+    GRAPH_EXACT = 1
+} GraphMode;
+
+
+typedef enum
+{
     CHARGE_IGNORE = 0,
     CHARGE_DEFAULT_AS_UNCHARGED = 1,
     CHARGE_DEFAULT_AS_ANY = 2
@@ -59,6 +66,13 @@ typedef enum
 } IsotopeMode;
 
 
+typedef enum
+{
+    STEREO_IGNORE = 0,
+    STEREO_STRICT = 1
+} StereoMode;
+
+
 typedef struct
 {
     int target_selector;
@@ -68,10 +82,10 @@ typedef struct
 
 typedef struct
 {
+    GraphMode graphMode;
     ChargeMode chargeMode;
     IsotopeMode isotopeMode;
-    bool strictStereo;
-    bool exact;
+    StereoMode stereoMode;
 
     const Molecule *restrict query;
     const Molecule *restrict target;
@@ -129,8 +143,8 @@ inline void sort_bond_atoms(int array[4])
 }
 
 
-inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *const restrict query, bool strictStereo,
-        bool exact, ChargeMode chargeMode, IsotopeMode isotopeMode)
+inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *const restrict query,
+        GraphMode graphMode, ChargeMode chargeMode, IsotopeMode isotopeMode, StereoMode stereoMode)
 {
 #if USE_VF2_TIMEOUT
     if(unlikely(vf2TimeoutId == MAX_TIMEOUTS))
@@ -139,10 +153,10 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
 
     int queryAtomCount = query->atomCount;
 
-    vf2state->strictStereo = strictStereo;
+    vf2state->graphMode = graphMode;
     vf2state->chargeMode = chargeMode;
     vf2state->isotopeMode = isotopeMode;
-    vf2state->exact = exact;
+    vf2state->stereoMode = stereoMode;
     vf2state->query = query;
     vf2state->queryAtomCount = queryAtomCount;
     vf2state->core_len = 0;
@@ -201,7 +215,7 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
     }
 
 
-    if(unlikely(exact))
+    if(unlikely(graphMode == GRAPH_EXACT))
         vf2state->core_target = (int *) palloc(queryAtomCount * sizeof(int));
 }
 
@@ -370,7 +384,7 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
     }
 
 
-    if(likely(!vf2state->exact))
+    if(likely(vf2state->graphMode != GRAPH_EXACT))
     {
         if(unlikely(molecule_get_hydrogen_count(vf2state->query, vf2state->query_idx) >
                 molecule_get_hydrogen_count(vf2state->target, vf2state->target_idx) &&
@@ -421,7 +435,7 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
 
         if(is_core_defined(vf2state->core_target[other2]))
         {
-            if(unlikely(vf2state->exact))
+            if(unlikely(vf2state->graphMode == GRAPH_EXACT))
             {
                 int other1 = vf2state->core_target[other2];
 
@@ -435,7 +449,7 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
         }
     }
 
-    if(unlikely(vf2state->exact))
+    if(unlikely(vf2state->graphMode == GRAPH_EXACT))
         return newQuery == newTarget;
     else
         return newQuery <= newTarget;
@@ -520,7 +534,7 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
             if(normalize_atom_stereo(targetAtoms, targetStereo) != queryStereo)
                 return false;
         }
-        else if(vf2state->exact)
+        else if(vf2state->graphMode == GRAPH_EXACT)
         {
             if(queryStereo != targetStereo)
                 return false;
@@ -589,7 +603,7 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
             if(normalize_bond_stereo(targetAtoms, targetStereo) != queryStereo)
                 return false;
         }
-        else if(vf2state->exact)
+        else if(vf2state->graphMode == GRAPH_EXACT)
         {
             if(queryStereo != targetStereo)
                 return false;
@@ -655,7 +669,7 @@ inline bool vf2state_is_match_valid(const VF2State *const restrict vf2state)
     }
 
 
-    if(unlikely(vf2state->strictStereo) && !vf2state_is_stereo_valid(vf2state))
+    if(unlikely(vf2state->stereoMode == STEREO_STRICT) && !vf2state_is_stereo_valid(vf2state))
             return false;
 
 
@@ -714,7 +728,7 @@ inline bool vf2state_match_core(VF2State *const restrict vf2state)
 
 inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *const restrict target, int timeout)
 {
-    if(likely(!vf2state->exact))
+    if(likely(vf2state->graphMode != GRAPH_EXACT))
     {
         if(vf2state->queryAtomCount > target->atomCount || vf2state->query->bondCount > target->bondCount)
             return false;
@@ -731,7 +745,7 @@ inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *co
     vf2state->targetAtomCount = targetAtomCount;
     vf2state->core_len = 0;
 
-    if(likely(!vf2state->exact))
+    if(likely(vf2state->graphMode != GRAPH_EXACT))
         vf2state->core_target = (int *) palloc(targetAtomCount * sizeof(int));
 
     for(int i = 0; i < targetAtomCount; i++)

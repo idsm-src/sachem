@@ -14,6 +14,7 @@
 #include "java.h"
 #include "molecule.h"
 #include "sachem.h"
+#include "subsearch.h"
 
 
 #define SHOW_STATS                0
@@ -34,11 +35,11 @@
 typedef struct
 {
     int32_t topN;
-    bool strictStereo;
-    bool exact;
     bool extended;
+    GraphMode graphMode;
     ChargeMode chargeMode;
     IsotopeMode isotopeMode;
+    StereoMode stereoMode;
     int32_t vf2_timeout;
 
     BitSet resultMask;
@@ -208,15 +209,14 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 #endif
 
         VarChar *query = PG_GETARG_VARCHAR_P(0);
-        text *type = PG_GETARG_TEXT_P(1);
+        int32_t type = PG_GETARG_INT32(1);
         int32_t topN = PG_GETARG_INT32(2);
-        bool strictStereo = PG_GETARG_BOOL(3);
-        bool exact = PG_GETARG_BOOL(4);
-        bool tautomers = PG_GETARG_BOOL(5);
-        ChargeMode chargeMode = PG_GETARG_INT32(6);
-        IsotopeMode isotopeMode = PG_GETARG_INT32(7);
+        GraphMode graphMode = PG_GETARG_INT32(3);
+        ChargeMode chargeMode = PG_GETARG_INT32(4);
+        IsotopeMode isotopeMode = PG_GETARG_INT32(5);
+        StereoMode stereoMode = PG_GETARG_INT32(6);
+        TautomerMode tautomerMode = PG_GETARG_INT32(7);
         int32_t vf2_timeout = PG_GETARG_INT32(8);
-        char *typeStr = text_to_cstring(type);
 
         FuncCallContext *funcctx = SRF_FIRSTCALL_INIT();
         PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
@@ -225,17 +225,16 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
         funcctx->user_fctx = info;
 
         info->topN = topN;
-        info->strictStereo = strictStereo;
-        info->exact = exact;
+        info->graphMode = graphMode;
         info->chargeMode = chargeMode;
         info->isotopeMode = isotopeMode;
+        info->stereoMode = stereoMode;
         info->vf2_timeout = vf2_timeout;
 
-        info->queryDataCount = java_parse_orchem_substructure_query(&info->queryData, VARDATA(query), VARSIZE(query) - VARHDRSZ, typeStr, exact, tautomers);
+        info->queryDataCount = java_parse_orchem_substructure_query(&info->queryData, VARDATA(query), VARSIZE(query) - VARHDRSZ,
+                type, graphMode == GRAPH_EXACT, tautomerMode == TAUTOMER_INCHI);
 
         PG_FREE_IF_COPY(query, 0);
-        PG_FREE_IF_COPY(type, 1);
-        pfree(typeStr);
 
         info->queryDataPosition = -1;
         info->candidatePosition = -1;
@@ -308,10 +307,10 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
                     PG_MEMCONTEXT_BEGIN(info->isomorphismContext);
                     info->extended = molecule_is_extended_search_needed(data->molecule, info->chargeMode, info->isotopeMode);
-                    molecule_init(&info->queryMolecule, data->molecule, data->restH, info->extended, info->strictStereo,
-                            info->chargeMode, info->isotopeMode);
-                    vf2state_init(&info->vf2state, &info->queryMolecule, info->strictStereo, info->exact,
-                            info->chargeMode, info->isotopeMode);
+                    molecule_init(&info->queryMolecule, data->molecule, data->restH, info->extended,
+                            info->chargeMode != CHARGE_IGNORE, info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
+                    vf2state_init(&info->vf2state, &info->queryMolecule, info->graphMode, info->chargeMode,
+                            info->isotopeMode, info->stereoMode);
                     PG_MEMCONTEXT_END();
 
                     info->candidatePosition = bitset_next_set_bit(&info->candidates, 0);
@@ -404,8 +403,8 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
             PG_MEMCONTEXT_BEGIN(info->targetContext);
             Molecule target;
-            molecule_init(&target, VARDATA(moleculeData), NULL, info->extended, info->strictStereo, info->chargeMode,
-                    info->isotopeMode);
+            molecule_init(&target, VARDATA(moleculeData), NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
+                    info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
             match = vf2state_match(&info->vf2state, &target, info->vf2_timeout);
             PG_MEMCONTEXT_END();
             MemoryContextReset(info->targetContext);

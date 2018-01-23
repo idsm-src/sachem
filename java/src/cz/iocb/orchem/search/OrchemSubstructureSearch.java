@@ -49,7 +49,7 @@ public abstract class OrchemSubstructureSearch extends SubstructureSearch
     };
 
 
-    public static OrchemQueryData[] getQueryData(byte[] queryArray, String type, boolean implicitHydrogens,
+    public static OrchemQueryData[] getQueryData(byte[] queryArray, int type, boolean implicitHydrogens,
             boolean tautomers)
             throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException
     {

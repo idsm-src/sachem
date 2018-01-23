@@ -84,7 +84,7 @@ typedef struct
 
 
 inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, bool extended,
-        bool withStereo, bool withCharges, bool withMasses)
+        bool withCharges, bool withIsotopes, bool withStereo)
 {
     int xAtomCount = *data << 8 | *(data + 1);
     data += 2;
@@ -123,7 +123,7 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, 
     uint8_t *atomHydrogens = (uint8_t *) palloc0(atomCount);
     uint8_t *bondTypes = (uint8_t *) palloc(bondCount);
     int8_t  *atomCharges = withCharges ? (int8_t *) palloc0(atomCount) : NULL;
-    uint8_t *atomMasses = withMasses ? (uint8_t *) palloc0(atomCount) : NULL;
+    uint8_t *atomMasses = withIsotopes ? (uint8_t *) palloc0(atomCount) : NULL;
     uint8_t *atomStereo = withStereo ? (uint8_t *) palloc0(atomCount) : NULL;
     uint8_t *bondStereo = withStereo ? (uint8_t *) palloc0(bondCount) : NULL;
 
@@ -265,7 +265,7 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, 
                 break;
 
             case RECORD_ISOTOPE:
-                if(withMasses && idx < atomCount)
+                if(withIsotopes && idx < atomCount)
                     atomMasses[idx] = data[offset + 2];
                 break;
 
@@ -283,7 +283,7 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, 
 }
 
 
-inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, bool withMasses)
+inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, bool withIsotopes)
 {
     int xAtomCount = *data << 8 | *(data + 1);
     data += 2;
@@ -305,7 +305,7 @@ inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, 
             return true;
 
 
-    if(!withCharges && !withMasses)
+    if(!withCharges && !withIsotopes)
         return false;
 
     data += xAtomCount;
@@ -327,7 +327,7 @@ inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, 
                 break;
 
             case RECORD_ISOTOPE:
-                if(withMasses && idx >= xAtomCount + cAtomCount)
+                if(withIsotopes && idx >= xAtomCount + cAtomCount)
                     return true;
                 break;
         }

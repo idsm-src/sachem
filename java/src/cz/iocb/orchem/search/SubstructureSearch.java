@@ -46,12 +46,7 @@ public abstract class SubstructureSearch
     }
 
 
-    private static final String QUERY_TYPE_MOL = "MOL";
-    private static final String QUERY_TYPE_RGROUP = "RGROUP";
-    private static final String QUERY_TYPE_SMILES = "SMILES";
-
-
-    public static QueryData[] getQueryData(byte[] queryArray, String type, boolean implicitHydrogens, boolean tautomers)
+    public static QueryData[] getQueryData(byte[] queryArray, int type, boolean implicitHydrogens, boolean tautomers)
             throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException
     {
         String query = new String(queryArray, StandardCharsets.ISO_8859_1);
@@ -103,12 +98,12 @@ public abstract class SubstructureSearch
      * @throws CloneNotSupportedException
      * @throws TimeoutException
      */
-    protected static List<IAtomContainer> translateUserQuery(String query, String queryType, boolean tautomers)
+    protected static List<IAtomContainer> translateUserQuery(String query, int queryType, boolean tautomers)
             throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException
     {
         List<IAtomContainer> userQueries = null;
 
-        if(queryType.equals(QUERY_TYPE_RGROUP))
+        if(queryType == QueryFormat.RGROUP.ordinal())
         {
             InputStream ins = new ByteArrayInputStream(query.getBytes());
 
@@ -120,7 +115,7 @@ public abstract class SubstructureSearch
 
             //TODO: add support for tautomers
         }
-        else if(queryType.equals(QUERY_TYPE_MOL))
+        else if(queryType == QueryFormat.MOLFILE.ordinal())
         {
             if(!tautomers)
             {
@@ -135,7 +130,7 @@ public abstract class SubstructureSearch
                 userQueries = tautomerGenerator.getTautomers(query);
             }
         }
-        else if(queryType.equals(QUERY_TYPE_SMILES))
+        else if(queryType == QueryFormat.SMILES.ordinal())
         {
             if(!tautomers)
             {

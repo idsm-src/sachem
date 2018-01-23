@@ -35,9 +35,9 @@ typedef struct
 } OrchemLoaderData;
 
 
-int java_parse_substructure_query(SubstructureQueryData **data, char* query, size_t queryLength, char *type, bool implicitHydrogens, bool tautomers);
-int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, char* query, size_t queryLength, char *type, bool implicitHydrogens, bool tautomers);
-int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t queryLength, char *type);
+int java_parse_substructure_query(SubstructureQueryData **data, char* query, size_t queryLength, int32_t type, bool implicitHydrogens, bool tautomers);
+int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, char* query, size_t queryLength, int32_t type, bool implicitHydrogens, bool tautomers);
+int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t queryLength, int32_t type);
 void java_parse_orchem_data(size_t count, VarChar **molfiles, OrchemLoaderData *data);
 void java_module_init(void);
 void java_module_finish(void);

@@ -89,8 +89,8 @@ GRANT TRUNCATE ON TABLE compound_stats TO PUBLIC;
 GRANT SELECT ON TABLE orchem_molecule_errors TO PUBLIC;
 
 
-CREATE FUNCTION "orchem_substructure_search"(varchar, varchar, int, boolean, boolean, boolean, int = 2, int = 2, int = 5000) RETURNS SETOF int AS 'MODULE_PATHNAME','orchem_substructure_search' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
-CREATE FUNCTION "orchem_similarity_search"(varchar, varchar, float4, int) RETURNS TABLE (compound int, score float4) AS 'MODULE_PATHNAME','orchem_similarity_search' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
+CREATE FUNCTION "orchem_substructure_search"(varchar, int, int = 0, int = 0, int = 2, int = 0, int = 0, int = 0, int = 5000) RETURNS SETOF int AS 'MODULE_PATHNAME','orchem_substructure_search' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
+CREATE FUNCTION "orchem_similarity_search"(varchar, int, float4, int = 0) RETURNS TABLE (compound int, score float4) AS 'MODULE_PATHNAME','orchem_similarity_search' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
 CREATE FUNCTION "orchem_sync_data"(boolean = false) RETURNS void AS 'MODULE_PATHNAME','orchem_sync_data' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
 
 

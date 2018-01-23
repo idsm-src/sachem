@@ -107,10 +107,9 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
 #endif
 
         VarChar *query = PG_GETARG_VARCHAR_P(0);
-        text *type = PG_GETARG_TEXT_P(1);
+        int32_t type = PG_GETARG_INT32(1);
         float4 cutoff = PG_GETARG_FLOAT4(2);
         int32_t topN = PG_GETARG_INT32(3);
-        char *typeStr = text_to_cstring(type);
 
         FuncCallContext *funcctx = SRF_FIRSTCALL_INIT();
         PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
@@ -122,11 +121,9 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
         info->topN = topN;
 
         uint64_t *words;
-        int length =  java_parse_orchem_similarity_query(&words, VARDATA(query), VARSIZE(query) - VARHDRSZ, typeStr);
+        int length =  java_parse_orchem_similarity_query(&words, VARDATA(query), VARSIZE(query) - VARHDRSZ, type);
 
         PG_FREE_IF_COPY(query, 0);
-        PG_FREE_IF_COPY(type, 1);
-        pfree(typeStr);
 
         if(likely(length >= 0))
         {

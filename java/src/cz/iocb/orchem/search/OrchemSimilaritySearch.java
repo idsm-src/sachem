@@ -14,10 +14,6 @@ import cz.iocb.orchem.shared.MoleculeCreator;
 
 public class OrchemSimilaritySearch
 {
-    private static final String QUERY_TYPE_MOL = "MOL";
-    private static final String QUERY_TYPE_SMILES = "SMILES";
-
-
     private static final ThreadLocal<OrchemExtendedFingerprinter> fingerPrinter = new ThreadLocal<OrchemExtendedFingerprinter>()
     {
         @Override
@@ -28,14 +24,14 @@ public class OrchemSimilaritySearch
     };
 
 
-    public static long[] getQueryData(byte[] queryArray, String queryType) throws CDKException, IOException
+    public static long[] getQueryData(byte[] queryArray, int queryType) throws CDKException, IOException
     {
         String query = new String(queryArray, StandardCharsets.ISO_8859_1);
         IAtomContainer molecule = null;
 
-        if(queryType.equals(QUERY_TYPE_MOL))
+        if(queryType == QueryFormat.MOLFILE.ordinal())
             molecule = MoleculeCreator.getMoleculeFromMolfile(query);
-        else if(queryType.equals(QUERY_TYPE_SMILES))
+        else if(queryType == QueryFormat.SMILES.ordinal())
             molecule = new SmilesParser(SilentChemObjectBuilder.getInstance()).parseSmiles(query);
         else
             return null;
