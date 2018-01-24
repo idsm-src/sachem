@@ -1,5 +1,8 @@
 #include "fpsearch-lucy.h"
 
+#include <postgres.h>
+#include <fmgr.h>
+
 #include <fstream>
 #include <string>
 #include <map>
@@ -30,6 +33,7 @@
 #include <GraphMol/RWMol.h>
 
 #include "fingerprints/IOCBFingerprint.h"
+#include "../molecule.h"
 
 /*
  * tools
@@ -169,7 +173,7 @@ static void open_searcher (fpsearch_data&d)
 	d.searcher = IxSearcher_new ( (Obj*) (d.folder));
 }
 
-static inline RDKit::Bond::BondType bondtype_jg2rd(int type)
+static inline RDKit::Bond::BondType bondtype_jg2rd(uint8_t type)
 {
 	switch (type)
 	{
@@ -193,34 +197,72 @@ static inline RDKit::Bond::BondType bondtype_jg2rd(int type)
 }
 
 //caller responsible for deallocating the ROMol
-static RDKit::ROMol* JGMol2RDMol (const Molecule*m)
+static RDKit::ROMol* JGMol2RDMol (const uint8_t *data)
 {
 	try {
 		RDKit::RWMol rwm;
-		std::map<int, int> atomMap;
 
-		for (int i = 0; i < m->atomCount; ++i) {
-			RDKit::Atom* a = new RDKit::Atom();
-			int aNum = molecule_get_atom_number (m, i);
-			a->setAtomicNum (aNum > 0 ? aNum : 0);
-			a->setFormalCharge (molecule_get_formal_charge (m, i));
-			a->setNumExplicitHs (molecule_get_hydrogen_count (m, i));
-			a->setNoImplicit (true); //no implicit Hs
-			atomMap[i] = rwm.addAtom (a, false, true);
-		}
+	    int xAtomCount = *data << 8 | *(data + 1);
+	    data += 2;
 
-		for (int i = 0; i < m->atomCount; ++i) {
-			int nbs = molecule_get_bond_list_size (m, i);
-			for (int j = 0; j < nbs; ++j) {
-				int otherAtom = molecule_get_bond_list (m, i) [j];
-				if (otherAtom <= i) continue;
-				int bondData = molecule_get_bond_type
-				               (m, molecule_get_bond
-				                (m, i, otherAtom));
-				rwm.addBond (atomMap[i], atomMap[otherAtom],
-				             bondtype_jg2rd (bondData));
-			}
-		}
+	    int cAtomCount = *data << 8 | *(data + 1);
+	    data += 4;
+
+	    int xBondCount = *data << 8 | *(data + 1);
+	    data += 4;
+
+	    int atomCount = xAtomCount + cAtomCount;
+
+
+        std::vector<int> atomMap(atomCount, -1);
+
+	    for (int i = 0; i < xAtomCount; ++i) {
+	        int aNum = (int8_t) data[i];
+	        if(aNum > 0) {
+	            RDKit::Atom* a = new RDKit::Atom();
+	            a->setAtomicNum (aNum);
+	            a->setNoImplicit (true);
+	            atomMap[i] = rwm.addAtom (a, false, true);
+	        }
+	    }
+
+        for (int i = xAtomCount; i < atomCount; ++i) {
+            RDKit::Atom* a = new RDKit::Atom();
+            a->setAtomicNum (6);
+            a->setNoImplicit (true);
+            atomMap[i] = rwm.addAtom (a, false, true);
+        }
+
+        data += xAtomCount;
+
+
+        for(int i = 0; i < xBondCount; i++)
+        {
+            int offset = i * BOND_BLOCK_SIZE;
+
+            RDKit::Bond::BondType bondType = bondtype_jg2rd (data[offset + 3]);
+
+            if(bondType == RDKit::Bond::UNSPECIFIED)
+                continue;
+
+            int b0 = data[offset + 0];
+            int b1 = data[offset + 1];
+            int b2 = data[offset + 2];
+
+            int x = b0 | b1 << 4 & 0xF00;
+            int y = b2 | b1 << 8 & 0xF00;
+
+            if(x >= atomCount || y >= atomCount)
+                continue;
+
+            int ax = atomMap[x];
+            int ay = atomMap[y];
+
+            if(ax < 0 || ay < 0)
+                continue;
+
+            rwm.addBond (ax, ay, bondType);
+        }
 
 		RDKit::ROMol *rom = new RDKit::ROMol (rwm);
 		return rom;
@@ -284,7 +326,7 @@ static void index_remove (fpsearch_data&d, int guid)
 	pthread_mutex_unlock (&d.index_mtx);
 }
 
-static Hits* search_query (fpsearch_data&d, const Molecule*m, int max_results)
+static Hits* search_query (fpsearch_data&d, const uint8_t*m, int max_results)
 {
 	auto* molh = JGMol2RDMol (m);
 	if (!molh) return nullptr;
@@ -441,7 +483,7 @@ void FPSEARCH_API (params_set) (void*dd, const FPSEARCH_API (params_t) *pp)
 }
 
 //returns a new search object
-void* FPSEARCH_API (search) (void*dd, const Molecule*mol, int max_results)
+void* FPSEARCH_API (search) (void*dd, const uint8_t*mol, int max_results)
 {
 	fpsearch_data&d = * (fpsearch_data*) dd;
 	open_searcher (d);
@@ -474,7 +516,7 @@ void FPSEARCH_API (search_finish) (void*dd, void*ss)
 	DECREF ( (Hits*) ss);
 }
 
-int FPSEARCH_API (add_mol) (void*dd, int guid, const Molecule*mol)
+int FPSEARCH_API (add_mol) (void*dd, int guid, const uint8_t *mol)
 {
 	fpsearch_data&d = * (fpsearch_data*) dd;
 	open_indexer (d);

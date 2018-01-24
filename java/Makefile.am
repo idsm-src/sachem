@@ -32,6 +32,7 @@ EXTRA_DIST = \
     src/cz/iocb/orchem/load/GeneralCompoundLoader.java \
     src/cz/iocb/orchem/load/DrugbankCompoundUpdater.java \
     src/cz/iocb/orchem/load/PubChemCompoundUpdater.java \
+    src/cz/iocb/orchem/search/LucyLoader.java \
     src/cz/iocb/orchem/search/OrchemLoader.java \
     src/cz/iocb/orchem/search/OrchemMoleculeBuilder.java \
     src/cz/iocb/orchem/search/OrchemSimilaritySearch.java \

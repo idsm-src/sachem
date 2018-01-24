@@ -2,7 +2,7 @@
 #ifndef _FPSEARCH_LIB_H
 #define _FPSEARCH_LIB_H
 
-#include "../molecule.h"
+#include <stdint.h>
 
 
 #ifndef FPSEARCH_API
@@ -60,7 +60,7 @@ void FPSEARCH_API (params_set) (void *dd, const FPSEARCH_API (params_t) *pp);
  * returns `ss` search cursor
  */
 void* FPSEARCH_API (search) (void *dd,
-                             const Molecule *mol,
+                             const uint8_t *mol,
                              int max_results);
 
 /* fplucy_search_fillbuf
@@ -84,7 +84,7 @@ void FPSEARCH_API (search_finish) (void *dd,
  */
 int FPSEARCH_API (add_mol) (void *dd,
                             int guid,
-                            const Molecule*mol);
+                            const uint8_t*mol);
 
 /* fplucy_flush
  * commit molecules from add_mol that are waiting in write buffer

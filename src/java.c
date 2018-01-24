@@ -88,6 +88,12 @@ static jfieldID orchemLoaderFpField = NULL;
 static jfieldID orchemLoaderMoleculeField = NULL;
 static jmethodID orchemLoaderDataMethod = NULL;
 
+static jclass lucyLoaderClass = NULL;
+static jclass lucyLoaderDataClass = NULL;
+static jfieldID lucyLoaderExceptionField = NULL;
+static jfieldID lucyLoaderMoleculeField = NULL;
+static jmethodID lucyLoaderDataMethod = NULL;
+
 
 static inline void java_check_exception(const char *str)
 {
@@ -235,6 +241,22 @@ void java_module_init(void)
     java_check_exception(__func__);
 
     orchemLoaderDataMethod = (*env)->GetStaticMethodID(env, orchemLoaderClass, "getIndexData", "([[B)[Lcz/iocb/orchem/search/OrchemLoader$OrchemData;");
+    java_check_exception(__func__);
+
+
+    lucyLoaderClass = (*env)->FindClass(env, "cz/iocb/orchem/search/LucyLoader");
+    java_check_exception(__func__);
+
+    lucyLoaderDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/LucyLoader$LucyData");
+    java_check_exception(__func__);
+
+    lucyLoaderExceptionField = (*env)->GetFieldID(env, lucyLoaderDataClass, "exception", "Ljava/lang/String;");
+    java_check_exception(__func__);
+
+    lucyLoaderMoleculeField = (*env)->GetFieldID(env, lucyLoaderDataClass, "molecule", "[B");
+    java_check_exception(__func__);
+
+    lucyLoaderDataMethod = (*env)->GetStaticMethodID(env, lucyLoaderClass, "getIndexData", "([[B)[Lcz/iocb/orchem/search/LucyLoader$LucyData;");
     java_check_exception(__func__);
 
 
@@ -638,6 +660,98 @@ void java_parse_orchem_data(size_t count, VarChar **molfiles, OrchemLoaderData *
         JavaDeleteRef(exception);
         JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
         JavaDeleteLongArray(fpArray, fp, JNI_ABORT);
+        JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
+}
+
+
+void java_parse_lucy_data(size_t count, VarChar **molfiles, LucyLoaderData *data)
+{
+    if(initialised == false)
+        elog(ERROR, "%s: java module is not properly initialized", __func__);
+
+
+    jbyteArray molfileArrayArg = NULL;
+    jobjectArray resultArray = NULL;
+    jbyteArray molfileArg = NULL;
+    jobject resultElement = NULL;
+    jstring exception = NULL;
+    jbyteArray moleculeArray = NULL;
+    jbyte *molecule = NULL;
+
+
+    PG_TRY();
+    {
+        molfileArrayArg = (*env)->NewObjectArray(env, count, byteArrayClass, NULL);
+        java_check_exception(__func__);
+
+        for(int i = 0; i < count; i++)
+        {
+            int length = VARSIZE(molfiles[i]) - VARHDRSZ;
+            molfileArg = (*env)->NewByteArray(env, length);
+            java_check_exception(__func__);
+
+            (*env)->SetByteArrayRegion(env, molfileArg, 0, length, (jbyte*) VARDATA(molfiles[i]));
+            (*env)->SetObjectArrayElement(env, molfileArrayArg, i, molfileArg);
+
+            JavaDeleteRef(molfileArg);
+        }
+
+
+        resultArray = (*env)->CallStaticObjectMethod(env, lucyLoaderClass, lucyLoaderDataMethod, molfileArrayArg);
+        java_check_exception(__func__);
+
+        JavaDeleteRef(molfileArrayArg);
+
+
+        for(int i = 0; i < count; i++)
+        {
+            resultElement = (*env)->GetObjectArrayElement(env, resultArray, i);
+            exception = (*env)->GetObjectField(env, resultElement, lucyLoaderExceptionField);
+
+            if(exception)
+            {
+                jboolean isCopy;
+                const char *message = (*env)->GetStringUTFChars(env, exception, &isCopy);
+                data[i].error = cstring_to_text(message);
+                (*env)->ReleaseStringUTFChars(env, exception, message);
+                JavaDeleteRef(exception);
+
+                data[i].molecule = NULL;
+            }
+            else
+            {
+                moleculeArray = (jbyteArray)  (*env)->GetObjectField(env, resultElement, lucyLoaderMoleculeField);
+
+                jsize moleculeSize = (*env)->GetArrayLength(env, moleculeArray);
+
+                molecule = (*env)->GetByteArrayElements(env, moleculeArray, NULL);
+                java_check_exception(__func__);
+
+                data[i].molecule = (bytea *) palloc(VARHDRSZ + moleculeSize);
+                SET_VARSIZE(data[i].molecule, VARHDRSZ + moleculeSize);
+                memcpy(VARDATA(data[i].molecule), molecule, moleculeSize);
+
+                data[i].error = NULL;
+
+                JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
+            }
+
+            JavaDeleteRef(resultElement);
+        }
+
+        JavaDeleteRef(resultArray);
+    }
+    PG_CATCH();
+    {
+        JavaDeleteRef(molfileArrayArg);
+        JavaDeleteRef(resultArray);
+        JavaDeleteRef(molfileArg);
+        JavaDeleteRef(resultElement);
+        JavaDeleteRef(exception);
         JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
 
         PG_RE_THROW();

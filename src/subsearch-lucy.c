@@ -21,7 +21,11 @@
 
 #define SHOW_STATS                0
 #define FETCH_SIZE                1000
+#define SYNC_FETCH_SIZE           100000
+#define COMPOUNDS_TABLE           "compounds"
 #define MOLECULES_TABLE           "orchem_molecules"
+#define MOLECULE_ERRORS_TABLE     "orchem_molecule_errors"
+#define AUDIT_TABLE               "orchem_compound_audit"
 
 
 typedef struct
@@ -62,11 +66,17 @@ typedef struct
 } SubstructureSearchData;
 
 
+typedef struct
+{
+    pg_atomic_uint32 possition;
+    uint32_t count;
+    LucyLoaderData *data;
+} ThreadData;
+
+
 static bool initialised = false;
 static SPIPlanPtr mainQueryPlan;
 static void *fplucy;
-static pthread_mutex_t indexMutex;
-bool volatile indexingError;
 
 
 void subsearch_lucy_module_init(void)
@@ -242,7 +252,7 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
                             info->stereoMode);
                     PG_MEMCONTEXT_END();
 
-                    info->lucySearch = fplucy_search(fplucy, &info->queryMolecule, INT32_MAX);
+                    info->lucySearch = fplucy_search(fplucy, data->molecule, INT32_MAX);
                 }
 
 
@@ -276,7 +286,7 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
                 if(unlikely(SPI_execute_plan(mainQueryPlan, values, NULL, true, 0) != SPI_OK_SELECT))
                     elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
-                if(unlikely(SPI_processed != count || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 3))
+                if(unlikely(/*SPI_processed != count ||*/ SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 3))
                     elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
                 info->table = SPI_tuptable;
@@ -359,141 +369,152 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 }
 
 
-void *lucy_substructure_process_spi_table(void* idx)
+void *lucy_substructure_process_data(void *dataPtr)
 {
-    MemoryContext indexContext = NULL;
+    ThreadData* data = (ThreadData*) dataPtr;
 
-    pthread_mutex_lock(&indexMutex);
-    PG_TRY();
+    while(true)
     {
-        indexContext = AllocSetContextCreate(CurrentMemoryContext, "index thread context", ALLOCSET_DEFAULT_SIZES);
-    }
-    PG_CATCH();
-    {
-        indexingError = true;
-    }
-    PG_END_TRY();
-    pthread_mutex_unlock(&indexMutex);
+        uint32_t i = pg_atomic_fetch_add_u32(&data->possition, 1);
 
-
-    while(!indexingError)
-    {
-        Datum seqid;
-        Molecule molecule;
-
-        pthread_mutex_lock(&indexMutex);
-
-        volatile int *index = (volatile int*) idx;
-        int i = *index;
-
-        if(i >= SPI_processed)
-        {
-            pthread_mutex_unlock(&indexMutex);
-            break;
-        }
-
-        PG_TRY();
-        {
-            MemoryContextReset(indexContext);
-
-            HeapTuple tuple = SPI_tuptable->vals[i];
-            char isNullFlag;
-
-
-            seqid = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-
-            Datum moleculeDatum = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 2, &isNullFlag);
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-
-            PG_MEMCONTEXT_BEGIN(indexContext);
-            bytea *moleculeData = DatumGetByteaP(moleculeDatum);
-            molecule_init(&molecule, VARDATA(moleculeData), NULL, false, false, false, false);
-            PG_MEMCONTEXT_END();
-
-            (*index)++;
-        }
-        PG_CATCH();
-        {
-            indexingError = true;
-        }
-        PG_END_TRY();
-        pthread_mutex_unlock(&indexMutex);
-
-        if(indexingError)
+        if(i >= data->count)
             break;
 
-
-        if(fplucy_add_mol(fplucy, DatumGetInt32(seqid), &molecule))
-            indexingError = true;
-    }
-
-
-    if(indexContext != NULL)
-    {
-        pthread_mutex_lock(&indexMutex);
-        PG_TRY();
-        {
-            MemoryContextDelete(indexContext);
-        }
-        PG_CATCH();
-        {
-            indexingError = true;
-        }
-        PG_END_TRY();
-        pthread_mutex_unlock(&indexMutex);
+        if(data->data[i].molecule)
+            fplucy_add_mol(fplucy, data->data[i].seqid, VARDATA(data->data[i].molecule));
     }
 
     pthread_exit((void*) 0);
 }
 
 
-PG_FUNCTION_INFO_V1(lucy_substructure_create_index);
-Datum lucy_substructure_create_index(PG_FUNCTION_ARGS)
+PG_FUNCTION_INFO_V1(lucy_sync_data);
+Datum lucy_sync_data(PG_FUNCTION_ARGS)
 {
-    createBasePath();
+    bool verbose = PG_GETARG_BOOL(0);
 
     MemoryContext memoryContext = CurrentMemoryContext;
+    createBasePath();
 
 
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-         elog(ERROR, "%s: SPI_connect() failed", __func__);
+        elog(ERROR, "%s: SPI_connect() failed", __func__);
 
-    Portal cursor = SPI_cursor_open_with_args(NULL, "select seqid, molecule from " MOLECULES_TABLE,
-            0, NULL, NULL, NULL, true, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
+    char isNullFlag;
 
-
+    /*
+     * perepare reqired thread data
+     */
     int countOfThread = sysconf(_SC_NPROCESSORS_ONLN);
-    int processed = 0;
 
     pthread_attr_t attr;
     pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    pthread_mutex_init(&indexMutex, NULL);
+
+
+    /*
+     * delete unnecessary data
+     */
+
+    if(unlikely(SPI_exec("delete from " MOLECULES_TABLE " tbl using "
+            AUDIT_TABLE " aud where tbl.id = aud.id", 0) != SPI_OK_DELETE))
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
+
+
+    /*
+     * compoute free seqid
+     */
+
+    if(unlikely(SPI_execute("select coalesce(max(seqid)+1, 0) from "
+            MOLECULES_TABLE, false, FETCH_ALL) != SPI_OK_SELECT))
+        elog(ERROR, "%s: SPI_execute() failed", __func__);
+
+    if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
+        elog(ERROR, "%s: SPI_execute() failed", __func__);
+
+    int32_t seqidNext = DatumGetInt32(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
+
+    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+        elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+
+    /*
+     * convert new data
+     */
+
+    /* TODO: find a better way to obtain bigint[] OID */
+    if(unlikely(SPI_exec("select typarray from pg_type where typname = 'int8'", 0) != SPI_OK_SELECT))
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
+
+    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
+
+    Oid int8arrayOid = DatumGetObjectId(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
+
+    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+        elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+    if(int8arrayOid == 0)
+        elog(ERROR, "%s: cannot determine bigint[] oid", __func__);
+
+
+    SPIPlanPtr moleculesPlan = SPI_prepare("insert into " MOLECULES_TABLE " (seqid, id, molecule) values ($1,$2,$3)",
+            4, (Oid[]) { INT4OID, INT4OID, BYTEAOID, BYTEAOID });
+
+
+    Portal compoundCursor = SPI_cursor_open_with_args(NULL, "select cmp.id, cmp.molfile from " COMPOUNDS_TABLE " cmp, "
+            AUDIT_TABLE " aud where cmp.id = aud.id and aud.stored",
+            0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
+
+
+    VarChar **molfiles = palloc(SYNC_FETCH_SIZE * sizeof(VarChar *));
+    LucyLoaderData *data = palloc(SYNC_FETCH_SIZE * sizeof(LucyLoaderData));
+    int count = 0;
 
     while(true)
     {
-        SPI_cursor_fetch(cursor, true, 10000);
+        SPI_cursor_fetch(compoundCursor, true, SYNC_FETCH_SIZE);
 
-        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 3))
+        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
             elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
 
         if(SPI_processed == 0)
             break;
 
-        int idx = 0;
-        indexingError = false;
+        int processed = SPI_processed;
+        SPITupleTable *tuptable = SPI_tuptable;
+
+        for(int i = 0; i < processed; i++)
+        {
+            HeapTuple tuple = tuptable->vals[i];
+
+            Datum molfile = SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag);
+
+            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+            molfiles[i] = DatumGetVarCharP(molfile);
+        }
+
+        java_parse_lucy_data(processed, molfiles, data);
+
+        for(int i = 0; i < processed; i++)
+        {
+            HeapTuple tuple = SPI_tuptable->vals[i];
+            char isNullFlag;
+
+            data[i].seqid = seqidNext++;
+
+            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+        }
+
         pthread_t threads[countOfThread];
+        ThreadData threadData = {.count = processed, .data = data};
+        pg_atomic_init_u32(&threadData.possition, 0);
 
         PG_MEMCONTEXT_BEGIN(memoryContext);
         for(int i = 0; i < countOfThread; i++)
-            pthread_create(&threads[i], &attr, lucy_substructure_process_spi_table, (void *) &idx);
+            pthread_create(&threads[i], &attr, lucy_substructure_process_data, (void *) &threadData);
         PG_MEMCONTEXT_END();
 
         void *status;
@@ -501,25 +522,67 @@ Datum lucy_substructure_create_index(PG_FUNCTION_ARGS)
         for(int i = 0; i < countOfThread; i++)
             pthread_join(threads[i], &status);
 
-        if(indexingError)
-            break;
 
-        processed += SPI_processed;
-        elog(NOTICE, "already processed: %i", processed);
+        for(int i = 0; i < processed; i++)
+        {
+            HeapTuple tuple = tuptable->vals[i];
 
-        SPI_freetuptable(SPI_tuptable);
+            if((char *) molfiles[i] != DatumGetPointer(SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag)))
+                pfree(molfiles[i]);
+
+
+            Datum id = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
+
+            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+
+            if(data[i].error)
+            {
+                char *message = text_to_cstring(data[i].error);
+                elog(NOTICE, "%i: %s", DatumGetInt32(id), message);
+                pfree(message);
+
+                Datum values[] = {Int32GetDatum(id), PointerGetDatum(data[i].error)};
+
+                if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)",
+                        2, (Oid[]) { INT4OID, TEXTOID }, values, NULL, false, 0) != SPI_OK_INSERT)
+                    elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
+
+                pfree(data[i].error);
+            }
+
+            if(data[i].molecule == NULL)
+                continue;
+
+
+            Datum moleculesValues[] = {Int32GetDatum(data[i].seqid), id, PointerGetDatum(data[i].molecule)};
+
+            if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
+                elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+
+            pfree(data[i].molecule);
+        }
+
+        SPI_freetuptable(tuptable);
+
+
+        count += processed;
+
+        if(verbose)
+            elog(NOTICE, "already processed: %i", count);
     }
 
-    pthread_mutex_destroy(&indexMutex);
-    pthread_attr_destroy(&attr);
+    SPI_cursor_close(compoundCursor);
 
-    if(indexingError)
-        elog(ERROR, "%s: error in an indexing thread", __func__);
+    if(unlikely(SPI_exec("delete from " AUDIT_TABLE, 0) != SPI_OK_DELETE))
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
+
 
     fplucy_flush(fplucy);
     SPI_finish();
-
-    PG_RETURN_BOOL(true);
+    PG_RETURN_VOID();
 }
 
 

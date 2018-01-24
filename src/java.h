@@ -35,10 +35,19 @@ typedef struct
 } OrchemLoaderData;
 
 
+typedef struct
+{
+    int32_t seqid;
+    bytea *molecule;
+    text *error;
+} LucyLoaderData;
+
+
 int java_parse_substructure_query(SubstructureQueryData **data, char* query, size_t queryLength, int32_t type, bool implicitHydrogens, bool tautomers);
 int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, char* query, size_t queryLength, int32_t type, bool implicitHydrogens, bool tautomers);
 int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t queryLength, int32_t type);
 void java_parse_orchem_data(size_t count, VarChar **molfiles, OrchemLoaderData *data);
+void java_parse_lucy_data(size_t count, VarChar **molfiles, LucyLoaderData *data);
 void java_module_init(void);
 void java_module_finish(void);
 
