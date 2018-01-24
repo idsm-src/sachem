@@ -6,6 +6,7 @@
 #include <GraphMol/Substruct/SubstructMatch.h>
 
 #include <memory>
+#include <boost/thread/mutex.hpp>
 
 namespace RDKit
 {
@@ -364,18 +365,23 @@ static const char* patterns[] = {
 
 static std::vector<std::unique_ptr<ROMol>> smarts;
 static bool init = false;
+static boost::mutex mtx;
 
 SparseIntVect<boost::uint32_t> *getFingerprint (const ROMol &mol,
                                                 BitInfo *info)
 {
 	if (!init) {
-		size_t cnt = 0;
-		//count the patterns
-		for (const char**pp = patterns; *pp; ++pp, ++cnt);
-		smarts.resize (cnt);
-		for (size_t i = 0; i < cnt; ++i)
-			smarts[i] = std::unique_ptr<ROMol>(SmartsToMol (patterns[i]));
-		init = true;
+	    mtx.lock();
+	    if (!init) {
+	        size_t cnt = 0;
+	        //count the patterns
+	        for (const char**pp = patterns; *pp; ++pp, ++cnt);
+	        smarts.resize (cnt);
+	        for (size_t i = 0; i < cnt; ++i)
+	            smarts[i] = std::unique_ptr<ROMol>(SmartsToMol (patterns[i]));
+	        init = true;
+	    }
+		mtx.unlock();
 	}
 
 	std::map<uint32_t, int> fp;
