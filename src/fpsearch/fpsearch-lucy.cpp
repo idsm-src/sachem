@@ -25,10 +25,11 @@
 #include <Lucy/Search/TermQuery.h>
 
 #include <GraphMol/AtomIterators.h>
-#include <GraphMol/Fingerprints/IOCBFingerprint.h>
 #include <GraphMol/MolOps.h>
 #include <GraphMol/ROMol.h>
 #include <GraphMol/RWMol.h>
+
+#include "fingerprints/IOCBFingerprint.h"
 
 /*
  * tools

@@ -31,10 +31,6 @@ libfpsearch_la_LDFLAGS = $(CLOWNFISH_LDFLAGS) $(LUCY_LDFLAGS) \
         ../../build/rdkit/Code/GraphMol/CMakeFiles/GraphMol.dir/RingInfo.cpp.o \
         ../../build/rdkit/Code/GraphMol/CMakeFiles/GraphMol.dir/ROMol.cpp.o \
         ../../build/rdkit/Code/GraphMol/CMakeFiles/GraphMol.dir/RWMol.cpp.o \
-        ../../build/rdkit/Code/GraphMol/Fingerprints/CMakeFiles/Fingerprints.dir/AtomFingerprint.cpp.o \
-        ../../build/rdkit/Code/GraphMol/Fingerprints/CMakeFiles/Fingerprints.dir/CRNGFingerprint.cpp.o \
-        ../../build/rdkit/Code/GraphMol/Fingerprints/CMakeFiles/Fingerprints.dir/IOCBFingerprint.cpp.o \
-        ../../build/rdkit/Code/GraphMol/Fingerprints/CMakeFiles/Fingerprints.dir/SGFingerprint.cpp.o \
         ../../build/rdkit/Code/GraphMol/SmilesParse/CMakeFiles/SmilesParse.dir/CXSmilesOps.cpp.o \
         ../../build/rdkit/Code/GraphMol/SmilesParse/CMakeFiles/SmilesParse.dir/lex.yysmarts.cpp.o \
         ../../build/rdkit/Code/GraphMol/SmilesParse/CMakeFiles/SmilesParse.dir/lex.yysmiles.cpp.o \
@@ -54,5 +50,16 @@ libfpsearch_la_LDFLAGS = $(CLOWNFISH_LDFLAGS) $(LUCY_LDFLAGS) \
         ../../build/rdkit/Code/RDGeneral/CMakeFiles/RDGeneral.dir/utils.cpp.o \
         ../../build/rdkit/Code/RDGeneral/CMakeFiles/RDGeneral.dir/versions.cpp.o
 
-libfpsearch_la_SOURCES = fpsearch-lucy.cpp
-EXTRA_DIST = fpsearch-lucy.h
+libfpsearch_la_SOURCES = \
+	fpsearch-lucy.cpp \
+	fingerprints/IOCBFingerprint.cpp \
+	fingerprints/AtomFingerprint.cpp \
+	fingerprints/CRNGFingerprint.cpp \
+	fingerprints/SGFingerprint.cpp
+
+EXTRA_DIST = \
+	fpsearch-lucy.h \
+	fingerprints/IOCBFingerprint.h \
+	fingerprints/AtomFingerprint.h \
+	fingerprints/CRNGFingerprint.h \
+	fingerprints/SGFingerprint.h
