@@ -159,6 +159,8 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, 
     for(int i = 0; i < atomCount * atomCount; i++)
         molecule->bondMatrix[i] = -1;
 
+    int boundIdx = 0;
+
     for(int i = 0; i < xBondCount; i++)
     {
         int offset = i * BOND_BLOCK_SIZE;
@@ -190,17 +192,17 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, 
         if(unlikely(molecule->bondListSizes[x] == BOND_LIST_BASE_SIZE || molecule->bondListSizes[y] == BOND_LIST_BASE_SIZE))
             elog(ERROR, "%s: too high atom valence", __func__);
 
-        molecule->bondMatrix[x * molecule->atomCount + y] = i;
-        molecule->bondMatrix[y * molecule->atomCount + x] = i;
+        molecule->bondMatrix[x * molecule->atomCount + y] = boundIdx;
+        molecule->bondMatrix[y * molecule->atomCount + x] = boundIdx;
 
-        molecule->contains[i][0] = x;
-        molecule->contains[i][1] = y;
+        molecule->contains[boundIdx][0] = x;
+        molecule->contains[boundIdx][1] = y;
+
+        boundIdx++;
     }
 
     data += xBondCount * BOND_BLOCK_SIZE;
 
-
-    int boundIdx = xBondCount;
 
     for(int i = 0; i < hAtomCount; i++)
     {
