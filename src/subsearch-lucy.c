@@ -24,9 +24,9 @@
 #define FETCH_SIZE                1000
 #define SYNC_FETCH_SIZE           100000
 #define COMPOUNDS_TABLE           "compounds"
-#define MOLECULES_TABLE           "orchem_molecules"
-#define MOLECULE_ERRORS_TABLE     "orchem_molecule_errors"
-#define AUDIT_TABLE               "orchem_compound_audit"
+#define MOLECULES_TABLE           "sachem_molecules"
+#define MOLECULE_ERRORS_TABLE     "sachem_molecule_errors"
+#define AUDIT_TABLE               "sachem_compound_audit"
 
 
 typedef struct

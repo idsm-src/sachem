@@ -16,7 +16,7 @@
 
 #define SHOW_STATS          0
 #define EXTFP_SIZE          907
-#define FINGERPRINT_TABLE   "orchem_fingerprint"
+#define FINGERPRINT_TABLE   "sachem_fingerprint"
 
 
 typedef struct

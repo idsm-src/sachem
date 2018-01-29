@@ -24,12 +24,12 @@
 #define COUNTS_SIZE               13
 #define SYNC_FETCH_SIZE           100000
 #define COMPOUNDS_TABLE           "compounds"
-#define AUDIT_TABLE               "orchem_compound_audit"
-#define INDEX_TABLE               "orchem_index"
-#define MOLECULES_TABLE           "orchem_molecules"
-#define MOLECULE_ERRORS_TABLE     "orchem_molecule_errors"
-#define FINGERPRINT_TABLE         "orchem_fingerprint"
-#define MOLECULE_COUNTS_TABLE     "orchem_molecule_counts"
+#define AUDIT_TABLE               "sachem_compound_audit"
+#define INDEX_TABLE               "sachem_index"
+#define MOLECULES_TABLE           "sachem_molecules"
+#define MOLECULE_ERRORS_TABLE     "sachem_molecule_errors"
+#define FINGERPRINT_TABLE         "sachem_fingerprint"
+#define MOLECULE_COUNTS_TABLE     "sachem_molecule_counts"
 
 
 typedef struct

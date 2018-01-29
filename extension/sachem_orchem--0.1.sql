@@ -24,26 +24,26 @@ CREATE TABLE compound_stats (
     PRIMARY KEY (id)
 );
 
-CREATE TABLE orchem_compound_audit (
+CREATE TABLE sachem_compound_audit (
     id                    INT NOT NULL,
     stored                BOOLEAN NOT NULL,
     PRIMARY KEY (id)
 );
 
-CREATE TABLE orchem_index (
+CREATE TABLE sachem_index (
     id                    INT NOT NULL,
     path                  TEXT NOT NULL,
     PRIMARY KEY (id)
 );
 
-CREATE TABLE orchem_molecules (
+CREATE TABLE sachem_molecules (
     id                    INT NOT NULL,
     seqid                 INT NOT NULL,
     molecule              BYTEA NOT NULL,
     PRIMARY KEY (id)
 );
 
-CREATE TABLE orchem_molecule_errors (
+CREATE TABLE sachem_molecule_errors (
     id                    SERIAL NOT NULL,
     timestamp             TIMESTAMPTZ NOT NULL DEFAULT now(),
     compound              INT NOT NULL,
@@ -51,13 +51,13 @@ CREATE TABLE orchem_molecule_errors (
     PRIMARY KEY (id)
 );
 
-CREATE TABLE orchem_molecule_counts (
+CREATE TABLE sachem_molecule_counts (
     id                    INT NOT NULL,
     counts                SMALLINT[] NOT NULL,
     PRIMARY KEY (id)
 );
 
-CREATE TABLE orchem_fingerprint (
+CREATE TABLE sachem_fingerprint (
     id                    INT NOT NULL,
     bit_count             SMALLINT NOT NULL,
     fp                    BIGINT[] NOT NULL,
@@ -65,8 +65,8 @@ CREATE TABLE orchem_fingerprint (
 );
 
 
-CREATE INDEX orchem_molecules__seqid ON orchem_molecules(seqid);
-CREATE INDEX orchem_fingerprint__bit_count ON orchem_fingerprint(bit_count);
+CREATE INDEX sachem_molecules__seqid ON sachem_molecules(seqid);
+CREATE INDEX sachem_fingerprint__bit_count ON sachem_fingerprint(bit_count);
 
 
 GRANT SELECT ON TABLE compounds TO PUBLIC;
@@ -86,41 +86,41 @@ GRANT INSERT ON TABLE compound_stats TO PUBLIC;
 GRANT UPDATE ON TABLE compound_stats TO PUBLIC;
 GRANT DELETE ON TABLE compound_stats TO PUBLIC;
 GRANT TRUNCATE ON TABLE compound_stats TO PUBLIC;
-GRANT SELECT ON TABLE orchem_molecule_errors TO PUBLIC;
+GRANT SELECT ON TABLE sachem_molecule_errors TO PUBLIC;
 
 
-CREATE FUNCTION "orchem_substructure_search"(varchar, int, int = 0, int = 0, int = 2, int = 0, int = 0, int = 0, int = 5000) RETURNS SETOF int AS 'MODULE_PATHNAME','orchem_substructure_search' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
-CREATE FUNCTION "orchem_similarity_search"(varchar, int, float4, int = 0) RETURNS TABLE (compound int, score float4) AS 'MODULE_PATHNAME','orchem_similarity_search' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
-CREATE FUNCTION "orchem_sync_data"(boolean = false) RETURNS void AS 'MODULE_PATHNAME','orchem_sync_data' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
+CREATE FUNCTION "sachem_substructure_search"(varchar, int, int = 0, int = 0, int = 2, int = 0, int = 0, int = 0, int = 5000) RETURNS SETOF int AS 'MODULE_PATHNAME','orchem_substructure_search' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
+CREATE FUNCTION "sachem_similarity_search"(varchar, int, float4, int = 0) RETURNS TABLE (compound int, score float4) AS 'MODULE_PATHNAME','orchem_similarity_search' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
+CREATE FUNCTION "sachem_sync_data"(boolean = false) RETURNS void AS 'MODULE_PATHNAME','orchem_sync_data' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
 
 
-CREATE FUNCTION orchem_compound_audit() RETURNS TRIGGER AS
+CREATE FUNCTION sachem_compound_audit() RETURNS TRIGGER AS
 $body$
 BEGIN
   IF (TG_OP = 'INSERT') THEN
-    INSERT INTO orchem_compound_audit (id, stored) VALUES (NEW.id, true)
+    INSERT INTO sachem_compound_audit (id, stored) VALUES (NEW.id, true)
         ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id, stored=true;
     RETURN NEW;
   ELSIF (TG_OP = 'UPDATE') THEN
     IF (OLD.molfile != NEW.molfile) THEN
-        INSERT INTO orchem_compound_audit (id, stored) VALUES (NEW.id, true)
+        INSERT INTO sachem_compound_audit (id, stored) VALUES (NEW.id, true)
             ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id, stored=true;
     END IF;
     RETURN NEW;
   ELSIF (TG_OP = 'DELETE') THEN
-    INSERT INTO orchem_compound_audit (id, stored) VALUES (OLD.id, false)
+    INSERT INTO sachem_compound_audit (id, stored) VALUES (OLD.id, false)
         ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id, stored=false;
     RETURN OLD;
   ELSIF (TG_OP = 'TRUNCATE') THEN
-    INSERT INTO orchem_compound_audit SELECT id, false FROM compounds
+    INSERT INTO sachem_compound_audit SELECT id, false FROM compounds
         ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id, stored=false;
     RETURN NULL;
   END IF;
 END;
 $body$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE TRIGGER orchem_compound_audit AFTER INSERT OR UPDATE OR DELETE ON compounds
-    FOR EACH ROW EXECUTE PROCEDURE orchem_compound_audit();
+CREATE TRIGGER sachem_compound_audit AFTER INSERT OR UPDATE OR DELETE ON compounds
+    FOR EACH ROW EXECUTE PROCEDURE sachem_compound_audit();
 
-CREATE TRIGGER orchem_truncate_compounds_audit BEFORE TRUNCATE ON compounds
-    FOR EACH STATEMENT EXECUTE PROCEDURE orchem_compound_audit();
+CREATE TRIGGER sachem_truncate_compounds_audit BEFORE TRUNCATE ON compounds
+    FOR EACH STATEMENT EXECUTE PROCEDURE sachem_compound_audit();

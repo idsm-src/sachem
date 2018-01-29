@@ -183,10 +183,10 @@ void java_module_init(void)
     java_check_exception(__func__);
 
 
-    substructureSearchClass = (*env)->FindClass(env, "cz/iocb/orchem/search/SubstructureSearch");
+    substructureSearchClass = (*env)->FindClass(env, "cz/iocb/sachem/search/SubstructureSearch");
     java_check_exception(__func__);
 
-    substructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/SubstructureSearch$QueryData");
+    substructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/sachem/search/SubstructureSearch$QueryData");
     java_check_exception(__func__);
 
     moleculeField = (*env)->GetFieldID(env, substructureQueryDataClass, "molecule", "[B");
@@ -195,14 +195,14 @@ void java_module_init(void)
     restHField = (*env)->GetFieldID(env, substructureQueryDataClass, "restH", "[Z");
     java_check_exception(__func__);
 
-    substructureQueryDataMethod = (*env)->GetStaticMethodID(env, substructureSearchClass, "getQueryData", "([BIZZ)[Lcz/iocb/orchem/search/SubstructureSearch$QueryData;");
+    substructureQueryDataMethod = (*env)->GetStaticMethodID(env, substructureSearchClass, "getQueryData", "([BIZZ)[Lcz/iocb/sachem/search/SubstructureSearch$QueryData;");
     java_check_exception(__func__);
 
 
-    orchemSubstructureSearchClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemSubstructureSearch");
+    orchemSubstructureSearchClass = (*env)->FindClass(env, "cz/iocb/sachem/search/OrchemSubstructureSearch");
     java_check_exception(__func__);
 
-    orchemSubstructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemSubstructureSearch$OrchemQueryData");
+    orchemSubstructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/sachem/search/OrchemSubstructureSearch$OrchemQueryData");
     java_check_exception(__func__);
 
     countsField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "counts", "[S");
@@ -211,21 +211,21 @@ void java_module_init(void)
     fpField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "fp", "[S");
     java_check_exception(__func__);
 
-    orchemSubstructureQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSubstructureSearchClass, "getQueryData", "([BIZZ)[Lcz/iocb/orchem/search/OrchemSubstructureSearch$OrchemQueryData;");
+    orchemSubstructureQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSubstructureSearchClass, "getQueryData", "([BIZZ)[Lcz/iocb/sachem/search/OrchemSubstructureSearch$OrchemQueryData;");
     java_check_exception(__func__);
 
 
-    orchemSimilaritySearchClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemSimilaritySearch");
+    orchemSimilaritySearchClass = (*env)->FindClass(env, "cz/iocb/sachem/search/OrchemSimilaritySearch");
     java_check_exception(__func__);
 
     orchemSimilarityQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSimilaritySearchClass, "getQueryData", "([BI)[J");
     java_check_exception(__func__);
 
 
-    orchemLoaderClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemLoader");
+    orchemLoaderClass = (*env)->FindClass(env, "cz/iocb/sachem/search/OrchemLoader");
     java_check_exception(__func__);
 
-    orchemLoaderDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/OrchemLoader$OrchemData");
+    orchemLoaderDataClass = (*env)->FindClass(env, "cz/iocb/sachem/search/OrchemLoader$OrchemData");
     java_check_exception(__func__);
 
     orchemLoaderExceptionField = (*env)->GetFieldID(env, orchemLoaderDataClass, "exception", "Ljava/lang/String;");
@@ -240,14 +240,14 @@ void java_module_init(void)
     orchemLoaderMoleculeField = (*env)->GetFieldID(env, orchemLoaderDataClass, "molecule", "[B");
     java_check_exception(__func__);
 
-    orchemLoaderDataMethod = (*env)->GetStaticMethodID(env, orchemLoaderClass, "getIndexData", "([[B)[Lcz/iocb/orchem/search/OrchemLoader$OrchemData;");
+    orchemLoaderDataMethod = (*env)->GetStaticMethodID(env, orchemLoaderClass, "getIndexData", "([[B)[Lcz/iocb/sachem/search/OrchemLoader$OrchemData;");
     java_check_exception(__func__);
 
 
-    lucyLoaderClass = (*env)->FindClass(env, "cz/iocb/orchem/search/LucyLoader");
+    lucyLoaderClass = (*env)->FindClass(env, "cz/iocb/sachem/search/LucyLoader");
     java_check_exception(__func__);
 
-    lucyLoaderDataClass = (*env)->FindClass(env, "cz/iocb/orchem/search/LucyLoader$LucyData");
+    lucyLoaderDataClass = (*env)->FindClass(env, "cz/iocb/sachem/search/LucyLoader$LucyData");
     java_check_exception(__func__);
 
     lucyLoaderExceptionField = (*env)->GetFieldID(env, lucyLoaderDataClass, "exception", "Ljava/lang/String;");
@@ -256,7 +256,7 @@ void java_module_init(void)
     lucyLoaderMoleculeField = (*env)->GetFieldID(env, lucyLoaderDataClass, "molecule", "[B");
     java_check_exception(__func__);
 
-    lucyLoaderDataMethod = (*env)->GetStaticMethodID(env, lucyLoaderClass, "getIndexData", "([[B)[Lcz/iocb/orchem/search/LucyLoader$LucyData;");
+    lucyLoaderDataMethod = (*env)->GetStaticMethodID(env, lucyLoaderClass, "getIndexData", "([[B)[Lcz/iocb/sachem/search/LucyLoader$LucyData;");
     java_check_exception(__func__);
 
 

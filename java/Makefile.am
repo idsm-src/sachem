@@ -17,30 +17,30 @@ EXTRA_DIST = \
     lib/cdk-2.1.1.jar \
     lib/commons-net-3.6.jar \
     lib/jdbc-postgresql.jar \
-    src/cz/iocb/orchem/convert/ConvertMolecule.java \
-    src/cz/iocb/orchem/fingerprint/bitpos/BitPosApi.java \
-    src/cz/iocb/orchem/fingerprint/bitpos/BitPositions.java \
-    src/cz/iocb/orchem/fingerprint/bitpos/ExtendedBitPositions.java \
-    src/cz/iocb/orchem/fingerprint/bitpos/Neighbour.java \
-    src/cz/iocb/orchem/fingerprint/OrchemExtendedFingerprinter.java \
-    src/cz/iocb/orchem/fingerprint/OrchemFingerprinter.java \
-    src/cz/iocb/orchem/isomorphism/IsomorphismSort.java \
-    src/cz/iocb/orchem/load/ConfigurationProperties.java \
-    src/cz/iocb/orchem/load/CompoundLoader.java \
-    src/cz/iocb/orchem/load/CompoundUpdater.java \
-    src/cz/iocb/orchem/load/ConnectionPool.java \
-    src/cz/iocb/orchem/load/GeneralCompoundLoader.java \
-    src/cz/iocb/orchem/load/DrugbankCompoundUpdater.java \
-    src/cz/iocb/orchem/load/PubChemCompoundUpdater.java \
-    src/cz/iocb/orchem/search/LucyLoader.java \
-    src/cz/iocb/orchem/search/OrchemLoader.java \
-    src/cz/iocb/orchem/search/OrchemMoleculeBuilder.java \
-    src/cz/iocb/orchem/search/OrchemSimilaritySearch.java \
-    src/cz/iocb/orchem/search/OrchemSubstructureSearch.java \
-    src/cz/iocb/orchem/search/SubstructureSearch.java \
-    src/cz/iocb/orchem/search/QueryFormat.java \
-    src/cz/iocb/orchem/shared/MoleculeCounts.java \
-    src/cz/iocb/orchem/shared/MoleculeCreator.java \
-    src/cz/iocb/orchem/tautomers/CombinationCountException.java \
-    src/cz/iocb/orchem/tautomers/InChI.java \
-    src/cz/iocb/orchem/tautomers/InchiTautomerGenerator.java
+    src/cz/iocb/sachem/convert/ConvertMolecule.java \
+    src/cz/iocb/sachem/fingerprint/bitpos/BitPosApi.java \
+    src/cz/iocb/sachem/fingerprint/bitpos/BitPositions.java \
+    src/cz/iocb/sachem/fingerprint/bitpos/ExtendedBitPositions.java \
+    src/cz/iocb/sachem/fingerprint/bitpos/Neighbour.java \
+    src/cz/iocb/sachem/fingerprint/OrchemExtendedFingerprinter.java \
+    src/cz/iocb/sachem/fingerprint/OrchemFingerprinter.java \
+    src/cz/iocb/sachem/isomorphism/IsomorphismSort.java \
+    src/cz/iocb/sachem/load/ConfigurationProperties.java \
+    src/cz/iocb/sachem/load/CompoundLoader.java \
+    src/cz/iocb/sachem/load/CompoundUpdater.java \
+    src/cz/iocb/sachem/load/ConnectionPool.java \
+    src/cz/iocb/sachem/load/GeneralCompoundLoader.java \
+    src/cz/iocb/sachem/load/DrugbankCompoundUpdater.java \
+    src/cz/iocb/sachem/load/PubChemCompoundUpdater.java \
+    src/cz/iocb/sachem/search/LucyLoader.java \
+    src/cz/iocb/sachem/search/OrchemLoader.java \
+    src/cz/iocb/sachem/search/OrchemSimilaritySearch.java \
+    src/cz/iocb/sachem/search/OrchemSubstructureSearch.java \
+    src/cz/iocb/sachem/search/SachemMoleculeBuilder.java \
+    src/cz/iocb/sachem/search/SubstructureSearch.java \
+    src/cz/iocb/sachem/search/QueryFormat.java \
+    src/cz/iocb/sachem/shared/MoleculeCounts.java \
+    src/cz/iocb/sachem/shared/MoleculeCreator.java \
+    src/cz/iocb/sachem/tautomers/CombinationCountException.java \
+    src/cz/iocb/sachem/tautomers/InChI.java \
+    src/cz/iocb/sachem/tautomers/InchiTautomerGenerator.java
