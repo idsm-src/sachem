@@ -676,7 +676,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
 
     SPIPlanPtr moleculesPlan = SPI_prepare("insert into " MOLECULES_TABLE " (seqid, id, molecule) values ($1,$2,$3)",
-            4, (Oid[]) { INT4OID, INT4OID, BYTEAOID, BYTEAOID });
+            3, (Oid[]) { INT4OID, INT4OID, BYTEAOID });
 
     SPIPlanPtr countsPlan = SPI_prepare("insert into " MOLECULE_COUNTS_TABLE " (id, counts) values ($1,$2)",
             2, (Oid[]) { INT4OID, INT2ARRAYOID });
@@ -745,7 +745,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
                 elog(NOTICE, "%i: %s", DatumGetInt32(id), message);
                 pfree(message);
 
-                Datum values[] = {Int32GetDatum(id), PointerGetDatum(data[i].error)};
+                Datum values[] = {id, PointerGetDatum(data[i].error)};
 
                 if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)",
                         2, (Oid[]) { INT4OID, TEXTOID }, values, NULL, false, 0) != SPI_OK_INSERT)
