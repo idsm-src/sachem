@@ -32,7 +32,6 @@ CREATE TABLE orchem_compound_audit (
 
 CREATE TABLE orchem_molecules (
     id                    INT NOT NULL,
-    seqid                 INT NOT NULL,
     molecule              BYTEA NOT NULL,
     PRIMARY KEY (id)
 );
@@ -44,9 +43,6 @@ CREATE TABLE orchem_molecule_errors (
     message               TEXT NOT NULL,
     PRIMARY KEY (id)
 );
-
-
-CREATE INDEX orchem_molecules__seqid ON orchem_molecules(seqid);
 
 
 GRANT SELECT ON TABLE compounds TO PUBLIC;

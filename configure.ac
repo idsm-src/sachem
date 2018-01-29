@@ -49,7 +49,7 @@ fi
 
 cd build/clownfish/runtime/c
 ./configure || exit $?
-CLOWNFISH_CPPFLAGS=
+CLOWNFISH_CPPFLAGS="-DCFISH_USE_SHORT_NAMES"
 CLOWNFISH_LDFLAGS="-L$(pwd)"
 cd -
 
@@ -68,7 +68,7 @@ cd build/lucy/c
 ./configure || exit $?
 sed -i 's|cfc|../../clownfish/compiler/c/cfc --include=../../clownfish/runtime/c/autogen/share/clownfish/include|' Makefile
 sed -i 's|-l clownfish|-L ../../clownfish/runtime/c -l clownfish|' Makefile
-LUCY_CPPFLAGS="-I$(pwd)/autogen/include"
+LUCY_CPPFLAGS="-DLUCY_USE_SHORT_NAMES -I$(pwd)/autogen/include"
 LUCY_LDFLAGS="-L$(pwd)"
 cd -
 
@@ -76,27 +76,5 @@ AC_SUBST([LUCY_CPPFLAGS])
 AC_SUBST([LUCY_LDFLAGS])
 
 
-dnl process rdkit
-AC_PATH_PROG([CMAKE], [cmake], [])
-if test "no$CMAKE" = no ; then
-    AC_MSG_ERROR([cmake not found])
-fi
-
-AC_MSG_NOTICE([IOCB RDKit])
-if test ! -e build/rdkit ; then
-    cp -r $srcdir/lib/rdkit build
-    chmod -R u+w build/rdkit
-fi
-
-cd build/rdkit
-$CMAKE -DCMAKE_CXX_FLAGS=-std=gnu++11 || exit $?
-RDKIT_CPPFLAGS="-I$(pwd)/Code"
-RDKIT_LDFLAGS="-L$(pwd)/lib"
-cd -
-
-AC_SUBST([RDKIT_CPPFLAGS])
-AC_SUBST([RDKIT_LDFLAGS])
-
-
-AC_CONFIG_FILES(Makefile src/Makefile src/fpsearch/Makefile java/Makefile lib/Makefile extension/Makefile script/Makefile)
+AC_CONFIG_FILES(Makefile src/Makefile src/fingerprints/Makefile java/Makefile lib/Makefile extension/Makefile script/Makefile)
 AC_OUTPUT

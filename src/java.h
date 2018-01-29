@@ -37,7 +37,6 @@ typedef struct
 
 typedef struct
 {
-    int32_t seqid;
     bytea *molecule;
     text *error;
 } LucyLoaderData;

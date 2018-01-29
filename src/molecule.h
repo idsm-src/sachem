@@ -62,7 +62,7 @@ enum BondStereoType
 };
 
 
-typedef struct
+typedef struct Molecule
 {
     int atomCount;
     int bondCount;
@@ -83,7 +83,7 @@ typedef struct
 } Molecule;
 
 
-inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, bool extended,
+inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *restH, bool extended,
         bool withCharges, bool withIsotopes, bool withStereo)
 {
     int xAtomCount = *data << 8 | *(data + 1);
@@ -282,6 +282,117 @@ inline void molecule_init(Molecule *const molecule, uint8_t *data, bool *restH, 
                 break;
         }
     }
+}
+
+
+inline void molecule_simple_free(Molecule *const molecule, void (*free)(void *))
+{
+    if(molecule->atomNumbers)
+        (*free)(molecule->atomNumbers);
+
+    if(molecule->bondTypes)
+        (*free)(molecule->bondTypes);
+
+    if(molecule->bondLists)
+        (*free)(molecule->bondLists);
+
+    if(molecule->bondListSizes)
+        (*free)(molecule->bondListSizes);
+
+    if(molecule->contains)
+        (*free)(molecule->contains);
+
+    if(molecule->bondMatrix)
+        (*free)(molecule->bondMatrix);
+}
+
+
+inline bool molecule_simple_init(Molecule *const molecule, const uint8_t *data, void *(*alloc)(size_t))
+{
+    memset(molecule, 0, sizeof(Molecule));
+
+
+    int xAtomCount = *data << 8 | *(data + 1);
+    data += 2;
+
+    int cAtomCount = *data << 8 | *(data + 1);
+    data += 4;
+
+    int xBondCount = *data << 8 | *(data + 1);
+    data += 4;
+
+
+    int atomCount = xAtomCount + cAtomCount;
+    int bondCount = xBondCount;
+
+
+    molecule->atomCount = atomCount;
+    molecule->bondCount = bondCount;
+
+    molecule->atomNumbers = (uint8_t *) (*alloc)(atomCount);
+    molecule->bondTypes = (uint8_t *) (*alloc)(bondCount);
+    molecule->bondLists = (int *) (*alloc)(BOND_LIST_BASE_SIZE * atomCount * sizeof(int));
+    molecule->bondListSizes = (int *) (*alloc)(atomCount * sizeof(int));
+    molecule->contains = (int (*)[2]) (*alloc)(bondCount * 2 * sizeof(int));
+    molecule->bondMatrix = (int *) (*alloc)(atomCount * atomCount * sizeof(int));
+
+    if(unlikely(!molecule->atomNumbers || !molecule->bondTypes || !molecule->bondLists || !molecule->bondListSizes ||
+            !molecule->contains || !molecule->bondMatrix))
+        return false;
+
+
+    for(int i = 0; i < xAtomCount; i++)
+        molecule->atomNumbers[i] = data[i];
+
+    for(int i = xAtomCount; i < atomCount; i++)
+        molecule->atomNumbers[i] = C_ATOM_NUMBER;
+
+    for(int i = 0; i < atomCount; i++)
+        molecule->bondListSizes[i] = 0;
+
+    data += xAtomCount;
+
+
+    for(int i = 0; i < atomCount * atomCount; i++)
+        molecule->bondMatrix[i] = -1;
+
+    int boundIdx = 0;
+
+    for(int i = 0; i < xBondCount; i++)
+    {
+        int offset = i * BOND_BLOCK_SIZE;
+
+        molecule->bondTypes[i] = data[offset + 3];
+
+        int b0 = data[offset + 0];
+        int b1 = data[offset + 1];
+        int b2 = data[offset + 2];
+
+        int x = b0 | b1 << 4 & 0xF00;
+        int y = b2 | b1 << 8 & 0xF00;
+
+        if(x >= atomCount || y >= atomCount)
+        {
+            molecule->bondCount--;
+            continue;
+        }
+
+        molecule->bondLists[x * BOND_LIST_BASE_SIZE + molecule->bondListSizes[x]++] = y;
+        molecule->bondLists[y * BOND_LIST_BASE_SIZE + molecule->bondListSizes[y]++] = x;
+
+        if(unlikely(molecule->bondListSizes[x] == BOND_LIST_BASE_SIZE || molecule->bondListSizes[y] == BOND_LIST_BASE_SIZE))
+            elog(ERROR, "%s: too high atom valence", __func__);
+
+        molecule->bondMatrix[x * molecule->atomCount + y] = boundIdx;
+        molecule->bondMatrix[y * molecule->atomCount + x] = boundIdx;
+
+        molecule->contains[boundIdx][0] = x;
+        molecule->contains[boundIdx][1] = y;
+
+        boundIdx++;
+    }
+
+    return true;
 }
 
 
