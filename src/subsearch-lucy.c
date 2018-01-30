@@ -71,7 +71,7 @@ typedef struct
 {
     pg_atomic_uint32 possition;
     uint32_t count;
-    char **result;
+    Fingerprint *result;
     LucyLoaderData *data;
 } ThreadData;
 
@@ -249,9 +249,16 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
                     vf2state_init(&info->vf2state, &info->queryMolecule, info->graphMode, info->chargeMode, info->isotopeMode,
                             info->stereoMode);
 
-                    char *fp = fingerprint_get_query(&info->queryMolecule, &palloc);
+                    Fingerprint fp = fingerprint_get_query(&info->queryMolecule, &palloc);
+
+                    if(!fingerprint_is_valid(fp))
+                        elog(ERROR, "fingerprint cannot be generated");
+
                     info->lucySearch = lucy_search(&lucy, fp, INT32_MAX);
-                    pfree(fp);
+
+                    if(fp.data != NULL)
+                        pfree(fp.data);
+
                     PG_MEMCONTEXT_END();
                 }
 
@@ -379,7 +386,7 @@ void *lucy_substructure_process_data(void *dataPtr)
         }
         else
         {
-            data->result[i] = NULL;
+            data->result[i] = (Fingerprint) {.size = -1, .data = NULL};
         }
     }
 
@@ -481,6 +488,7 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
 
     VarChar **molfiles = palloc(SYNC_FETCH_SIZE * sizeof(VarChar *));
     LucyLoaderData *data = palloc(SYNC_FETCH_SIZE * sizeof(LucyLoaderData));
+    Fingerprint *result = palloc(SYNC_FETCH_SIZE * sizeof(Fingerprint));
     int count = 0;
 
 
@@ -521,7 +529,6 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
         }
 
         pthread_t threads[countOfThread];
-        char *result[SYNC_FETCH_SIZE];
         ThreadData threadData = {.count = processed, .data = data, .result = result};
         pg_atomic_init_u32(&threadData.possition, 0);
 
@@ -551,7 +558,7 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
                     elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
-                if(data[i].error || result[i] == NULL)
+                if(data[i].error || !fingerprint_is_valid(result[i]))
                 {
                     if(data[i].error == NULL)
                         data[i].error = cstring_to_text("fingerprint cannot be generated");
@@ -578,7 +585,7 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
                 if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
                     elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
-                if(result[i] != NULL)
+                if(fingerprint_is_valid(result[i]))
                     lucy_add(&lucy, DatumGetInt32(id), result[i]);
 
                 pfree(data[i].molecule);
@@ -587,14 +594,14 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
         PG_CATCH();
         {
             for(int i = 0; i < processed; i++)
-                free(result[i]);
+                free(result[i].data);
 
             PG_RE_THROW();
         }
         PG_END_TRY();
 
         for(int i = 0; i < processed; i++)
-            free(result[i]);
+            free(result[i].data);
 
         SPI_freetuptable(tuptable);
 

@@ -50,7 +50,7 @@ static inline void write_bitword(char *buffer, uint32_t fp)
 }
 
 
-char *fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t))
+Fingerprint fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t))
 {
     try
     {
@@ -58,13 +58,14 @@ char *fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t))
 
         if(res.size() > 0)
         {
-            char *fp = (char *) (*alloc)(res.size() * 7);
+            size_t size = res.size() * 7;
+            char *data = (char *) (*alloc)(size);
 
-            if(fp == NULL)
-                return fp;
+            if(data == NULL)
+                return {.size = (size_t) -1, .data = NULL};
 
 
-            char *data = fp;
+            Fingerprint fp = {size : size - 1, data: data};
 
             for(uint32_t i : res)
             {
@@ -74,25 +75,22 @@ char *fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t))
             }
 
             data[-1] = '\0';
-
             return fp;
         }
         else
         {
-            char *fp = (char *) (*alloc)(1);
-            fp[0] = '\0';
-            return fp;
+            return {.size = 0, .data = NULL};
         }
     }
     catch (...)
     {
     }
 
-    return NULL;
+    return {.size = (size_t) -1, .data = NULL};
 }
 
 
-char *fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_t))
+Fingerprint fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_t))
 {
     try
     {
@@ -157,13 +155,13 @@ char *fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_t))
 
         if(fps.size() > 0)
         {
-            char *fp = (char *) (*alloc)(fps.size() * 9);
+            size_t size = fps.size() * 9;
+            char *data = (char *) (*alloc)(size);
 
-            if(fp == NULL)
-                return fp;
+            if(data == NULL)
+                return {size : (size_t) -1, data : NULL};
 
-
-            char *data = fp;
+            Fingerprint fp = {size : size - 1, data: data};
 
             for(uint32_t i : fps)
             {
@@ -175,19 +173,16 @@ char *fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_t))
             }
 
             data[-1] = '\0';
-
             return fp;
         }
         else
         {
-            char *fp = (char *) (*alloc)(1);
-            fp[0] = '\0';
-            return fp;
+            return {.size = 0, .data = NULL};
         }
     }
     catch (...)
     {
     }
 
-    return NULL;
+    return {.size = (size_t) -1, .data = NULL};
 }

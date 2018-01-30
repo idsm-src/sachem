@@ -16,13 +16,20 @@
 #include "lucy.h"
 
 
+#define ID_NAME     "id"
+#define FP_NAME     "fp"
+#define FP_PATTERN  "[a-zA-Z0-9+/]+"
+#define BOOLOP      "AND"
+
+
+
 void lucy_init(Lucy *lucy, const char *index_dir)
 {
     lucy_bootstrap_parcel();
 
-    lucy->folder = Str_newf(index_dir);
-    lucy->idF = Str_newf("id");
-    lucy->fpF = Str_newf("fp");
+    lucy->folder = Str_new_from_trusted_utf8(index_dir, strlen(index_dir));
+    lucy->idF = Str_new_wrap_trusted_utf8(ID_NAME, sizeof(ID_NAME) - 1);
+    lucy->fpF = Str_new_wrap_trusted_utf8(FP_NAME, sizeof(FP_NAME) - 1);
 
     lucy->schema = Schema_new();
     StringType *stype = StringType_new();
@@ -30,7 +37,7 @@ void lucy_init(Lucy *lucy, const char *index_dir)
     Schema_Spec_Field(lucy->schema, lucy->idF, (FieldType*) stype);
     DECREF(stype);
 
-    String* re = Str_newf ("[a-zA-Z0-9+/]+");
+    String* re = Str_new_wrap_trusted_utf8(FP_PATTERN, sizeof(FP_PATTERN) - 1);
     RegexTokenizer *rt = RegexTokenizer_new(re);
     FullTextType *fttype = FullTextType_new((Analyzer*) rt);
     FullTextType_Set_Indexed(fttype, true);
@@ -41,7 +48,7 @@ void lucy_init(Lucy *lucy, const char *index_dir)
     DECREF(re);
     DECREF(fttype);
 
-    String *boolop = Str_newf("AND");
+    String *boolop = Str_new_wrap_trusted_utf8(BOOLOP, sizeof(BOOLOP) - 1);
     lucy->qparser = QParser_new(lucy->schema, NULL, boolop, NULL);
     DECREF(boolop);
 }
@@ -53,17 +60,17 @@ void lucy_begin(Lucy *lucy)
 }
 
 
-void lucy_add(Lucy *lucy, int32_t id, const char *fp)
+void lucy_add(Lucy *lucy, int32_t id, Fingerprint fp)
 {
     Doc *doc = Doc_new(NULL, 0);
 
     char buffer[12];
-    sprintf(buffer, "%u", id);
-    String *idValue = Str_newf(buffer);
+    int size = sprintf(buffer, "%u", id);
+    String *idValue = Str_new_wrap_trusted_utf8(buffer, size);
     Doc_Store(doc, lucy->idF, (Obj*) idValue);
     DECREF(idValue);
 
-    String *fpValue = Str_newf(fp);
+    String *fpValue = Str_new_wrap_trusted_utf8(fp.data, fp.size);
     Doc_Store(doc, lucy->fpF, (Obj*) fpValue);
     DECREF(fpValue);
 
@@ -75,8 +82,8 @@ void lucy_add(Lucy *lucy, int32_t id, const char *fp)
 void lucy_delete(Lucy *lucy, int32_t id)
 {
     char buffer[12];
-    sprintf(buffer, "%u", id);
-    String *idValue = Str_newf(buffer);
+    int size = sprintf(buffer, "%u", id);
+    String *idValue = Str_new_wrap_trusted_utf8(buffer, size);
 
     Indexer_Delete_By_Term(lucy->indexer,lucy->idF, (Obj*) idValue);
     DECREF(idValue);
@@ -96,11 +103,11 @@ void lucy_optimize(Lucy *lucy)
 }
 
 
-Hits *lucy_search(Lucy *lucy, const char *queryFp, int max_results)
+Hits *lucy_search(Lucy *lucy, Fingerprint fp, int max_results)
 {
     lucy->searcher = IxSearcher_new((Obj*) (lucy->folder));
 
-    String *queryStr = Str_newf(queryFp);
+    String *queryStr = Str_new_wrap_trusted_utf8(fp.data, fp.size);
     Query *query = QParser_Parse(lucy->qparser, queryStr);
     Hits *hits = IxSearcher_Hits(lucy->searcher, (Obj*) query, 0, max_results, NULL);
 
