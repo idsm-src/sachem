@@ -291,7 +291,7 @@ static void recurse_walk_range(std::map<int, std::vector<int>> &nbrs, PathType &
         return;
 
 
-    // we  have the cndidates that can be used to add to the existing path try extending the subgraphs
+    // we  have the candidates that can be used to add to the existing path try extending the subgraphs
     while(cands.size() != 0)
     {
         int next = cands.back();  // start with the last one in the candidate list
