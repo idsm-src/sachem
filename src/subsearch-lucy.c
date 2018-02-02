@@ -46,7 +46,7 @@ typedef struct
     int queryDataCount;
     int queryDataPosition;
 
-    Hits *lucySearch;
+    LucyResultSet resultSet;
 
     SPITupleTable *table;
     int tableRowCount;
@@ -185,7 +185,7 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
         PG_FREE_IF_COPY(query, 0);
 
         info->queryDataPosition = -1;
-        info->lucySearch = NULL;
+        info->resultSet = NULL_RESULT_SET;
         info->table = NULL;
         info->tableRowCount = -1;
         info->tableRowPosition = -1;
@@ -218,130 +218,138 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
     Datum result;
     bool isNull = true;
 
-    if(likely(info->topN <= 0 || info->topN != info->foundResults))
+    PG_TRY();
     {
-        while(true)
+        if(likely(info->topN <= 0 || info->topN != info->foundResults))
         {
-            if(unlikely(info->tableRowPosition == info->tableRowCount))
+            while(true)
             {
-                if(info->table != NULL)
+                if(unlikely(info->tableRowPosition == info->tableRowCount))
                 {
-                    MemoryContextDelete(info->table->tuptabcxt);
-                    info->table = NULL;
-                }
+                    if(info->table != NULL)
+                    {
+                        MemoryContextDelete(info->table->tuptabcxt);
+                        info->table = NULL;
+                    }
 
 
-                if(info->lucySearch == NULL)
-                {
-                    info->queryDataPosition++;
+                    if(!lucy_is_open(&lucy, &info->resultSet))
+                    {
+                        info->queryDataPosition++;
 
-                    if(unlikely(info->queryDataPosition == info->queryDataCount))
-                        break;
+                        if(unlikely(info->queryDataPosition == info->queryDataCount))
+                            break;
 
+                        SubstructureQueryData *data = &(info->queryData[info->queryDataPosition]);
+
+                        MemoryContextReset(info->isomorphismContext);
+
+                        PG_MEMCONTEXT_BEGIN(info->isomorphismContext);
+                        info->extended = molecule_is_extended_search_needed(data->molecule, info->chargeMode, info->isotopeMode);
+                        molecule_init(&info->queryMolecule, data->molecule, data->restH, info->extended,
+                                info->chargeMode != CHARGE_IGNORE, info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
+                        vf2state_init(&info->vf2state, &info->queryMolecule, info->graphMode, info->chargeMode, info->isotopeMode,
+                                info->stereoMode);
+
+                        Fingerprint fp = fingerprint_get_query(&info->queryMolecule, &palloc);
+
+                        if(!fingerprint_is_valid(fp))
+                            elog(ERROR, "fingerprint cannot be generated");
+
+                        info->resultSet = lucy_search(&lucy, fp, INT32_MAX);
+
+
+                        if(fp.data != NULL)
+                            pfree(fp.data);
+
+                        PG_MEMCONTEXT_END();
+                    }
+
+
+                    int32 *arrayData = (int32 *) ARR_DATA_PTR(info->arrayBuffer);
                     SubstructureQueryData *data = &(info->queryData[info->queryDataPosition]);
 
-                    MemoryContextReset(info->isomorphismContext);
+                    int count = lucy_get(&lucy, &info->resultSet, arrayData, FETCH_SIZE);
 
-                    PG_MEMCONTEXT_BEGIN(info->isomorphismContext);
-                    info->extended = molecule_is_extended_search_needed(data->molecule, info->chargeMode, info->isotopeMode);
-                    molecule_init(&info->queryMolecule, data->molecule, data->restH, info->extended,
-                            info->chargeMode != CHARGE_IGNORE, info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
-                    vf2state_init(&info->vf2state, &info->queryMolecule, info->graphMode, info->chargeMode, info->isotopeMode,
-                            info->stereoMode);
 
-                    Fingerprint fp = fingerprint_get_query(&info->queryMolecule, &palloc);
+                    if(unlikely(count == 0))
+                        continue;
 
-                    if(!fingerprint_is_valid(fp))
-                        elog(ERROR, "fingerprint cannot be generated");
 
-                    info->lucySearch = lucy_search(&lucy, fp, INT32_MAX);
+                    *(ARR_DIMS(info->arrayBuffer)) = count;
+                    SET_VARSIZE(info->arrayBuffer, count * sizeof(int32) + ARR_OVERHEAD_NONULLS(1));
 
-                    if(fp.data != NULL)
-                        pfree(fp.data);
+                    Datum values[] = { PointerGetDatum(info->arrayBuffer)};
 
-                    PG_MEMCONTEXT_END();
+
+                    if(unlikely(!connected && SPI_connect() != SPI_OK_CONNECT))
+                         elog(ERROR, "%s: SPI_connect() failed", __func__);
+
+                    connected = true;
+
+
+                    if(unlikely(SPI_execute_plan(mainQueryPlan, values, NULL, true, 0) != SPI_OK_SELECT))
+                        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+                    if(unlikely(/*SPI_processed != count ||*/ SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
+                        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+                    info->table = SPI_tuptable;
+                    info->tableRowCount = SPI_processed;
+                    info->tableRowPosition = 0;
+
+                    MemoryContextSetParent(SPI_tuptable->tuptabcxt, funcctx->multi_call_memory_ctx);
                 }
 
-
-                int32 *arrayData = (int32 *) ARR_DATA_PTR(info->arrayBuffer);
-                SubstructureQueryData *data = &(info->queryData[info->queryDataPosition]);
-
-                int count = lucy_get(&lucy, info->lucySearch, arrayData, FETCH_SIZE);
+                TupleDesc tupdesc = info->table->tupdesc;
+                HeapTuple tuple = info->table->vals[info->tableRowPosition++];
+                char isNullFlag;
 
 
-                if(unlikely(count == 0))
-                {
-                    info->lucySearch = NULL;
-                    continue;
-                }
+                Datum id = SPI_getbinval(tuple, tupdesc, 1, &isNullFlag);
+
+                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
-                *(ARR_DIMS(info->arrayBuffer)) = count;
-                SET_VARSIZE(info->arrayBuffer, count * sizeof(int32) + ARR_OVERHEAD_NONULLS(1));
+                Datum molecule = SPI_getbinval(tuple, tupdesc, 2, &isNullFlag);
 
-                Datum values[] = { PointerGetDatum(info->arrayBuffer)};
-
-
-                if(unlikely(!connected && SPI_connect() != SPI_OK_CONNECT))
-                     elog(ERROR, "%s: SPI_connect() failed", __func__);
-
-                connected = true;
-
-
-                if(unlikely(SPI_execute_plan(mainQueryPlan, values, NULL, true, 0) != SPI_OK_SELECT))
-                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
-
-                if(unlikely(/*SPI_processed != count ||*/ SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
-                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
-
-                info->table = SPI_tuptable;
-                info->tableRowCount = SPI_processed;
-                info->tableRowPosition = 0;
-
-                MemoryContextSetParent(SPI_tuptable->tuptabcxt, funcctx->multi_call_memory_ctx);
-            }
-
-            TupleDesc tupdesc = info->table->tupdesc;
-            HeapTuple tuple = info->table->vals[info->tableRowPosition++];
-            char isNullFlag;
-
-
-            Datum id = SPI_getbinval(tuple, tupdesc, 1, &isNullFlag);
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-
-            Datum molecule = SPI_getbinval(tuple, tupdesc, 2, &isNullFlag);
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 #if SHOW_STATS
-            info->candidateCount++;
+                info->candidateCount++;
 #endif
 
-            bytea *moleculeData = DatumGetByteaP(molecule);
-            bool match;
+                bytea *moleculeData = DatumGetByteaP(molecule);
+                bool match;
 
-            PG_MEMCONTEXT_BEGIN(info->targetContext);
-            Molecule target;
-            molecule_init(&target, VARDATA(moleculeData), NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
-                    info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
-            match = vf2state_match(&info->vf2state, &target, info->vf2_timeout);
-            PG_MEMCONTEXT_END();
-            MemoryContextReset(info->targetContext);
+                PG_MEMCONTEXT_BEGIN(info->targetContext);
+                Molecule target;
+                molecule_init(&target, VARDATA(moleculeData), NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
+                        info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
+                match = vf2state_match(&info->vf2state, &target, info->vf2_timeout);
+                PG_MEMCONTEXT_END();
+                MemoryContextReset(info->targetContext);
 
-            if(match)
-            {
-                bitset_set(&info->resultMask, DatumGetInt32(id));
-                info->foundResults++;
-                result = id;
-                isNull = false;
-                break;
+                if(match)
+                {
+                    bitset_set(&info->resultMask, DatumGetInt32(id));
+                    info->foundResults++;
+                    result = id;
+                    isNull = false;
+                    break;
+                }
             }
         }
     }
+    PG_CATCH();
+    {
+        lucy_fail(&lucy, &info->resultSet);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
 
     if(connected)
         SPI_finish();
@@ -419,206 +427,218 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
 
     lucy_begin(&lucy);
 
-    /*
-     * delete unnecessary data
-     */
-
-    Portal auditCursor = SPI_cursor_open_with_args(NULL, "select id from " AUDIT_TABLE " where not stored",
-            0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
-
-    while(true)
+    PG_TRY();
     {
-        SPI_cursor_fetch(auditCursor, true, SYNC_FETCH_SIZE);
+        /*
+         * delete unnecessary data
+         */
 
-        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-            elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
+        Portal auditCursor = SPI_cursor_open_with_args(NULL, "select id from " AUDIT_TABLE " where not stored",
+                0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
-        if(SPI_processed == 0)
-            break;
-
-        for(int i = 0; i < SPI_processed; i++)
+        while(true)
         {
-            HeapTuple tuple = SPI_tuptable->vals[i];
+            SPI_cursor_fetch(auditCursor, true, SYNC_FETCH_SIZE);
 
-            Datum id = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
+            if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
+                elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
 
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+            if(SPI_processed == 0)
+                break;
 
-            lucy_delete(&lucy, DatumGetInt32(id));
-        }
-    }
-
-    SPI_cursor_close(auditCursor);
-
-
-    if(unlikely(SPI_exec("delete from " MOLECULES_TABLE " tbl using "
-            AUDIT_TABLE " aud where tbl.id = aud.id", 0) != SPI_OK_DELETE))
-        elog(ERROR, "%s: SPI_exec() failed", __func__);
-
-
-    /*
-     * convert new data
-     */
-
-    /* TODO: find a better way to obtain bigint[] OID */
-    if(unlikely(SPI_exec("select typarray from pg_type where typname = 'int8'", 0) != SPI_OK_SELECT))
-        elog(ERROR, "%s: SPI_exec() failed", __func__);
-
-    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-        elog(ERROR, "%s: SPI_exec() failed", __func__);
-
-    Oid int8arrayOid = DatumGetObjectId(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
-
-    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-        elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-    if(int8arrayOid == 0)
-        elog(ERROR, "%s: cannot determine bigint[] oid", __func__);
-
-
-    SPIPlanPtr moleculesPlan = SPI_prepare("insert into " MOLECULES_TABLE " (id, molecule) values ($1,$2)",
-            2, (Oid[]) { INT4OID, BYTEAOID });
-
-
-    Portal compoundCursor = SPI_cursor_open_with_args(NULL, "select cmp.id, cmp.molfile from " COMPOUNDS_TABLE " cmp, "
-            AUDIT_TABLE " aud where cmp.id = aud.id and aud.stored",
-            0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
-
-
-    VarChar **molfiles = palloc(SYNC_FETCH_SIZE * sizeof(VarChar *));
-    LucyLoaderData *data = palloc(SYNC_FETCH_SIZE * sizeof(LucyLoaderData));
-    Fingerprint *result = palloc(SYNC_FETCH_SIZE * sizeof(Fingerprint));
-    int count = 0;
-
-
-    while(true)
-    {
-        SPI_cursor_fetch(compoundCursor, true, SYNC_FETCH_SIZE);
-
-        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
-            elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
-
-        if(SPI_processed == 0)
-            break;
-
-        int processed = SPI_processed;
-        SPITupleTable *tuptable = SPI_tuptable;
-
-        for(int i = 0; i < processed; i++)
-        {
-            HeapTuple tuple = tuptable->vals[i];
-
-            Datum molfile = SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag);
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-            molfiles[i] = DatumGetVarCharP(molfile);
-        }
-
-        java_parse_lucy_data(processed, molfiles, data);
-
-        for(int i = 0; i < processed; i++)
-        {
-            HeapTuple tuple = SPI_tuptable->vals[i];
-            char isNullFlag;
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-        }
-
-        pthread_t threads[countOfThread];
-        ThreadData threadData = {.count = processed, .data = data, .result = result};
-        pg_atomic_init_u32(&threadData.possition, 0);
-
-        PG_MEMCONTEXT_BEGIN(memoryContext);
-        for(int i = 0; i < countOfThread; i++)
-            pthread_create(&threads[i], &attr, lucy_substructure_process_data, (void *) &threadData);
-        PG_MEMCONTEXT_END();
-
-        void *status;
-
-        for(int i = 0; i < countOfThread; i++)
-            pthread_join(threads[i], &status);
-
-        PG_TRY();
-        {
-            for(int i = 0; i < processed; i++)
+            for(int i = 0; i < SPI_processed; i++)
             {
-                HeapTuple tuple = tuptable->vals[i];
+                HeapTuple tuple = SPI_tuptable->vals[i];
 
-                if((char *) molfiles[i] != DatumGetPointer(SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag)))
-                    pfree(molfiles[i]);
-
-
-                Datum id = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
+                Datum id = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
 
                 if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                     elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
-
-                if(data[i].error || !fingerprint_is_valid(result[i]))
-                {
-                    if(data[i].error == NULL)
-                        data[i].error = cstring_to_text("fingerprint cannot be generated");
-
-                    char *message = text_to_cstring(data[i].error);
-                    elog(NOTICE, "%i: %s", DatumGetInt32(id), message);
-                    pfree(message);
-
-                    Datum values[] = {id, PointerGetDatum(data[i].error)};
-
-                    if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)",
-                            2, (Oid[]) { INT4OID, TEXTOID }, values, NULL, false, 0) != SPI_OK_INSERT)
-                        elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
-
-                    pfree(data[i].error);
-                }
-
-                if(data[i].molecule == NULL)
-                    continue;
-
-
-                Datum moleculesValues[] = {id, PointerGetDatum(data[i].molecule)};
-
-                if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
-                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
-
-                if(fingerprint_is_valid(result[i]))
-                    lucy_add(&lucy, DatumGetInt32(id), result[i]);
-
-                pfree(data[i].molecule);
+                lucy_delete(&lucy, DatumGetInt32(id));
             }
         }
-        PG_CATCH();
+
+        SPI_cursor_close(auditCursor);
+
+
+        if(unlikely(SPI_exec("delete from " MOLECULES_TABLE " tbl using "
+                AUDIT_TABLE " aud where tbl.id = aud.id", 0) != SPI_OK_DELETE))
+            elog(ERROR, "%s: SPI_exec() failed", __func__);
+
+
+        /*
+         * convert new data
+         */
+
+        /* TODO: find a better way to obtain bigint[] OID */
+        if(unlikely(SPI_exec("select typarray from pg_type where typname = 'int8'", 0) != SPI_OK_SELECT))
+            elog(ERROR, "%s: SPI_exec() failed", __func__);
+
+        if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
+            elog(ERROR, "%s: SPI_exec() failed", __func__);
+
+        Oid int8arrayOid = DatumGetObjectId(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
+
+        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+        if(int8arrayOid == 0)
+            elog(ERROR, "%s: cannot determine bigint[] oid", __func__);
+
+
+        SPIPlanPtr moleculesPlan = SPI_prepare("insert into " MOLECULES_TABLE " (id, molecule) values ($1,$2)",
+                2, (Oid[]) { INT4OID, BYTEAOID });
+
+
+        Portal compoundCursor = SPI_cursor_open_with_args(NULL, "select cmp.id, cmp.molfile from " COMPOUNDS_TABLE " cmp, "
+                AUDIT_TABLE " aud where cmp.id = aud.id and aud.stored",
+                0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
+
+
+        VarChar **molfiles = palloc(SYNC_FETCH_SIZE * sizeof(VarChar *));
+        LucyLoaderData *data = palloc(SYNC_FETCH_SIZE * sizeof(LucyLoaderData));
+        Fingerprint *result = palloc(SYNC_FETCH_SIZE * sizeof(Fingerprint));
+        int count = 0;
+
+
+        while(true)
         {
+            SPI_cursor_fetch(compoundCursor, true, SYNC_FETCH_SIZE);
+
+            if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
+                elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
+
+            if(SPI_processed == 0)
+                break;
+
+            int processed = SPI_processed;
+            SPITupleTable *tuptable = SPI_tuptable;
+
+            for(int i = 0; i < processed; i++)
+            {
+                HeapTuple tuple = tuptable->vals[i];
+
+                Datum molfile = SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag);
+
+                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+                molfiles[i] = DatumGetVarCharP(molfile);
+            }
+
+            java_parse_lucy_data(processed, molfiles, data);
+
+            for(int i = 0; i < processed; i++)
+            {
+                HeapTuple tuple = SPI_tuptable->vals[i];
+                char isNullFlag;
+
+                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+            }
+
+            pthread_t threads[countOfThread];
+            ThreadData threadData = {.count = processed, .data = data, .result = result};
+            pg_atomic_init_u32(&threadData.possition, 0);
+
+            PG_MEMCONTEXT_BEGIN(memoryContext);
+            for(int i = 0; i < countOfThread; i++)
+                pthread_create(&threads[i], &attr, lucy_substructure_process_data, (void *) &threadData);
+            PG_MEMCONTEXT_END();
+
+            void *status;
+
+            for(int i = 0; i < countOfThread; i++)
+                pthread_join(threads[i], &status);
+
+            PG_TRY();
+            {
+                for(int i = 0; i < processed; i++)
+                {
+                    HeapTuple tuple = tuptable->vals[i];
+
+                    if((char *) molfiles[i] != DatumGetPointer(SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag)))
+                        pfree(molfiles[i]);
+
+
+                    Datum id = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
+
+                    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                        elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+
+                    if(data[i].error || !fingerprint_is_valid(result[i]))
+                    {
+                        if(data[i].error == NULL)
+                            data[i].error = cstring_to_text("fingerprint cannot be generated");
+
+                        char *message = text_to_cstring(data[i].error);
+                        elog(NOTICE, "%i: %s", DatumGetInt32(id), message);
+                        pfree(message);
+
+                        Datum values[] = {id, PointerGetDatum(data[i].error)};
+
+                        if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)",
+                                2, (Oid[]) { INT4OID, TEXTOID }, values, NULL, false, 0) != SPI_OK_INSERT)
+                            elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
+
+                        pfree(data[i].error);
+                    }
+
+                    if(data[i].molecule == NULL)
+                        continue;
+
+
+                    Datum moleculesValues[] = {id, PointerGetDatum(data[i].molecule)};
+
+                    if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
+                        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+                    if(fingerprint_is_valid(result[i]))
+                        lucy_add(&lucy, DatumGetInt32(id), result[i]);
+
+                    pfree(data[i].molecule);
+                }
+            }
+            PG_CATCH();
+            {
+                for(int i = 0; i < processed; i++)
+                    free(result[i].data);
+
+                PG_RE_THROW();
+            }
+            PG_END_TRY();
+
             for(int i = 0; i < processed; i++)
                 free(result[i].data);
 
-            PG_RE_THROW();
+            SPI_freetuptable(tuptable);
+
+
+            count += processed;
+
+            if(verbose)
+                elog(NOTICE, "already processed: %i", count);
         }
-        PG_END_TRY();
 
-        for(int i = 0; i < processed; i++)
-            free(result[i].data);
+        SPI_cursor_close(compoundCursor);
 
-        SPI_freetuptable(tuptable);
+        if(unlikely(SPI_exec("delete from " AUDIT_TABLE, 0) != SPI_OK_DELETE))
+            elog(ERROR, "%s: SPI_exec() failed", __func__);
 
 
-        count += processed;
-
-        if(verbose)
-            elog(NOTICE, "already processed: %i", count);
+        lucy_commit(&lucy);
     }
+    PG_CATCH();
+    {
+        lucy_rollback(&lucy);
 
-    SPI_cursor_close(compoundCursor);
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
 
-    if(unlikely(SPI_exec("delete from " AUDIT_TABLE, 0) != SPI_OK_DELETE))
-        elog(ERROR, "%s: SPI_exec() failed", __func__);
 
-
-    lucy_commit(&lucy);
     SPI_finish();
     PG_RETURN_VOID();
 }
