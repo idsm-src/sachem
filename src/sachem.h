@@ -47,7 +47,7 @@ inline void createBasePath(void)
 }
 
 
-inline char *getFilePath(char* fileName)
+inline char *getFilePath(char *fileName)
 {
     Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
 

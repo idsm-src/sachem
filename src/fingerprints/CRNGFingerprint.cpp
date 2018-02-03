@@ -389,7 +389,7 @@ std::map<uint32_t, int> crng_fingerprint_get(const Molecule *molecule, BitInfo *
 
             if(info)
             {
-                for (auto &match : matches)
+                for(auto &match : matches)
                     (*info)[i].insert(match.begin(), match.end());
             }
         }

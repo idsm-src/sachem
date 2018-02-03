@@ -124,16 +124,16 @@ static void base_init(InitRoutineContext *context)
     lucy->schema = Schema_new();
     context->stype = StringType_new();
     StringType_Set_Indexed(context->stype, false);
-    Schema_Spec_Field(lucy->schema, lucy->idF, (FieldType*) context->stype);
+    Schema_Spec_Field(lucy->schema, lucy->idF, (FieldType *) context->stype);
     saveDecref(context->stype);
 
     context->re = Str_new_wrap_trusted_utf8(FP_PATTERN, sizeof(FP_PATTERN) - 1);
     context->rt = RegexTokenizer_new(context->re);
-    context->fttype = FullTextType_new((Analyzer*) context->rt);
+    context->fttype = FullTextType_new((Analyzer *) context->rt);
     FullTextType_Set_Indexed(context->fttype, true);
     FullTextType_Set_Highlightable(context->fttype, false);
     FullTextType_Set_Stored(context->fttype, false);
-    Schema_Spec_Field(lucy->schema, lucy->fpF, (FieldType*) context->fttype);
+    Schema_Spec_Field(lucy->schema, lucy->fpF, (FieldType *) context->fttype);
     saveDecref(context->re);
     saveDecref(context->rt);
     saveDecref(context->fttype);
@@ -186,7 +186,7 @@ void lucy_init(Lucy *lucy, const char *indexPath)
 
 static void base_begin(Lucy *lucy)
 {
-    lucy->indexer = Indexer_new(lucy->schema, (Obj*) (lucy->folder), NULL, Indexer_CREATE);
+    lucy->indexer = Indexer_new(lucy->schema, (Obj *) (lucy->folder), NULL, Indexer_CREATE);
 }
 
 
@@ -208,11 +208,11 @@ static void base_add(AddRoutineContext *context)
     char buffer[12];
     int size = sprintf(buffer, "%u", context->id);
     context->idValue = Str_new_wrap_trusted_utf8(buffer, size);
-    Doc_Store(context->doc, context->lucy->idF, (Obj*) context->idValue);
+    Doc_Store(context->doc, context->lucy->idF, (Obj *) context->idValue);
     saveDecref(context->idValue);
 
     context->fpValue = Str_new_wrap_trusted_utf8(context->fp.data, context->fp.size);
-    Doc_Store(context->doc, context->lucy->fpF, (Obj*) context->fpValue);
+    Doc_Store(context->doc, context->lucy->fpF, (Obj *) context->fpValue);
     saveDecref(context->fpValue);
 
     Indexer_Add_Doc(context->lucy->indexer, context->doc, 1.0);
@@ -249,7 +249,7 @@ static void base_delete(DeleteRoutineContext *context)
     int size = sprintf(buffer, "%u", context->id);
     context->idValue = Str_new_wrap_trusted_utf8(buffer, size);
 
-    Indexer_Delete_By_Term(context->lucy->indexer, context->lucy->idF, (Obj*) context->idValue);
+    Indexer_Delete_By_Term(context->lucy->indexer, context->lucy->idF, (Obj *) context->idValue);
     saveDecref(context->idValue);
 }
 
@@ -312,11 +312,11 @@ void lucy_rollback(Lucy *lucy)
 static void base_search(SearchRoutineContext *context)
 {
     if(context->lucy->searcher == NULL)
-        context->lucy->searcher = IxSearcher_new((Obj*) (context->lucy->folder));
+        context->lucy->searcher = IxSearcher_new((Obj *) (context->lucy->folder));
 
     context->queryStr = Str_new_wrap_trusted_utf8(context->fp.data, context->fp.size);
     context->query = QParser_Parse(context->lucy->qparser, context->queryStr);
-    context->hits = IxSearcher_Hits(context->lucy->searcher, (Obj*) context->query, 0, context->max_results, NULL);
+    context->hits = IxSearcher_Hits(context->lucy->searcher, (Obj *) context->query, 0, context->max_results, NULL);
 
     saveDecref(context->query);
     saveDecref(context->queryStr);
@@ -365,11 +365,11 @@ static void base_get(GetRoutineContext *context)
             break;
         }
 
-        context->id = (String*) HitDoc_Extract(context->hit, context->lucy->idF);
+        context->id = (String *) HitDoc_Extract(context->hit, context->lucy->idF);
         *(results++) = Str_To_I64(context->id);
 
-        ++ret;
-        --size;
+        ret++;
+        size--;
 
         saveDecref(context->id);
         saveDecref(context->hit);

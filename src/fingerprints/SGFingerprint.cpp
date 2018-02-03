@@ -182,11 +182,11 @@ static bool submol_hash(const std::vector<int> &bondIds, const Molecule *molecul
 		int mindir = -1;
 		int n = cycle.size();
 
-		for(int rot = 0; rot < n; ++rot)
+		for(int rot = 0; rot < n; rot++)
 		{
 			for(int dir = -1; dir <= 1; dir += 2)
 			{
-				for(int i = 0; i < n; ++i)
+				for(int i = 0; i < n; i++)
 				{
 					if(cycle[(n + minrot + i * mindir) % n] < cycle[(n + rot + i * dir) % n])
 						break; // must be ok
@@ -204,7 +204,7 @@ static bool submol_hash(const std::vector<int> &bondIds, const Molecule *molecul
 
 		uint32_t seed = 0;
 
-		for(int i = 0; i < n; ++i)
+		for(int i = 0; i < n; i++)
 			update_seed(cycle[(n + minrot + i * mindir) % n], seed);
 
 		result = seed;
@@ -278,7 +278,7 @@ static void recurse_walk_range(std::map<int, std::vector<int>> &nbrs, PathType &
 {
     uint nsize = spath.size();
 
-    if((nsize >= lowerLen) && (nsize <= upperLen))
+    if(nsize >= lowerLen && nsize <= upperLen)
         res[nsize].push_back(spath);
 
     // end case for recursion

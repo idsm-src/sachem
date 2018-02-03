@@ -294,7 +294,7 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
         queryArg = (*env)->NewByteArray(env, queryLength);
         java_check_exception(__func__);
 
-        (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte*) query);
+        (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte *) query);
 
 
         result = (jobjectArray) (*env)->CallStaticObjectMethod(env, substructureSearchClass, substructureQueryDataMethod, queryArg, (jint) type, (jboolean) implicitHydrogens, (jboolean) tautomers);
@@ -388,7 +388,7 @@ int java_parse_orchem_substructure_query(OrchemSubstructureQueryData **data, cha
         queryArg = (*env)->NewByteArray(env, queryLength);
         java_check_exception(__func__);
 
-        (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte*) query);
+        (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte *) query);
 
 
         result = (jobjectArray) (*env)->CallStaticObjectMethod(env, orchemSubstructureSearchClass, orchemSubstructureQueryDataMethod, queryArg, (jint) type, (jboolean) implicitHydrogens, (jboolean) tautomers);
@@ -495,7 +495,7 @@ int java_parse_orchem_similarity_query(uint64_t **data, char* query, size_t quer
         queryArg = (*env)->NewByteArray(env, queryLength);
         java_check_exception(__func__);
 
-        (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte*) query);
+        (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte *) query);
 
         result = (jlongArray) (*env)->CallStaticObjectMethod(env, orchemSimilaritySearchClass, orchemSimilarityQueryDataMethod, queryArg, (jint) type);
         java_check_exception(__func__);
@@ -561,7 +561,7 @@ void java_parse_orchem_data(size_t count, VarChar **molfiles, OrchemLoaderData *
             molfileArg = (*env)->NewByteArray(env, length);
             java_check_exception(__func__);
 
-            (*env)->SetByteArrayRegion(env, molfileArg, 0, length, (jbyte*) VARDATA(molfiles[i]));
+            (*env)->SetByteArrayRegion(env, molfileArg, 0, length, (jbyte *) VARDATA(molfiles[i]));
             (*env)->SetObjectArrayElement(env, molfileArrayArg, i, molfileArg);
 
             JavaDeleteRef(molfileArg);
@@ -694,7 +694,7 @@ void java_parse_lucy_data(size_t count, VarChar **molfiles, LucyLoaderData *data
             molfileArg = (*env)->NewByteArray(env, length);
             java_check_exception(__func__);
 
-            (*env)->SetByteArrayRegion(env, molfileArg, 0, length, (jbyte*) VARDATA(molfiles[i]));
+            (*env)->SetByteArrayRegion(env, molfileArg, 0, length, (jbyte *) VARDATA(molfiles[i]));
             (*env)->SetObjectArrayElement(env, molfileArrayArg, i, molfileArg);
 
             JavaDeleteRef(molfileArg);

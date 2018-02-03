@@ -375,7 +375,7 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 
 void *lucy_substructure_process_data(void *dataPtr)
 {
-    ThreadData* data = (ThreadData*) dataPtr;
+    ThreadData *data = (ThreadData *) dataPtr;
     Molecule molecule;
 
     while(true)
@@ -398,7 +398,7 @@ void *lucy_substructure_process_data(void *dataPtr)
         }
     }
 
-    pthread_exit((void*) 0);
+    pthread_exit((void *) 0);
 }
 
 

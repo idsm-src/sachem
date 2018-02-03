@@ -20,10 +20,10 @@ PG_MODULE_MAGIC;
 
 
 static const unsigned char b64str[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-static std::map<uint32_t, int> fporder __attribute__ ((init_priority (200)));
+static std::map<uint32_t, int> fporder __attribute__ ((init_priority(200)));
 
 
-void __attribute__ ((constructor (300))) fingerprint_init (void)
+void __attribute__ ((constructor(300))) fingerprint_init(void)
 {
     std::ifstream stream(DATADIR "/fporder.bin", std::ios::in | std::ios::binary);
 
@@ -45,8 +45,8 @@ void __attribute__ ((constructor (300))) fingerprint_init (void)
 
 static inline void write_bitword(char *buffer, uint32_t fp)
 {
-    for(int i = 0; i < 6; ++i)
-        buffer[i] = b64str[ (fp >> (6 * i)) & 0x3f];
+    for(int i = 0; i < 6; i++)
+        buffer[i] = b64str[(fp >> (6 * i)) & 0x3f];
 }
 
 
@@ -82,7 +82,7 @@ Fingerprint fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t))
             return {.size = 0, .data = NULL};
         }
     }
-    catch (...)
+    catch(...)
     {
     }
 
@@ -102,11 +102,11 @@ Fingerprint fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_
         std::map<int, uint32_t> fpi;
         int unknownId = -1;
 
-        for (uint32_t i : res)
+        for(uint32_t i : res)
         {
             auto o = fporder.find(i);
 
-            if (o == fporder.end())
+            if(o == fporder.end())
                 // if the fingerprint is not known to fporder (which it should be but keeping that database in shape
                 // is not very easy), let's assume it's very good (and put it on the beginning of the queue...
                 fpi[unknownId--] = i;
@@ -123,7 +123,7 @@ Fingerprint fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_
         int nfps = 0;
         coverage.resize(uncovered, 0);
 
-        for(auto&i : fpi)
+        for(auto &i : fpi)
         {
             if(uncovered <= 0)
                 break;
@@ -133,7 +133,7 @@ Fingerprint fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_
 
             bool found = false;
 
-            for (auto a : info[i.second])
+            for(auto a : info[i.second])
             {
                 if(coverage[a] < QUERY_ATOM_COVERAGE)
                 {
@@ -147,8 +147,8 @@ Fingerprint fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_
 
             if(found)
             {
-                fps.insert (i.second);
-                ++nfps;
+                fps.insert(i.second);
+                nfps++;
             }
         }
 
@@ -180,7 +180,7 @@ Fingerprint fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_
             return {.size = 0, .data = NULL};
         }
     }
-    catch (...)
+    catch(...)
     {
     }
 

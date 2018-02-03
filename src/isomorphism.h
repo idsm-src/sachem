@@ -761,7 +761,7 @@ inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *co
 #endif
     bool result = vf2state_match_core(vf2state);
 #if USE_VF2_TIMEOUT
-    disable_timeout (vf2TimeoutId, false);
+    disable_timeout(vf2TimeoutId, false);
 #endif
 
     return result;
