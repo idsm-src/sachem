@@ -241,6 +241,9 @@ static void get_neighbor_list(const Molecule *molecule, std::map<int, std::vecto
 
             int bid1 = molecule_get_bond(molecule, i, bondedAtoms[l]);
 
+            if(molecule_get_bond_type(molecule, bid1) > BOND_AROMATIC)
+                continue;
+
             if(nbrs.find(bid1) == nbrs.end())
             {
                 std::vector<int> nlst;
@@ -253,6 +256,9 @@ static void get_neighbor_list(const Molecule *molecule, std::map<int, std::vecto
                     continue;
 
                 int bid2 = molecule_get_bond(molecule, i, bondedAtoms[k]);
+
+                if(molecule_get_bond_type(molecule, bid2) > BOND_AROMATIC)
+                    continue;
 
                 if(bid1 != bid2)
                     nbrs[bid1].push_back(bid2);  //FIXME: pathListType should probably be container of pointers?
