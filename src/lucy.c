@@ -11,6 +11,7 @@
 #include <Lucy/Search/ANDQuery.h>
 #include <Lucy/Search/Hits.h>
 #include <Lucy/Search/IndexSearcher.h>
+#include <Lucy/Search/MatchAllQuery.h>
 #include <Lucy/Search/QueryParser.h>
 #include <Lucy/Search/TermQuery.h>
 #include "lucy.h"
@@ -314,8 +315,16 @@ static void base_search(SearchRoutineContext *context)
     if(context->lucy->searcher == NULL)
         context->lucy->searcher = IxSearcher_new((Obj *) (context->lucy->folder));
 
-    context->queryStr = Str_new_wrap_trusted_utf8(context->fp.data, context->fp.size);
-    context->query = QParser_Parse(context->lucy->qparser, context->queryStr);
+    if(context->fp.size != 0)
+    {
+        context->queryStr = Str_new_wrap_trusted_utf8(context->fp.data, context->fp.size);
+        context->query = QParser_Parse(context->lucy->qparser, context->queryStr);
+    }
+    else
+    {
+        context->query = (Query *) MatchAllQuery_new();
+    }
+
     context->hits = IxSearcher_Hits(context->lucy->searcher, (Obj *) context->query, 0, context->max_results, NULL);
 
     saveDecref(context->query);
