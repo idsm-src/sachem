@@ -27,24 +27,24 @@ typedef std::pair<uint32_t, std::list<uint32_t>> AtomDesc;
 
 static inline void update_seed(uint32_t x, uint32_t &seed)
 {
-	seed ^= (uint32_t) x * 2654435761 + 2654435769 + (seed << 6) + (seed >> 2);
+    seed ^= (uint32_t) x * 2654435761 + 2654435769 + (seed << 6) + (seed >> 2);
 }
 
 
 template<class C>
 static inline uint32_t list_hash(uint32_t a, uint32_t b, const C &l)
 {
-	std::vector<uint32_t> s(l.begin(), l.end());
-	std::sort(s.begin(), s.end());
+    std::vector<uint32_t> s(l.begin(), l.end());
+    std::sort(s.begin(), s.end());
 
-	uint32_t seed = 0;
-	update_seed(a, seed);
-	update_seed(b, seed);
+    uint32_t seed = 0;
+    update_seed(a, seed);
+    update_seed(b, seed);
 
-	for(uint32_t &i : s)
-	    update_seed(i, seed);
+    for(uint32_t &i : s)
+        update_seed(i, seed);
 
-	return seed;
+    return seed;
 }
 
 
@@ -56,7 +56,7 @@ static inline uint32_t bond_hash(const Molecule *molecule, int b)
 
 static inline uint32_t atom_hash(const Molecule *molecule, int a)
 {
-	return molecule_get_atom_number(molecule, a);
+    return molecule_get_atom_number(molecule, a);
 }
 
 
@@ -64,158 +64,158 @@ static bool submol_hash(const std::vector<int> &bondIds, const Molecule *molecul
 {
     result = 0;
 
-	std::map<int, std::list<int>> preatoms;         // atomIdx -> bondIdxs
+    std::map<int, std::list<int>> preatoms;         // atomIdx -> bondIdxs
 
-	for(const int bid : bondIds)
-	{
+    for(const int bid : bondIds)
+    {
         preatoms[molecule_bond_atoms(molecule, bid)[0]].push_back(bid);
         preatoms[molecule_bond_atoms(molecule, bid)[1]].push_back(bid);
     }
 
-	std::map<int, std::map<int, AtomDesc>> atoms;   // degree -> atomID -> (hash, [incoming])
-	std::map<int, std::map<int, uint32_t>> bonds;   // atomFrom -> atomTo -> hash
+    std::map<int, std::map<int, AtomDesc>> atoms;   // degree -> atomID -> (hash, [incoming])
+    std::map<int, std::map<int, uint32_t>> bonds;   // atomFrom -> atomTo -> hash
 
-	atoms[1]; // create an empty list of degree-0 atoms
+    atoms[1]; // create an empty list of degree-0 atoms
 
-	for(auto &a : preatoms)
-	{
-		int aid = a.first;
+    for(auto &a : preatoms)
+    {
+        int aid = a.first;
 
-		// pre-hash the bonds
-		for(int bid : a.second)
-		    bonds[aid][molecule_get_bond_connected_atom(molecule, bid, aid)] = bond_hash(molecule, bid);
+        // pre-hash the bonds
+        for(int bid : a.second)
+            bonds[aid][molecule_get_bond_connected_atom(molecule, bid, aid)] = bond_hash(molecule, bid);
 
         atoms[a.second.size()][aid] = AtomDesc(atom_hash(molecule, aid), std::list<uint32_t>());
-	}
+    }
 
-	// purge the leaves until there is nothing left
-	while(!atoms[1].empty())
-	{
-	    std::map<int, AtomDesc> ats = atoms[1];
+    // purge the leaves until there is nothing left
+    while(!atoms[1].empty())
+    {
+        std::map<int, AtomDesc> ats = atoms[1];
 
-		for(auto &a : ats)
-		{
-			int aid = a.first;
+        for(auto &a : ats)
+        {
+            int aid = a.first;
 
-			// there is just one thing in bonds[aid]
-			int addto_id = bonds[aid].begin()->first;
-			uint32_t bond_hash = bonds[aid].begin()->second;
+            // there is just one thing in bonds[aid]
+            int addto_id = bonds[aid].begin()->first;
+            uint32_t bond_hash = bonds[aid].begin()->second;
 
-			uint32_t result_hash = list_hash(ats[aid].first, bond_hash, ats[aid].second);
+            uint32_t result_hash = list_hash(ats[aid].first, bond_hash, ats[aid].second);
 
-			bonds.erase(aid);
-			atoms[1].erase(aid);
-			int addto_deg = bonds[addto_id].size();
+            bonds.erase(aid);
+            atoms[1].erase(aid);
+            int addto_deg = bonds[addto_id].size();
 
-			if(ats.count(addto_id))
-			{
-				// final doublet handling!
-				AtomDesc other;
-				other.swap(atoms[addto_deg][addto_id]);
+            if(ats.count(addto_id))
+            {
+                // final doublet handling!
+                AtomDesc other;
+                other.swap(atoms[addto_deg][addto_id]);
 
-				uint32_t other_atom_hash = list_hash(other.first, bond_hash, other.second);
-				atoms[addto_deg].erase(addto_id);
-				bonds[addto_id].erase(aid);
-				atoms[0][addto_id].first = 666; //FIXME: use different value
-				atoms[0][addto_id].second.push_back(result_hash);
-				atoms[0][addto_id].second.push_back(other_atom_hash);
-				break;
-			}
+                uint32_t other_atom_hash = list_hash(other.first, bond_hash, other.second);
+                atoms[addto_deg].erase(addto_id);
+                bonds[addto_id].erase(aid);
+                atoms[0][addto_id].first = 666; //FIXME: use different value
+                atoms[0][addto_id].second.push_back(result_hash);
+                atoms[0][addto_id].second.push_back(other_atom_hash);
+                break;
+            }
 
-			// "normal" leaf
-			AtomDesc res_atom;
-			res_atom.swap(atoms[addto_deg][addto_id]);
-			atoms[addto_deg].erase(addto_id);
-			bonds[addto_id].erase(aid);
-			res_atom.second.push_back(result_hash);
-			atoms[addto_deg - 1][addto_id] = res_atom;
-		}
-	}
+            // "normal" leaf
+            AtomDesc res_atom;
+            res_atom.swap(atoms[addto_deg][addto_id]);
+            atoms[addto_deg].erase(addto_id);
+            bonds[addto_id].erase(aid);
+            res_atom.second.push_back(result_hash);
+            atoms[addto_deg - 1][addto_id] = res_atom;
+        }
+    }
 
-	if(atoms[0].empty())
-	{
-		// there must be a single cycle!
-		for(auto &i : atoms)
-			if(i.first != 2 && i.second.size())
-				return false;
-		// (note that the graph is connected)
+    if(atoms[0].empty())
+    {
+        // there must be a single cycle!
+        for(auto &i : atoms)
+            if(i.first != 2 && i.second.size())
+                return false;
+        // (note that the graph is connected)
 
-		auto &ats = atoms[2];
+        auto &ats = atoms[2];
 
-		if(ats.empty())
-		    return false; // this would be just weird.
+        if(ats.empty())
+            return false; // this would be just weird.
 
-		int curId = ats.begin()->first;
-		int lastId = -1;
-		int startId = curId;
-		bool found_next = true;
-		std::vector<uint32_t> cycle;
+        int curId = ats.begin()->first;
+        int lastId = -1;
+        int startId = curId;
+        bool found_next = true;
+        std::vector<uint32_t> cycle;
 
-		cycle.reserve(2 * ats.size());
-		AtomDesc &firstAtom = ats.begin()->second;
-		cycle.push_back(list_hash(firstAtom.first, 0, firstAtom.second));
+        cycle.reserve(2 * ats.size());
+        AtomDesc &firstAtom = ats.begin()->second;
+        cycle.push_back(list_hash(firstAtom.first, 0, firstAtom.second));
 
-		while(found_next)
-		{
-			found_next = false;
+        while(found_next)
+        {
+            found_next = false;
 
-			for(auto &i : bonds[curId])
-			{
-				if(i.first != lastId)
-				{
-					cycle.push_back(i.second);
+            for(auto &i : bonds[curId])
+            {
+                if(i.first != lastId)
+                {
+                    cycle.push_back(i.second);
 
-					if(i.first == startId)
-					    break;
+                    if(i.first == startId)
+                        break;
 
-					AtomDesc &theAtom = ats[i.first];
-					cycle.push_back(list_hash(theAtom.first, 0, theAtom.second));
-					lastId = curId;
-					curId = i.first;
-					found_next = true;
-					break;
-				}
-			}
-		}
+                    AtomDesc &theAtom = ats[i.first];
+                    cycle.push_back(list_hash(theAtom.first, 0, theAtom.second));
+                    lastId = curId;
+                    curId = i.first;
+                    found_next = true;
+                    break;
+                }
+            }
+        }
 
-		int minrot = 0;
-		int mindir = -1;
-		int n = cycle.size();
+        int minrot = 0;
+        int mindir = -1;
+        int n = cycle.size();
 
-		for(int rot = 0; rot < n; rot++)
-		{
-			for(int dir = -1; dir <= 1; dir += 2)
-			{
-				for(int i = 0; i < n; i++)
-				{
-					if(cycle[(n + minrot + i * mindir) % n] < cycle[(n + rot + i * dir) % n])
-						break; // must be ok
+        for(int rot = 0; rot < n; rot++)
+        {
+            for(int dir = -1; dir <= 1; dir += 2)
+            {
+                for(int i = 0; i < n; i++)
+                {
+                    if(cycle[(n + minrot + i * mindir) % n] < cycle[(n + rot + i * dir) % n])
+                        break; // must be ok
 
-					if(cycle[(n + minrot + i * mindir) % n] == cycle[(n + rot + i * dir) % n])
-						continue; // ok
+                    if(cycle[(n + minrot + i * mindir) % n] == cycle[(n + rot + i * dir) % n])
+                        continue; // ok
 
-					// found better!
-					minrot = rot;
-					mindir = dir;
-					break;
-				}
-			}
-		}
+                    // found better!
+                    minrot = rot;
+                    mindir = dir;
+                    break;
+                }
+            }
+        }
 
-		uint32_t seed = 0;
+        uint32_t seed = 0;
 
-		for(int i = 0; i < n; i++)
-			update_seed(cycle[(n + minrot + i * mindir) % n], seed);
+        for(int i = 0; i < n; i++)
+            update_seed(cycle[(n + minrot + i * mindir) % n], seed);
 
-		result = seed;
-		return true;
-	}
-	else
-	{
-		auto &a = *atoms[0].begin();
-		result = list_hash(a.second.first, 0, a.second.second);
-		return true;
-	}
+        result = seed;
+        return true;
+    }
+    else
+    {
+        auto &a = *atoms[0].begin();
+        result = list_hash(a.second.first, 0, a.second.second);
+        return true;
+    }
 }
 
 
@@ -363,7 +363,7 @@ static PathList find_subgraphs(const Molecule *molecule, uint lowerLen, uint upp
 
 static void add_molecule_fp(const Molecule *molecule, std::map<uint32_t, int> &fp, uint minLen, uint maxLen, BitInfo*info)
 {
-	PathList allSGs = find_subgraphs(molecule, minLen, maxLen, -1);
+    PathList allSGs = find_subgraphs(molecule, minLen, maxLen, -1);
 
 
     for(auto &i : allSGs)
@@ -416,31 +416,31 @@ static inline void fragment_walk(const Molecule *molecule, int atom, std::vector
 
 std::map<uint32_t, int> sg_fingerprint_get(const Molecule *molecule, uint minLen, uint maxLen, bool forQuery, BitInfo *info)
 {
-	if(forQuery)
-	{
-	    int minQueryLen = maxLen;
+    if(forQuery)
+    {
+        int minQueryLen = maxLen;
 
-	    std::vector<int> visitedAtoms(molecule->atomCount);
-	    std::vector<int> visitedBonds(molecule->bondCount);
+        std::vector<int> visitedAtoms(molecule->atomCount);
+        std::vector<int> visitedBonds(molecule->bondCount);
 
-	    for(int a = 0; a < molecule->atomCount; a++)
-	    {
-	        if(!visitedAtoms[a])
-	        {
-	            int visited = 0;
-	            fragment_walk(molecule, a, visitedAtoms, visitedBonds, visited);
+        for(int a = 0; a < molecule->atomCount; a++)
+        {
+            if(!visitedAtoms[a])
+            {
+                int visited = 0;
+                fragment_walk(molecule, a, visitedAtoms, visitedBonds, visited);
 
-	            if(visited > 0 && visited < minQueryLen && visited >= minLen)
-	                minQueryLen = visited;
-	        }
-	    }
+                if(visited > 0 && visited < minQueryLen && visited >= minLen)
+                    minQueryLen = visited;
+            }
+        }
 
-	    minLen = minQueryLen;
-	}
+        minLen = minQueryLen;
+    }
 
 
     std::map<uint32_t, int> fp;
     add_molecule_fp(molecule, fp, minLen, maxLen, info);
 
-	return fp;
+    return fp;
 }

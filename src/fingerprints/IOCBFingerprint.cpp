@@ -6,17 +6,17 @@
 
 static inline void update_seed(const uint32_t x, uint32_t &seed)
 {
-	seed ^= (uint32_t) x * 2654435761 + 2654435769 + (seed << 6) + (seed >> 2);
+    seed ^= (uint32_t) x * 2654435761 + 2654435769 + (seed << 6) + (seed >> 2);
 }
 
 
 static inline uint32_t hash3(uint32_t a, uint32_t b, uint32_t c)
 {
-	uint32_t seed = 0;
-	update_seed(a, seed);
-	update_seed(b, seed);
-	update_seed(c, seed);
-	return seed;
+    uint32_t seed = 0;
+    update_seed(a, seed);
+    update_seed(b, seed);
+    update_seed(c, seed);
+    return seed;
 }
 
 
@@ -65,13 +65,13 @@ std::set<uint32_t> iocb_fingerprint_get(const Molecule *molecule, int graphSize,
     std::map<uint32_t, int> sg = sg_fingerprint_get(molecule, 0, graphSize, forQuery, info ? &sgi : nullptr);
     process_elements(sg, sgi, 1, fp, maxFeatLogCount, forQuery, info);
 
-	BitInfo crngi;
-	std::map<uint32_t, int> crng = crng_fingerprint_get(molecule, info ? &crngi : nullptr);
+    BitInfo crngi;
+    std::map<uint32_t, int> crng = crng_fingerprint_get(molecule, info ? &crngi : nullptr);
     process_elements(crng, crngi, 2, fp, maxFeatLogCount, forQuery, info);
 
-	BitInfo atomi;
-	std::map<uint32_t, int> atom = atom_fingerprint_get(molecule, info ? &atomi : nullptr);
-	process_elements(atom, atomi, 3, fp, maxFeatLogCount, forQuery, info);
+    BitInfo atomi;
+    std::map<uint32_t, int> atom = atom_fingerprint_get(molecule, info ? &atomi : nullptr);
+    process_elements(atom, atomi, 3, fp, maxFeatLogCount, forQuery, info);
 
-	return fp;
+    return fp;
 }

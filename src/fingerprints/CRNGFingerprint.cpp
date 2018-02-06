@@ -376,12 +376,12 @@ void __attribute__ ((constructor)) crng_fingerprint_init(void)
 
 std::map<uint32_t, int> crng_fingerprint_get(const Molecule *molecule, BitInfo *info)
 {
- 	std::map<uint32_t, int> fp;
+     std::map<uint32_t, int> fp;
 
-	for(int i = 0; i < PATTERN_COUNT; i++)
-	{
-	    SubstructureMatch substructure(patternMolecule + i);
-	    std::vector<std::vector<int>> matches = substructure.match(molecule, 256);
+    for(int i = 0; i < PATTERN_COUNT; i++)
+    {
+        SubstructureMatch substructure(patternMolecule + i);
+        std::vector<std::vector<int>> matches = substructure.match(molecule, 256);
 
         if(matches.size())
         {
@@ -393,7 +393,7 @@ std::map<uint32_t, int> crng_fingerprint_get(const Molecule *molecule, BitInfo *
                     (*info)[i].insert(match.begin(), match.end());
             }
         }
-	}
+    }
 
-	return fp;
+    return fp;
 }
