@@ -2,6 +2,7 @@ package cz.iocb.sachem.search;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IBond;
@@ -48,7 +49,7 @@ public class LucyLoader
                             MoleculeCreator.configureMolecule(readMolecule);
 
                             if(!canBeIndexed(readMolecule))
-                                item.exception = "warning: cannot be fully indexed";
+                                throw new CDKException("query molecule cannot be indexed");
 
                             // calculate molecule binary representation
                             readMolecule.setAtoms(IsomorphismSort.atomsByFrequency(readMolecule));

@@ -3,6 +3,7 @@ package cz.iocb.sachem.search;
 import java.nio.charset.StandardCharsets;
 import java.util.BitSet;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IBond;
@@ -63,18 +64,12 @@ public class OrchemLoader
                             MoleculeCreator.configureMolecule(readMolecule);
 
                             // calculate similarity fingerprint
-                            if(canBeIndexed(readMolecule))
-                            {
-                                BitSet fp = fingerPrinter.get().getFingerprint(readMolecule);
-                                item.fp = fp.toLongArray();
-                            }
-                            else
-                            {
-                                BitSet fp = new BitSet(fingerPrinter.get().getSize());
-                                fp.set(0, fingerPrinter.get().getSize());
-                                item.fp = fp.toLongArray();
-                                item.exception = "warning: cannot be fully indexed";
-                            }
+                            if(!canBeIndexed(readMolecule))
+                                throw new CDKException("query molecule cannot be indexed");
+
+                            // calculate similarity fingerprint
+                            BitSet fp = fingerPrinter.get().getFingerprint(readMolecule);
+                            item.fp = fp.toLongArray();
 
                             // calculate molecule couts
                             MoleculeCounts counts = new MoleculeCounts(readMolecule, true);
