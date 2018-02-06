@@ -219,9 +219,10 @@ static bool submol_hash(const std::vector<int> &bondIds, const Molecule *molecul
 }
 
 
-static void get_neighbor_list(const Molecule *molecule, std::map<int, std::vector<int>> &nbrs)
+static std::vector<std::vector<int>> get_neighbor_list(const Molecule *molecule)
 {
-    nbrs.clear();
+    std::vector<std::vector<int>> nbrs(molecule->bondCount);
+
 
     int nAtoms = molecule->atomCount;
 
@@ -244,12 +245,6 @@ static void get_neighbor_list(const Molecule *molecule, std::map<int, std::vecto
             if(molecule_get_bond_type(molecule, bid1) > BOND_AROMATIC)
                 continue;
 
-            if(nbrs.find(bid1) == nbrs.end())
-            {
-                std::vector<int> nlst;
-                nbrs[bid1] = nlst;
-            }
-
             for(int k = 0; k < size; k++)
             {
                 if(molecule_get_atom_number(molecule, bondedAtoms[k]) <= H_ATOM_NUMBER)
@@ -261,10 +256,12 @@ static void get_neighbor_list(const Molecule *molecule, std::map<int, std::vecto
                     continue;
 
                 if(bid1 != bid2)
-                    nbrs[bid1].push_back(bid2);  //FIXME: pathListType should probably be container of pointers?
+                    nbrs[bid1].push_back(bid2);
             }
         }
     }
+
+    return nbrs;
 }
 
 
@@ -279,21 +276,16 @@ static void get_neighbor_list(const Molecule *molecule, std::map<int, std::vecto
  *                  up to "FindAllSubGraphs"
  * @param res       the final list of subgraphs
  */
-static void recurse_walk_range(std::map<int, std::vector<int>> &nbrs, PathType &spath, std::vector<int> &cands,
-        uint lowerLen, uint upperLen, std::vector<uint8_t> forbidden, std::map<int, PathList> &res)
+static void recurse_walk_range(std::vector<std::vector<int>> &nbrs, PathType &spath, std::vector<int> &cands,
+        uint lowerLen, uint upperLen, std::vector<uint8_t> forbidden, PathList &res)
 {
     uint nsize = spath.size();
 
     if(nsize >= lowerLen && nsize <= upperLen)
-        res[nsize].push_back(spath);
+        res.push_back(spath);
 
     // end case for recursion
-    if(nsize == upperLen)
-        return;
-
-
-    // if the path is already bigger than desired size
-    if(nsize > upperLen)
+    if(nsize >= upperLen)
         return;
 
 
@@ -311,9 +303,9 @@ static void recurse_walk_range(std::map<int, std::vector<int>> &nbrs, PathType &
             // update a local stack before the next recursive call
             std::vector<int> tstack = cands;
 
-            for(std::vector<int>::iterator bid = nbrs[next].begin(); bid != nbrs[next].end(); bid++)
-                if(!forbidden[*bid])
-                    tstack.push_back(*bid);
+            for(int bid : nbrs[next])
+                if(!forbidden[bid])
+                    tstack.push_back(bid);
 
             PathType tpath = spath;
             tpath.push_back(next);
@@ -324,26 +316,20 @@ static void recurse_walk_range(std::map<int, std::vector<int>> &nbrs, PathType &
 }
 
 
-static std::map<int, PathList> find_subgraphs(const Molecule *molecule, uint lowerLen, uint upperLen, int rootedAtAtom)
+static PathList find_subgraphs(const Molecule *molecule, uint lowerLen, uint upperLen, int rootedAtAtom)
 {
     std::vector<uint8_t> forbidden(molecule->bondCount);
 
-    std::map<int, std::vector<int>> nbrs;
-    get_neighbor_list(molecule, nbrs);
+    std::vector<std::vector<int>> nbrs = get_neighbor_list(molecule);
 
     // start path at each bond
-    std::map<int, PathList> res;
-
-    for(uint idx = lowerLen; idx <= upperLen; idx++)
-    {
-        PathList ordern;
-        res[idx] = ordern;
-    }
+    PathList res;
 
     // start paths at each bond:
-    for(std::map<int, std::vector<int>>::iterator nbi = nbrs.begin(); nbi != nbrs.end(); nbi++)
+    for(int i = 0; i < molecule->bondCount; i++)
     {
-        int i = (*nbi).first;
+        if(molecule_get_bond_type(molecule, i) > BOND_AROMATIC)
+            continue;
 
         // if we are only returning paths rooted at a particular atom, check now that this bond involves that atom:
         if(rootedAtAtom >= 0 && molecule_bond_atoms(molecule, i)[0] != rootedAtAtom &&
@@ -371,37 +357,34 @@ static std::map<int, PathList> find_subgraphs(const Molecule *molecule, uint low
 
     nbrs.clear();
 
-    return res;  //FIXME: need some verbose testing code here
+    return res;
 }
 
 
 static void add_molecule_fp(const Molecule *molecule, std::map<uint32_t, int> &fp, uint minLen, uint maxLen, BitInfo*info)
 {
-	std::map<int, PathList> allSGs = find_subgraphs(molecule, minLen, maxLen, -1);
+	PathList allSGs = find_subgraphs(molecule, minLen, maxLen, -1);
 
 
     for(auto &i : allSGs)
     {
-        for(auto &j : i.second)
+        uint32_t hash;
+
+        if(!submol_hash(i, molecule, hash))
+            continue;
+
+        fp[hash] += 1;
+
+
+        if(!info)
+            continue;
+
+        for(auto b : i)
         {
-            uint32_t hash;
-
-            if(!submol_hash(j, molecule, hash))
-                continue;
-
-            fp[hash] += 1;
-
-
-            if(!info)
-                continue;
-
-            for(auto b : j)
-            {
-                (*info)[hash].insert(molecule_bond_atoms(molecule, b)[0]);
-                (*info)[hash].insert(molecule_bond_atoms(molecule, b)[1]);
-            }
+            (*info)[hash].insert(molecule_bond_atoms(molecule, b)[0]);
+            (*info)[hash].insert(molecule_bond_atoms(molecule, b)[1]);
         }
-	}
+    }
 }
 
 
