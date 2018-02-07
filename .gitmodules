@@ -1,8 +1,8 @@
 [submodule "lib/lucy"]
 	path = lib/lucy
-	url = https://git-wip-us.apache.org/repos/asf/lucy.git
+	url = https://took28.ics.muni.cz/chemdb/apache-lucy.git
 	branch = 0.6
 [submodule "lib/clownfish"]
 	path = lib/clownfish
-	url = https://git-wip-us.apache.org/repos/asf/lucy-clownfish.git
+	url = https://took28.ics.muni.cz/chemdb/apache-clownfish.git
 	branch = 0.6
