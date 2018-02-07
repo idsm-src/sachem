@@ -39,6 +39,8 @@ public class ConvertMolecule
         if(smiles != null && !smiles.trim().equals(""))
         {
             SmilesParser sp = new SmilesParser(SilentChemObjectBuilder.getInstance());
+            sp.kekulise(!useBondType4);
+
             IAtomContainer molecule = sp.parseSmiles(smiles);
 
             // why are valencies being set?

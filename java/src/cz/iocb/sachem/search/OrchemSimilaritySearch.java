@@ -5,8 +5,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.BitSet;
 import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.interfaces.IAtomContainer;
-import org.openscience.cdk.silent.SilentChemObjectBuilder;
-import org.openscience.cdk.smiles.SmilesParser;
 import cz.iocb.sachem.fingerprint.OrchemExtendedFingerprinter;
 import cz.iocb.sachem.shared.MoleculeCreator;
 
@@ -37,7 +35,7 @@ public class OrchemSimilaritySearch
         if(queryType == QueryFormat.MOLFILE)
             molecule = MoleculeCreator.getMoleculeFromMolfile(query);
         else if(queryType == QueryFormat.SMILES)
-            molecule = new SmilesParser(SilentChemObjectBuilder.getInstance()).parseSmiles(query);
+            molecule = MoleculeCreator.getMoleculeFromSmiles(query);
         else
             throw new CDKException("unsupported format");
 

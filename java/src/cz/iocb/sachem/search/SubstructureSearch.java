@@ -28,7 +28,6 @@ import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.io.RGroupQueryReader;
 import org.openscience.cdk.isomorphism.matchers.RGroupQuery;
 import org.openscience.cdk.silent.SilentChemObjectBuilder;
-import org.openscience.cdk.smiles.SmilesParser;
 import cz.iocb.sachem.convert.ConvertMolecule;
 import cz.iocb.sachem.isomorphism.IsomorphismSort;
 import cz.iocb.sachem.shared.MoleculeCreator;
@@ -139,15 +138,14 @@ public abstract class SubstructureSearch
         {
             if(!tautomers)
             {
-                SmilesParser sp = new SmilesParser(SilentChemObjectBuilder.getInstance());
-                IAtomContainer molecule = sp.parseSmiles(query);
+                IAtomContainer molecule = MoleculeCreator.getMoleculeFromSmiles(query);
 
                 userQueries = new ArrayList<IAtomContainer>();
                 userQueries.add(molecule);
             }
             else
             {
-                String molfile = ConvertMolecule.smilesToMolfile(query, false, false);
+                String molfile = ConvertMolecule.smilesToMolfile(query, false, true);
                 InchiTautomerGenerator tautomerGenerator = new InchiTautomerGenerator();
                 userQueries = tautomerGenerator.getTautomers(molfile);
             }
