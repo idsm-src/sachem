@@ -6,7 +6,3 @@
 	path = lib/clownfish
 	url = https://git-wip-us.apache.org/repos/asf/lucy-clownfish.git
 	branch = 0.6
-[submodule "lib/rdkit"]
-	path = lib/rdkit
-	url = https://github.com/rdkit/rdkit.git
-	branch = master
