@@ -1,10 +1,12 @@
 #include <postgres.h>
 #include <stdio.h>
 #include <Clownfish/String.h>
+#include <Clownfish/Vector.h>
 #include <Lucy/Analysis/RegexTokenizer.h>
 #include <Lucy/Document/Doc.h>
 #include <Lucy/Document/HitDoc.h>
 #include <Lucy/Index/Indexer.h>
+#include <Lucy/Index/Snapshot.h>
 #include <Lucy/Plan/FullTextType.h>
 #include <Lucy/Plan/Schema.h>
 #include <Lucy/Plan/StringType.h>
@@ -60,6 +62,22 @@ typedef struct
 typedef struct
 {
     Lucy *lucy;
+    bytea *binarySnapshot;
+} CommitRoutineContext;
+
+
+typedef struct
+{
+    Lucy *lucy;
+    bytea *binarySnapshot;
+    Snapshot *snapshot;
+}
+SetSnapshotRoutineContext;
+
+
+typedef struct
+{
+    Lucy *lucy;
     Fingerprint fp;
     int max_results;
     String *queryStr;
@@ -109,6 +127,88 @@ static void throwError(Err *error)
 {
     saveNothrowDecref(error);
     elog(ERROR, "lucy error");
+}
+
+
+static bytea *snapshot_export(Snapshot *snapshot)
+{
+    Vector *list = Snapshot_List(snapshot);
+    uint32_t count = Snapshot_Num_Entries(snapshot);
+    size_t size = VARHDRSZ;
+
+    String *path = Snapshot_Get_Path(snapshot);
+    size_t pathLength = Str_Get_Size(path);
+    size += sizeof(size_t) + pathLength;
+
+    for(int i = 0; i < count; i++)
+    {
+        String *entry = (String *) Vec_Fetch(list, i);
+        size += sizeof(size_t) + Str_Get_Size(entry);
+    }
+
+    bytea *result = palloc_extended(size, MCXT_ALLOC_NO_OOM);
+
+    if(result == NULL)
+    {
+        DECREF(list);
+        CFISH_THROW(CFISH_ERR, "not enough memory");
+    }
+
+    SET_VARSIZE(result, size);
+
+    char *data = ((char *) result) + VARHDRSZ;
+
+    memcpy(data, &pathLength, sizeof(size_t));
+    data += sizeof(size_t);
+
+    memcpy(data, Str_Get_Ptr8(path), pathLength);
+    data += pathLength;
+
+    for(int i = 0; i < count; i++)
+    {
+        String *entry = (String *) Vec_Fetch(list, i);
+        size_t length = Str_Get_Size(entry);
+
+        memcpy(data, &length, sizeof(size_t));
+        data += sizeof(size_t);
+
+        memcpy(data, Str_Get_Ptr8(entry), length);
+        data += length;
+    }
+
+    DECREF(list);
+    return result;
+}
+
+
+static Snapshot *snapshot_import(bytea *data)
+{
+    int size = VARSIZE(data) - VARHDRSZ;
+
+    char *buffer = VARDATA(data);
+    char *end = buffer + size;
+    Snapshot *snapshot = Snapshot_new();
+
+    size_t length = *((size_t *) buffer);
+    buffer += sizeof(size_t);
+
+    String *path = Str_new_from_trusted_utf8(buffer, length);
+    Snapshot_Set_Path(snapshot, path);
+
+    buffer += length;
+
+    while(buffer != end)
+    {
+        size_t length = *((size_t *) buffer);
+        buffer += sizeof(size_t);
+
+        String *entry = Str_new_from_trusted_utf8(buffer, length);
+        Snapshot_Add_Entry(snapshot, entry);
+
+        buffer += length;
+    }
+
+    return snapshot;
 }
 
 
@@ -288,19 +388,31 @@ void lucy_optimize(Lucy *lucy)
 }
 
 
-static void base_commit(Lucy *lucy)
+static void base_commit(CommitRoutineContext *context)
 {
-    Indexer_Commit(lucy->indexer);
-    saveDecref(lucy->indexer);
+    Indexer_Commit(context->lucy->indexer);
+
+    context->binarySnapshot = snapshot_export(Indexer_Get_Snapshot(context->lucy->indexer));
+
+    saveDecref(context->lucy->indexer);
 }
 
 
-void lucy_commit(Lucy *lucy)
+bytea *lucy_commit(Lucy *lucy)
 {
-    Err *error = Err_trap((Err_Attempt_t) &base_commit, (void *) lucy);
+    CommitRoutineContext context;
+    context.lucy = lucy;
+    context.binarySnapshot = NULL;
+
+    Err *error = Err_trap((Err_Attempt_t) &base_commit, (void *) &context);
 
     if(error != NULL)
+    {
+        saveNothrowDecref(context.lucy->indexer);
         throwError(error);
+    }
+
+    return context.binarySnapshot;
 }
 
 
@@ -310,11 +422,39 @@ void lucy_rollback(Lucy *lucy)
 }
 
 
+static void base_set_snapshot(SetSnapshotRoutineContext *context)
+{
+    if(context->lucy->searcher != NULL)
+        saveDecref(context->lucy->searcher);
+
+    context->snapshot = snapshot_import(context->binarySnapshot);
+    context->lucy->searcher = IxSearcher_new((Obj *) (context->lucy->folder), context->snapshot);
+
+    saveDecref(context->snapshot);
+}
+
+
+void lucy_set_snapshot(Lucy *lucy, bytea *binarySnapshot)
+{
+    SetSnapshotRoutineContext context;
+    context.lucy = lucy;
+    context.binarySnapshot = binarySnapshot;
+    context.snapshot = NULL;
+
+    Err *error = Err_trap((Err_Attempt_t) &base_set_snapshot, (void *) &context);
+
+    if(error != NULL)
+    {
+        saveNothrowDecref(context.lucy->searcher);
+        saveNothrowDecref(context.snapshot);
+
+        throwError(error);
+    }
+}
+
+
 static void base_search(SearchRoutineContext *context)
 {
-    if(context->lucy->searcher == NULL)
-        context->lucy->searcher = IxSearcher_new((Obj *) (context->lucy->folder));
-
     if(context->fp.size != 0)
     {
         context->queryStr = Str_new_wrap_trusted_utf8(context->fp.data, context->fp.size);
@@ -346,7 +486,6 @@ LucyResultSet lucy_search(Lucy *lucy, Fingerprint fp, int max_results)
 
     if(error != NULL)
     {
-        saveNothrowDecref(context.lucy->searcher);
         saveNothrowDecref(context.query);
         saveNothrowDecref(context.queryStr);
         saveNothrowDecref(context.hits);

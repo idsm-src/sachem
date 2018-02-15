@@ -27,6 +27,7 @@
 #define MOLECULES_TABLE           "sachem_molecules"
 #define MOLECULE_ERRORS_TABLE     "sachem_molecule_errors"
 #define AUDIT_TABLE               "sachem_compound_audit"
+#define SNAPSHOT_TABLE            "sachem_snapshot"
 
 
 typedef struct
@@ -76,45 +77,77 @@ typedef struct
 } ThreadData;
 
 
-static bool initialised = false;
+static bool lucyInitialised = false;
+static int snapshotId = -1;
 static SPIPlanPtr mainQueryPlan;
+static SPIPlanPtr snapshotQueryPlan;
 static Lucy lucy;
 
 
-void subsearch_lucy_module_init(void)
+void lucy_subsearch_init(void)
 {
-    PG_TRY();
+    /* prepare lucy */
+    if(unlikely(lucyInitialised == false))
     {
-        /* prepare lucy */
         lucy_init(&lucy, getFilePath("lucy"));
+        lucyInitialised = true;
+    }
 
 
-        /* prepare query plan */
-        if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-            elog(ERROR, "%s: SPI_connect() failed", __func__);
+    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+        elog(ERROR, "%s: SPI_connect() failed", __func__);
 
-        mainQueryPlan = SPI_prepare("select id, molecule from " MOLECULES_TABLE " where id = any($1)", 1, (Oid[]) { INT4ARRAYOID });
+    /* prepare snapshot query plan */
+    if(unlikely(snapshotQueryPlan == NULL))
+    {
+        SPIPlanPtr plan = SPI_prepare("select id, snapshot from " SNAPSHOT_TABLE, 0, NULL);
 
-        if(unlikely(SPI_keepplan(mainQueryPlan) == SPI_ERROR_ARGUMENT))
+        if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
             elog(ERROR, "%s: SPI_keepplan() failed", __func__);
 
-
-        SPI_finish();
-        initialised = true;
+        snapshotQueryPlan = plan;
     }
-    PG_CATCH();
+
+
+    /* prepare query plan */
+    if(unlikely(mainQueryPlan == NULL))
     {
-        elog(NOTICE, "%s: initialization failed", __func__);
+        SPIPlanPtr plan = SPI_prepare("select id, molecule from " MOLECULES_TABLE " where id = any($1)", 1, (Oid[]) { INT4ARRAYOID });
 
-        PG_RE_THROW();
+        if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
+            elog(ERROR, "%s: SPI_keepplan() failed", __func__);
+
+        mainQueryPlan = plan;
     }
-    PG_END_TRY();
-}
 
 
-void subsearch_lucy_module_finish(void)
-{
-    initialised = false;
+    /* get snapshot information */
+    if(unlikely(SPI_execute_plan(snapshotQueryPlan, NULL, NULL, true, 0) != SPI_OK_SELECT))
+        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
+        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+
+    char isNullFlag;
+
+    Datum id = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
+
+    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+        elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+    if(unlikely(DatumGetInt32(id) != snapshotId))
+    {
+        Datum snapshot = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 2, &isNullFlag);
+
+        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+        lucy_set_snapshot(&lucy, DatumGetByteaP(snapshot));
+        snapshotId = DatumGetInt32(id);
+    }
+
+    SPI_finish();
 }
 
 
@@ -131,8 +164,7 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
         gettimeofday(&begin, NULL);
 #endif
 
-        if(unlikely(!initialised))
-            elog(ERROR, "%s: subsearch-lucy module is not properly initialized", __func__);
+        lucy_subsearch_init();
 
         VarChar *query = PG_GETARG_VARCHAR_P(0);
         int32_t type = PG_GETARG_INT32(1);
@@ -406,9 +438,18 @@ PG_FUNCTION_INFO_V1(lucy_sync_data);
 Datum lucy_sync_data(PG_FUNCTION_ARGS)
 {
     bool verbose = PG_GETARG_BOOL(0);
+    bool optimize = PG_GETARG_BOOL(1);
 
     MemoryContext memoryContext = CurrentMemoryContext;
     createBasePath();
+
+
+    /* prepare lucy */
+    if(unlikely(lucyInitialised == false))
+    {
+        lucy_init(&lucy, getFilePath("lucy"));
+        lucyInitialised = true;
+    }
 
 
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
@@ -628,7 +669,36 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
             elog(ERROR, "%s: SPI_exec() failed", __func__);
 
 
-        lucy_commit(&lucy);
+        if(optimize)
+            lucy_optimize(&lucy);
+
+        bytea *snaphot = lucy_commit(&lucy);
+
+
+        if(unlikely(SPI_exec("select id from " SNAPSHOT_TABLE, 0) != SPI_OK_SELECT))
+            elog(ERROR, "%s: SPI_exec() failed", __func__);
+
+        int snapshotNumber = 0;
+
+        if(SPI_processed != 0)
+        {
+            if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
+                elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+            Datum number = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
+
+            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE) || isNullFlag)
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+            snapshotNumber = DatumGetInt32(number) + 1;
+        }
+
+        if(unlikely(SPI_exec("delete from " SNAPSHOT_TABLE, 0) != SPI_OK_DELETE))
+            elog(ERROR, "%s: SPI_exec() failed", __func__);
+
+        if(SPI_execute_with_args("insert into " SNAPSHOT_TABLE " (id, snapshot) values ($1,$2)", 2, (Oid[]) { INT4OID, BYTEAOID },
+                (Datum[]) {Int32GetDatum(snapshotNumber), PointerGetDatum(snaphot)}, NULL, false, 0) != SPI_OK_INSERT)
+            elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
     }
     PG_CATCH();
     {
@@ -641,13 +711,4 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
 
     SPI_finish();
     PG_RETURN_VOID();
-}
-
-
-PG_FUNCTION_INFO_V1(lucy_substructure_optimize_index);
-Datum lucy_substructure_optimize_index(PG_FUNCTION_ARGS)
-{
-    lucy_optimize(&lucy);
-
-    PG_RETURN_BOOL(true);
 }
