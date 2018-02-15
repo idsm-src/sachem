@@ -24,8 +24,8 @@
 #define FP_PATTERN  "[a-zA-Z0-9+/]+"
 #define BOOLOP      "AND"
 
-#define saveDecref(x)           do { void *obj = x; x = NULL; DECREF(obj); } while(0)
-#define saveNothrowDecref(x)    do { void *obj = x; x = NULL; nothrowDecref(obj); } while(0)
+#define safeDecref(x)           do { void *obj = x; x = NULL; DECREF(obj); } while(0)
+#define safeNothrowDecref(x)    do { void *obj = x; x = NULL; nothrowDecref(obj); } while(0)
 
 
 typedef struct
@@ -117,7 +117,7 @@ static void nothrowDecref(void *obj)
 
     if(error != NULL)
     {
-        saveNothrowDecref(error);
+        safeNothrowDecref(error);
         elog(NOTICE, "cannot destroy a lucy object in error handler");
     }
 }
@@ -125,7 +125,7 @@ static void nothrowDecref(void *obj)
 
 static void throwError(Err *error)
 {
-    saveNothrowDecref(error);
+    safeNothrowDecref(error);
     elog(ERROR, "lucy error");
 }
 
@@ -226,7 +226,7 @@ static void base_init(InitRoutineContext *context)
     context->stype = StringType_new();
     StringType_Set_Indexed(context->stype, false);
     Schema_Spec_Field(lucy->schema, lucy->idF, (FieldType *) context->stype);
-    saveDecref(context->stype);
+    safeDecref(context->stype);
 
     context->re = Str_new_wrap_trusted_utf8(FP_PATTERN, sizeof(FP_PATTERN) - 1);
     context->rt = RegexTokenizer_new(context->re);
@@ -235,13 +235,13 @@ static void base_init(InitRoutineContext *context)
     FullTextType_Set_Highlightable(context->fttype, false);
     FullTextType_Set_Stored(context->fttype, false);
     Schema_Spec_Field(lucy->schema, lucy->fpF, (FieldType *) context->fttype);
-    saveDecref(context->re);
-    saveDecref(context->rt);
-    saveDecref(context->fttype);
+    safeDecref(context->re);
+    safeDecref(context->rt);
+    safeDecref(context->fttype);
 
     context->boolop = Str_new_wrap_trusted_utf8(BOOLOP, sizeof(BOOLOP) - 1);
     lucy->qparser = QParser_new(lucy->schema, NULL, context->boolop, NULL);
-    saveDecref(context->boolop);
+    safeDecref(context->boolop);
 }
 
 
@@ -268,17 +268,17 @@ void lucy_init(Lucy *lucy, const char *indexPath)
 
     if(error != NULL)
     {
-        saveNothrowDecref(lucy->folder);
-        saveNothrowDecref(lucy->idF);
-        saveNothrowDecref(lucy->fpF);
-        saveNothrowDecref(lucy->schema);
-        saveNothrowDecref(lucy->qparser);
+        safeNothrowDecref(lucy->folder);
+        safeNothrowDecref(lucy->idF);
+        safeNothrowDecref(lucy->fpF);
+        safeNothrowDecref(lucy->schema);
+        safeNothrowDecref(lucy->qparser);
 
-        saveNothrowDecref(context.stype);
-        saveNothrowDecref(context.rt);
-        saveNothrowDecref(context.re);
-        saveNothrowDecref(context.fttype);
-        saveNothrowDecref(context.boolop);
+        safeNothrowDecref(context.stype);
+        safeNothrowDecref(context.rt);
+        safeNothrowDecref(context.re);
+        safeNothrowDecref(context.fttype);
+        safeNothrowDecref(context.boolop);
 
         throwError(error);
     }
@@ -310,14 +310,14 @@ static void base_add(AddRoutineContext *context)
     int size = sprintf(buffer, "%u", context->id);
     context->idValue = Str_new_wrap_trusted_utf8(buffer, size);
     Doc_Store(context->doc, context->lucy->idF, (Obj *) context->idValue);
-    saveDecref(context->idValue);
+    safeDecref(context->idValue);
 
     context->fpValue = Str_new_wrap_trusted_utf8(context->fp.data, context->fp.size);
     Doc_Store(context->doc, context->lucy->fpF, (Obj *) context->fpValue);
-    saveDecref(context->fpValue);
+    safeDecref(context->fpValue);
 
     Indexer_Add_Doc(context->lucy->indexer, context->doc, 1.0);
-    saveDecref(context->doc);
+    safeDecref(context->doc);
 }
 
 
@@ -335,9 +335,9 @@ void lucy_add(Lucy *lucy, int32_t id, Fingerprint fp)
 
     if(error != NULL)
     {
-        saveNothrowDecref(context.doc);
-        saveNothrowDecref(context.idValue);
-        saveNothrowDecref(context.fpValue);
+        safeNothrowDecref(context.doc);
+        safeNothrowDecref(context.idValue);
+        safeNothrowDecref(context.fpValue);
 
         throwError(error);
     }
@@ -351,7 +351,7 @@ static void base_delete(DeleteRoutineContext *context)
     context->idValue = Str_new_wrap_trusted_utf8(buffer, size);
 
     Indexer_Delete_By_Term(context->lucy->indexer, context->lucy->idF, (Obj *) context->idValue);
-    saveDecref(context->idValue);
+    safeDecref(context->idValue);
 }
 
 
@@ -366,7 +366,7 @@ void lucy_delete(Lucy *lucy, int32_t id)
 
     if(error != NULL)
     {
-        saveNothrowDecref(context.idValue);
+        safeNothrowDecref(context.idValue);
 
         throwError(error);
     }
@@ -394,7 +394,7 @@ static void base_commit(CommitRoutineContext *context)
 
     context->binarySnapshot = snapshot_export(Indexer_Get_Snapshot(context->lucy->indexer));
 
-    saveDecref(context->lucy->indexer);
+    safeDecref(context->lucy->indexer);
 }
 
 
@@ -408,7 +408,7 @@ bytea *lucy_commit(Lucy *lucy)
 
     if(error != NULL)
     {
-        saveNothrowDecref(context.lucy->indexer);
+        safeNothrowDecref(context.lucy->indexer);
         throwError(error);
     }
 
@@ -418,19 +418,19 @@ bytea *lucy_commit(Lucy *lucy)
 
 void lucy_rollback(Lucy *lucy)
 {
-    saveNothrowDecref(lucy->indexer);
+    safeNothrowDecref(lucy->indexer);
 }
 
 
 static void base_set_snapshot(SetSnapshotRoutineContext *context)
 {
     if(context->lucy->searcher != NULL)
-        saveDecref(context->lucy->searcher);
+        safeDecref(context->lucy->searcher);
 
     context->snapshot = snapshot_import(context->binarySnapshot);
     context->lucy->searcher = IxSearcher_new((Obj *) (context->lucy->folder), context->snapshot);
 
-    saveDecref(context->snapshot);
+    safeDecref(context->snapshot);
 }
 
 
@@ -445,8 +445,8 @@ void lucy_set_snapshot(Lucy *lucy, bytea *binarySnapshot)
 
     if(error != NULL)
     {
-        saveNothrowDecref(context.lucy->searcher);
-        saveNothrowDecref(context.snapshot);
+        safeNothrowDecref(context.lucy->searcher);
+        safeNothrowDecref(context.snapshot);
 
         throwError(error);
     }
@@ -467,8 +467,8 @@ static void base_search(SearchRoutineContext *context)
 
     context->hits = IxSearcher_Hits(context->lucy->searcher, (Obj *) context->query, 0, context->max_results, NULL);
 
-    saveDecref(context->query);
-    saveDecref(context->queryStr);
+    safeDecref(context->query);
+    safeDecref(context->queryStr);
 }
 
 
@@ -486,9 +486,9 @@ LucyResultSet lucy_search(Lucy *lucy, Fingerprint fp, int max_results)
 
     if(error != NULL)
     {
-        saveNothrowDecref(context.query);
-        saveNothrowDecref(context.queryStr);
-        saveNothrowDecref(context.hits);
+        safeNothrowDecref(context.query);
+        safeNothrowDecref(context.queryStr);
+        safeNothrowDecref(context.hits);
 
         throwError(error);
     }
@@ -509,7 +509,7 @@ static void base_get(GetRoutineContext *context)
 
         if(context->hit == NULL)
         {
-            saveDecref(context->resultSet->hits);
+            safeDecref(context->resultSet->hits);
             break;
         }
 
@@ -519,8 +519,8 @@ static void base_get(GetRoutineContext *context)
         ret++;
         size--;
 
-        saveDecref(context->id);
-        saveDecref(context->hit);
+        safeDecref(context->id);
+        safeDecref(context->hit);
     }
 
     context->loaded = ret;
@@ -542,8 +542,8 @@ size_t lucy_get(Lucy *lucy, LucyResultSet *resultSet, int *results, size_t size)
 
     if(error != NULL)
     {
-        saveNothrowDecref(context.hit);
-        saveNothrowDecref(context.id);
+        safeNothrowDecref(context.hit);
+        safeNothrowDecref(context.id);
 
         throwError(error);
     }
@@ -554,5 +554,5 @@ size_t lucy_get(Lucy *lucy, LucyResultSet *resultSet, int *results, size_t size)
 
 void lucy_fail(Lucy *lucy, LucyResultSet *resultSet)
 {
-    saveNothrowDecref(resultSet->hits);
+    safeNothrowDecref(resultSet->hits);
 }
