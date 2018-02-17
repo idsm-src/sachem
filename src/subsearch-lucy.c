@@ -27,7 +27,7 @@
 #define MOLECULES_TABLE           "sachem_molecules"
 #define MOLECULE_ERRORS_TABLE     "sachem_molecule_errors"
 #define AUDIT_TABLE               "sachem_compound_audit"
-#define SNAPSHOT_TABLE            "sachem_snapshot"
+#define INDEX_TABLE               "sachem_index"
 
 
 typedef struct
@@ -78,7 +78,7 @@ typedef struct
 
 
 static bool lucyInitialised = false;
-static int snapshotId = -1;
+static int indexId = -1;
 static SPIPlanPtr mainQueryPlan;
 static SPIPlanPtr snapshotQueryPlan;
 static Lucy lucy;
@@ -89,7 +89,7 @@ void lucy_subsearch_init(void)
     /* prepare lucy */
     if(unlikely(lucyInitialised == false))
     {
-        lucy_init(&lucy, getFilePath("lucy"));
+        lucy_init(&lucy);
         lucyInitialised = true;
     }
 
@@ -100,7 +100,7 @@ void lucy_subsearch_init(void)
     /* prepare snapshot query plan */
     if(unlikely(snapshotQueryPlan == NULL))
     {
-        SPIPlanPtr plan = SPI_prepare("select id, snapshot from " SNAPSHOT_TABLE, 0, NULL);
+        SPIPlanPtr plan = SPI_prepare("select id, path from " INDEX_TABLE, 0, NULL);
 
         if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
             elog(ERROR, "%s: SPI_keepplan() failed", __func__);
@@ -136,15 +136,15 @@ void lucy_subsearch_init(void)
     if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
         elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
-    if(unlikely(DatumGetInt32(id) != snapshotId))
+    if(unlikely(DatumGetInt32(id) != indexId))
     {
-        Datum snapshot = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 2, &isNullFlag);
+        Datum path = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 2, &isNullFlag);
 
         if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
             elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
-        lucy_set_snapshot(&lucy, DatumGetByteaP(snapshot));
-        snapshotId = DatumGetInt32(id);
+        lucy_set_folder(&lucy, TextDatumGetCString(path));
+        indexId = DatumGetInt32(id);
     }
 
     SPI_finish();
@@ -447,7 +447,7 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
     /* prepare lucy */
     if(unlikely(lucyInitialised == false))
     {
-        lucy_init(&lucy, getFilePath("lucy"));
+        lucy_init(&lucy);
         lucyInitialised = true;
     }
 
@@ -456,6 +456,53 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
         elog(ERROR, "%s: SPI_connect() failed", __func__);
 
     char isNullFlag;
+
+
+    /* clone old index */
+    int indexNumber = 0;
+    char *oldIndexPath = NULL;
+
+    if(unlikely(SPI_exec("select id, path from " INDEX_TABLE, 0) != SPI_OK_SELECT))
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
+
+    if(SPI_processed != 0)
+    {
+        if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
+            elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+        Datum number = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
+
+        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE) || isNullFlag)
+            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+        indexNumber = DatumGetInt32(number) + 1;
+
+
+        Datum path = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 2, &isNullFlag);
+
+        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE) || isNullFlag)
+            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+        oldIndexPath = TextDatumGetCString(path);
+    }
+
+    Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
+    size_t basePathLength = strlen(DataDir);
+    size_t databaseLength = strlen(database->data);
+
+    char *indexPath = (char *) palloc(basePathLength +  databaseLength + 64);
+    sprintf(indexPath, "%s/%s/lucy-%i", DataDir, database->data, indexNumber);
+
+    lucy_link_directory(oldIndexPath, indexPath);
+    lucy_set_folder(&lucy, indexPath);
+
+    if(unlikely(SPI_exec("delete from " INDEX_TABLE, 0) != SPI_OK_DELETE))
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
+
+    if(SPI_execute_with_args("insert into " INDEX_TABLE " (id, path) values ($1,$2)", 2, (Oid[]) { INT4OID, TEXTOID },
+            (Datum[]) {Int32GetDatum(indexNumber), CStringGetTextDatum(indexPath)}, NULL, false, 0) != SPI_OK_INSERT)
+        elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
+
 
     /*
      * perepare reqired thread data
@@ -672,33 +719,7 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
         if(optimize)
             lucy_optimize(&lucy);
 
-        bytea *snaphot = lucy_commit(&lucy);
-
-
-        if(unlikely(SPI_exec("select id from " SNAPSHOT_TABLE, 0) != SPI_OK_SELECT))
-            elog(ERROR, "%s: SPI_exec() failed", __func__);
-
-        int snapshotNumber = 0;
-
-        if(SPI_processed != 0)
-        {
-            if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-                elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
-
-            Datum number = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
-
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE) || isNullFlag)
-                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-            snapshotNumber = DatumGetInt32(number) + 1;
-        }
-
-        if(unlikely(SPI_exec("delete from " SNAPSHOT_TABLE, 0) != SPI_OK_DELETE))
-            elog(ERROR, "%s: SPI_exec() failed", __func__);
-
-        if(SPI_execute_with_args("insert into " SNAPSHOT_TABLE " (id, snapshot) values ($1,$2)", 2, (Oid[]) { INT4OID, BYTEAOID },
-                (Datum[]) {Int32GetDatum(snapshotNumber), PointerGetDatum(snaphot)}, NULL, false, 0) != SPI_OK_INSERT)
-            elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
+        lucy_commit(&lucy);
     }
     PG_CATCH();
     {

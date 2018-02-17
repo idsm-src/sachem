@@ -1,12 +1,16 @@
 #include <postgres.h>
+#include <dirent.h>
+#include <fcntl.h>
 #include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <Clownfish/String.h>
 #include <Clownfish/Vector.h>
 #include <Lucy/Analysis/RegexTokenizer.h>
 #include <Lucy/Document/Doc.h>
 #include <Lucy/Document/HitDoc.h>
 #include <Lucy/Index/Indexer.h>
-#include <Lucy/Index/Snapshot.h>
 #include <Lucy/Plan/FullTextType.h>
 #include <Lucy/Plan/Schema.h>
 #include <Lucy/Plan/StringType.h>
@@ -31,13 +35,19 @@
 typedef struct
 {
     Lucy *lucy;
-    const char *indexPath;
     StringType *stype;
     RegexTokenizer *rt;
     String *re;
     FullTextType *fttype;
     String *boolop;
 } InitRoutineContext;
+
+
+typedef struct
+{
+    Lucy *lucy;
+    const char *indexPath;
+} SetFolderRoutineContext;
 
 
 typedef struct
@@ -57,22 +67,6 @@ typedef struct
     int32_t id;
     String *idValue;
 } DeleteRoutineContext;
-
-
-typedef struct
-{
-    Lucy *lucy;
-    bytea *binarySnapshot;
-} CommitRoutineContext;
-
-
-typedef struct
-{
-    Lucy *lucy;
-    bytea *binarySnapshot;
-    Snapshot *snapshot;
-}
-SetSnapshotRoutineContext;
 
 
 typedef struct
@@ -130,95 +124,12 @@ static void throwError(Err *error)
 }
 
 
-static bytea *snapshot_export(Snapshot *snapshot)
-{
-    Vector *list = Snapshot_List(snapshot);
-    uint32_t count = Snapshot_Num_Entries(snapshot);
-    size_t size = VARHDRSZ;
-
-    String *path = Snapshot_Get_Path(snapshot);
-    size_t pathLength = Str_Get_Size(path);
-    size += sizeof(size_t) + pathLength;
-
-    for(int i = 0; i < count; i++)
-    {
-        String *entry = (String *) Vec_Fetch(list, i);
-        size += sizeof(size_t) + Str_Get_Size(entry);
-    }
-
-    bytea *result = palloc_extended(size, MCXT_ALLOC_NO_OOM);
-
-    if(result == NULL)
-    {
-        DECREF(list);
-        CFISH_THROW(CFISH_ERR, "not enough memory");
-    }
-
-    SET_VARSIZE(result, size);
-
-    char *data = ((char *) result) + VARHDRSZ;
-
-    memcpy(data, &pathLength, sizeof(size_t));
-    data += sizeof(size_t);
-
-    memcpy(data, Str_Get_Ptr8(path), pathLength);
-    data += pathLength;
-
-    for(int i = 0; i < count; i++)
-    {
-        String *entry = (String *) Vec_Fetch(list, i);
-        size_t length = Str_Get_Size(entry);
-
-        memcpy(data, &length, sizeof(size_t));
-        data += sizeof(size_t);
-
-        memcpy(data, Str_Get_Ptr8(entry), length);
-        data += length;
-    }
-
-    DECREF(list);
-    return result;
-}
-
-
-static Snapshot *snapshot_import(bytea *data)
-{
-    int size = VARSIZE(data) - VARHDRSZ;
-
-    char *buffer = VARDATA(data);
-    char *end = buffer + size;
-    Snapshot *snapshot = Snapshot_new();
-
-    size_t length = *((size_t *) buffer);
-    buffer += sizeof(size_t);
-
-    String *path = Str_new_from_trusted_utf8(buffer, length);
-    Snapshot_Set_Path(snapshot, path);
-
-    buffer += length;
-
-    while(buffer != end)
-    {
-        size_t length = *((size_t *) buffer);
-        buffer += sizeof(size_t);
-
-        String *entry = Str_new_from_trusted_utf8(buffer, length);
-        Snapshot_Add_Entry(snapshot, entry);
-
-        buffer += length;
-    }
-
-    return snapshot;
-}
-
-
 static void base_init(InitRoutineContext *context)
 {
     Lucy *lucy = context->lucy;
 
     lucy_bootstrap_parcel();
 
-    lucy->folder = Str_new_from_trusted_utf8(context->indexPath, strlen(context->indexPath));
     lucy->idF = Str_new_wrap_trusted_utf8(ID_NAME, sizeof(ID_NAME) - 1);
     lucy->fpF = Str_new_wrap_trusted_utf8(FP_NAME, sizeof(FP_NAME) - 1);
 
@@ -245,7 +156,7 @@ static void base_init(InitRoutineContext *context)
 }
 
 
-void lucy_init(Lucy *lucy, const char *indexPath)
+void lucy_init(Lucy *lucy)
 {
     lucy->folder = NULL;
     lucy->idF = NULL;
@@ -257,7 +168,6 @@ void lucy_init(Lucy *lucy, const char *indexPath)
 
     InitRoutineContext context;
     context.lucy = lucy;
-    context.indexPath = indexPath;
     context.stype = NULL;
     context.rt = NULL;
     context.re = NULL;
@@ -282,6 +192,33 @@ void lucy_init(Lucy *lucy, const char *indexPath)
 
         throwError(error);
     }
+}
+
+
+static void base_set_folder(SetFolderRoutineContext *context)
+{
+    Lucy *lucy = context->lucy;
+
+    if(lucy->folder != NULL)
+        safeDecref(lucy->folder);
+
+    if(context->lucy->searcher != NULL)
+        safeDecref(context->lucy->searcher);
+
+    lucy->folder = Str_new_from_trusted_utf8(context->indexPath, strlen(context->indexPath));
+}
+
+
+void lucy_set_folder(Lucy *lucy, const char *indexPath)
+{
+    SetFolderRoutineContext context;
+    context.lucy = lucy;
+    context.indexPath = indexPath;
+
+    Err *error = Err_trap((Err_Attempt_t) &base_set_folder, (void *) &context);
+
+    if(error != NULL)
+        throwError(error);
 }
 
 
@@ -388,31 +325,23 @@ void lucy_optimize(Lucy *lucy)
 }
 
 
-static void base_commit(CommitRoutineContext *context)
+static void base_commit(Lucy *lucy)
 {
-    Indexer_Commit(context->lucy->indexer);
+    Indexer_Commit(lucy->indexer);
 
-    context->binarySnapshot = snapshot_export(Indexer_Get_Snapshot(context->lucy->indexer));
-
-    safeDecref(context->lucy->indexer);
+    safeDecref(lucy->indexer);
 }
 
 
-bytea *lucy_commit(Lucy *lucy)
+void lucy_commit(Lucy *lucy)
 {
-    CommitRoutineContext context;
-    context.lucy = lucy;
-    context.binarySnapshot = NULL;
-
-    Err *error = Err_trap((Err_Attempt_t) &base_commit, (void *) &context);
+    Err *error = Err_trap((Err_Attempt_t) &base_commit, (void *) lucy);
 
     if(error != NULL)
     {
-        safeNothrowDecref(context.lucy->indexer);
+        safeNothrowDecref(lucy->indexer);
         throwError(error);
     }
-
-    return context.binarySnapshot;
 }
 
 
@@ -422,39 +351,12 @@ void lucy_rollback(Lucy *lucy)
 }
 
 
-static void base_set_snapshot(SetSnapshotRoutineContext *context)
-{
-    if(context->lucy->searcher != NULL)
-        safeDecref(context->lucy->searcher);
-
-    context->snapshot = snapshot_import(context->binarySnapshot);
-    context->lucy->searcher = IxSearcher_new((Obj *) (context->lucy->folder), context->snapshot);
-
-    safeDecref(context->snapshot);
-}
-
-
-void lucy_set_snapshot(Lucy *lucy, bytea *binarySnapshot)
-{
-    SetSnapshotRoutineContext context;
-    context.lucy = lucy;
-    context.binarySnapshot = binarySnapshot;
-    context.snapshot = NULL;
-
-    Err *error = Err_trap((Err_Attempt_t) &base_set_snapshot, (void *) &context);
-
-    if(error != NULL)
-    {
-        safeNothrowDecref(context.lucy->searcher);
-        safeNothrowDecref(context.snapshot);
-
-        throwError(error);
-    }
-}
-
-
 static void base_search(SearchRoutineContext *context)
 {
+    if(context->lucy->searcher == NULL)
+        context->lucy->searcher = IxSearcher_new((Obj *) (context->lucy->folder));
+
+
     if(context->fp.size != 0)
     {
         context->queryStr = Str_new_wrap_trusted_utf8(context->fp.data, context->fp.size);
@@ -555,4 +457,74 @@ size_t lucy_get(Lucy *lucy, LucyResultSet *resultSet, int *results, size_t size)
 void lucy_fail(Lucy *lucy, LucyResultSet *resultSet)
 {
     safeNothrowDecref(resultSet->hits);
+}
+
+
+static void link_directory_at(int olddirfd, int newdirfd)
+{
+    DIR *dp = fdopendir(olddirfd);
+
+    if(dp == NULL)
+        elog(ERROR, "%s: fdopendir() failed", __func__);
+
+
+    struct dirent *ep;
+
+    while(ep = readdir (dp))
+    {
+        if(ep->d_name[0] == '.')
+            continue;
+
+        int subfd = openat(olddirfd, ep->d_name, 0);
+
+        if(subfd == -1)
+            elog(ERROR, "%s: openat() failed", __func__);
+
+        struct stat statbuf;
+        if(fstat(subfd, &statbuf) != 0)
+            elog(ERROR, "%s: fstat() failed", __func__);
+
+        if(statbuf.st_mode & S_IFDIR)
+        {
+            if(mkdirat(newdirfd, ep->d_name, 0700) != 0)
+                elog(ERROR, "%s: mkdirat() failed", __func__);
+
+            int newsubfd = openat(newdirfd, ep->d_name, 0);
+
+            if(newsubfd == -1)
+                elog(ERROR, "%s: openat() failed", __func__);
+
+            link_directory_at(subfd, newsubfd);
+        }
+        else if(statbuf.st_mode & S_IFREG)
+        {
+             if(linkat(olddirfd, ep->d_name, newdirfd, ep->d_name, 0) != 0)
+                elog(ERROR, "%s: linkat() failed", __func__);
+        }
+    }
+
+    (void) closedir (dp);
+}
+
+
+void lucy_link_directory(const char *oldPath, const char *newPath)
+{
+    if(mkdir(newPath, 0700) != 0)
+        elog(ERROR, "%s: mkdir() failed", __func__);
+
+
+    if(oldPath != NULL)
+    {
+        int newfd = open(newPath, 0);
+
+        if(newfd == -1)
+            elog(ERROR, "%s: open() failed", __func__);
+
+        int oldfd = open(oldPath, 0);
+
+        if(oldfd == -1)
+            elog(ERROR, "%s: open() failed", __func__);
+
+        link_directory_at(oldfd, newfd);
+    }
 }

@@ -46,34 +46,4 @@ inline void createBasePath(void)
         elog(ERROR, "%s: mkdir() failed", __func__);
 }
 
-
-inline char *getFilePath(char *fileName)
-{
-    Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
-
-    size_t basePathLength = strlen(DataDir);
-    size_t databaseLength = strlen(database->data);
-    size_t fileNameLength = strlen(fileName);
-
-    char *path = (char *) palloc(basePathLength +  databaseLength + fileNameLength + 3);
-    char *data = path;
-
-    memcpy(data, DataDir, basePathLength);
-    data += basePathLength;
-
-    *(data++) = '/';
-
-    memcpy(data, database->data, databaseLength);
-    data += databaseLength;
-
-    *(data++) = '/';
-
-    memcpy(data, fileName, fileNameLength);
-    data += fileNameLength;
-
-    *data = '\0';
-
-    return path;
-}
-
 #endif /* SACHEM_H_ */

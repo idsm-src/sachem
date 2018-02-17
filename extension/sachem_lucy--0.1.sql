@@ -30,9 +30,9 @@ CREATE TABLE sachem_compound_audit (
     PRIMARY KEY (id)
 );
 
-CREATE TABLE sachem_snapshot (
+CREATE TABLE sachem_index (
     id                    INT NOT NULL,
-    snapshot              BYTEA,
+    path                  TEXT NOT NULL,
     PRIMARY KEY (id)
 );
 
