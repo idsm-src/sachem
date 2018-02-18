@@ -135,7 +135,7 @@ static void base_init(InitRoutineContext *context)
 
     lucy->schema = Schema_new();
     context->stype = StringType_new();
-    StringType_Set_Indexed(context->stype, false);
+    StringType_Set_Indexed(context->stype, true);
     Schema_Spec_Field(lucy->schema, lucy->idF, (FieldType *) context->stype);
     safeDecref(context->stype);
 
