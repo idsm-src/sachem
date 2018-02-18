@@ -706,6 +706,9 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
 
             count += processed;
 
+            lucy_commit(&lucy);
+            lucy_begin(&lucy);
+
             if(verbose)
                 elog(NOTICE, "already processed: %i", count);
         }
