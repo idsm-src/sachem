@@ -617,15 +617,6 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
 
             java_parse_lucy_data(processed, molfiles, data);
 
-            for(int i = 0; i < processed; i++)
-            {
-                HeapTuple tuple = SPI_tuptable->vals[i];
-                char isNullFlag;
-
-                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-            }
-
             pthread_t threads[countOfThread];
             ThreadData threadData = {.count = processed, .data = data, .result = result};
             pg_atomic_init_u32(&threadData.possition, 0);
