@@ -6,10 +6,15 @@
 #include <utils/array.h>
 #include <utils/builtins.h>
 #include <utils/memutils.h>
-#include <pthread.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
+#include <postmaster/postmaster.h>
+#include <postmaster/fork_process.h>
+#include <storage/dsm.h>
+#include <storage/pg_shmem.h>
 #include "bitset.h"
 #include "isomorphism.h"
 #include "java.h"
@@ -22,7 +27,7 @@
 
 #define SHOW_STATS                0
 #define FETCH_SIZE                1000
-#define SYNC_FETCH_SIZE           100000
+#define SYNC_FETCH_SIZE           50000     // per process
 #define COMPOUNDS_TABLE           "compounds"
 #define MOLECULES_TABLE           "sachem_molecules"
 #define MOLECULE_ERRORS_TABLE     "sachem_molecule_errors"
@@ -405,35 +410,6 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 }
 
 
-void *lucy_substructure_process_data(void *dataPtr)
-{
-    ThreadData *data = (ThreadData *) dataPtr;
-    Molecule molecule;
-
-    while(true)
-    {
-        uint32_t i = pg_atomic_fetch_add_u32(&data->possition, 1);
-
-        if(i >= data->count)
-            break;
-
-        if(data->data[i].molecule)
-        {
-            if(molecule_simple_init(&molecule, VARDATA(data->data[i].molecule), malloc))
-                data->result[i] = fingerprint_get(&molecule, &malloc);
-
-            molecule_simple_free(&molecule, free);
-        }
-        else
-        {
-            data->result[i] = (Fingerprint) {.size = -1, .data = NULL};
-        }
-    }
-
-    pthread_exit((void *) 0);
-}
-
-
 PG_FUNCTION_INFO_V1(lucy_sync_data);
 Datum lucy_sync_data(PG_FUNCTION_ARGS)
 {
@@ -490,8 +466,19 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
     size_t basePathLength = strlen(DataDir);
     size_t databaseLength = strlen(database->data);
 
+    int countOfProcessors = sysconf(_SC_NPROCESSORS_ONLN);
+
     char *indexPath = (char *) palloc(basePathLength +  databaseLength + 64);
     sprintf(indexPath, "%s/%s/lucy-%i", DataDir, database->data, indexNumber);
+
+    char *subindexPath[countOfProcessors];
+
+    for(int p = 0; p < countOfProcessors; p++)
+    {
+        subindexPath[p] = (char *) palloc(basePathLength +  databaseLength + 64);
+        sprintf(subindexPath[p], "%s/%s/lucy-%i.%i", DataDir, database->data, indexNumber, p);
+    }
+
 
     lucy_link_directory(oldIndexPath, indexPath);
     lucy_set_folder(&lucy, indexPath);
@@ -502,15 +489,6 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
     if(SPI_execute_with_args("insert into " INDEX_TABLE " (id, path) values ($1,$2)", 2, (Oid[]) { INT4OID, TEXTOID },
             (Datum[]) {Int32GetDatum(indexNumber), CStringGetTextDatum(indexPath)}, NULL, false, 0) != SPI_OK_INSERT)
         elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
-
-
-    /*
-     * perepare reqired thread data
-     */
-    int countOfThread = sysconf(_SC_NPROCESSORS_ONLN);
-
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
 
 
     lucy_begin(&lucy);
@@ -526,7 +504,7 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
 
         while(true)
         {
-            SPI_cursor_fetch(auditCursor, true, SYNC_FETCH_SIZE);
+            SPI_cursor_fetch(auditCursor, true, countOfProcessors * SYNC_FETCH_SIZE);
 
             if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
                 elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
@@ -584,15 +562,15 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
                 0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
 
-        VarChar **molfiles = palloc(SYNC_FETCH_SIZE * sizeof(VarChar *));
-        LucyLoaderData *data = palloc(SYNC_FETCH_SIZE * sizeof(LucyLoaderData));
-        Fingerprint *result = palloc(SYNC_FETCH_SIZE * sizeof(Fingerprint));
+        Datum *ids = palloc(countOfProcessors * SYNC_FETCH_SIZE * sizeof(Datum));
+        VarChar **molfiles = palloc(countOfProcessors * SYNC_FETCH_SIZE * sizeof(VarChar *));
+        LucyLoaderData *data = palloc(countOfProcessors * SYNC_FETCH_SIZE * sizeof(LucyLoaderData));
         int count = 0;
 
 
         while(true)
         {
-            SPI_cursor_fetch(compoundCursor, true, SYNC_FETCH_SIZE);
+            SPI_cursor_fetch(compoundCursor, true, countOfProcessors * SYNC_FETCH_SIZE);
 
             if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
                 elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
@@ -607,6 +585,15 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
             {
                 HeapTuple tuple = tuptable->vals[i];
 
+
+                Datum id = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
+
+                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+                ids[i] = id;
+
+
                 Datum molfile = SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag);
 
                 if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
@@ -617,19 +604,70 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
 
             java_parse_lucy_data(processed, molfiles, data);
 
-            pthread_t threads[countOfThread];
-            ThreadData threadData = {.count = processed, .data = data, .result = result};
-            pg_atomic_init_u32(&threadData.possition, 0);
 
-            PG_MEMCONTEXT_BEGIN(memoryContext);
-            for(int i = 0; i < countOfThread; i++)
-                pthread_create(&threads[i], &attr, lucy_substructure_process_data, (void *) &threadData);
-            PG_MEMCONTEXT_END();
+            int process[countOfProcessors];
+            int started = false;
 
-            void *status;
+            for(int p = 0; p < countOfProcessors; p++)
+            {
+                int pid;
 
-            for(int i = 0; i < countOfThread; i++)
-                pthread_join(threads[i], &status);
+                switch((pid = fork_process()))
+                {
+                    case 0:
+                        /* in postmaster child ... */
+                        InitPostmasterChild();
+
+                        /* Close the postmaster's sockets */
+                        //ClosePostmasterPorts(false);
+
+                        /* Drop our connection to postmaster's shared memory, as well */
+                        dsm_detach_all();
+                        PGSharedMemoryDetach();
+
+                        PG_TRY();
+                        {
+                            lucy_set_folder(&lucy, subindexPath[p]);
+                            lucy_begin(&lucy);
+
+                            for(int i = p * SYNC_FETCH_SIZE; i < processed && i < (p + 1) * SYNC_FETCH_SIZE; i++)
+                            {
+                                if(data[i].molecule)
+                                {
+                                    Molecule molecule;
+
+                                    if(!molecule_simple_init(&molecule, VARDATA(data[i].molecule), malloc))
+                                        _exit(1);
+
+                                    Fingerprint result = fingerprint_get(&molecule, &malloc);
+
+                                    if(fingerprint_is_valid(result))
+                                        lucy_add(&lucy, DatumGetInt32(ids[i]), result);
+
+                                    molecule_simple_free(&molecule, free);
+                                }
+                            }
+
+                            lucy_commit(&lucy);
+                        }
+                        PG_CATCH();
+                        {
+                            _exit(2);
+                        }
+                        PG_END_TRY();
+                        _exit(0);
+
+                    default:
+                        if(pid != -1)
+                            started = true;
+
+                        process[p] = pid;
+                }
+            }
+
+            if(!started)
+                elog(ERROR, "index processes failed");
+
 
             PG_TRY();
             {
@@ -641,22 +679,16 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
                         pfree(molfiles[i]);
 
 
-                    Datum id = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
-
-                    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                        elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-
-                    if(data[i].error || !fingerprint_is_valid(result[i]))
+                    if(data[i].error)
                     {
                         if(data[i].error == NULL)
                             data[i].error = cstring_to_text("fingerprint cannot be generated");
 
                         char *message = text_to_cstring(data[i].error);
-                        elog(NOTICE, "%i: %s", DatumGetInt32(id), message);
+                        elog(NOTICE, "%i: %s", DatumGetInt32(ids[i]), message);
                         pfree(message);
 
-                        Datum values[] = {id, PointerGetDatum(data[i].error)};
+                        Datum values[] = {ids[i], PointerGetDatum(data[i].error)};
 
                         if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)",
                                 2, (Oid[]) { INT4OID, TEXTOID }, values, NULL, false, 0) != SPI_OK_INSERT)
@@ -669,36 +701,50 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
                         continue;
 
 
-                    Datum moleculesValues[] = {id, PointerGetDatum(data[i].molecule)};
+                    Datum moleculesValues[] = {ids[i], PointerGetDatum(data[i].molecule)};
 
                     if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
                         elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
-
-                    if(fingerprint_is_valid(result[i]))
-                        lucy_add(&lucy, DatumGetInt32(id), result[i]);
 
                     pfree(data[i].molecule);
                 }
             }
             PG_CATCH();
             {
-                for(int i = 0; i < processed; i++)
-                    free(result[i].data);
+                int wstatus;
+
+                for(int p = 0; p < countOfProcessors; p++)
+                    if(process[p] != -1)
+                        waitpid(process[p], &wstatus, 0);
 
                 PG_RE_THROW();
             }
             PG_END_TRY();
 
-            for(int i = 0; i < processed; i++)
-                free(result[i].data);
+
+            bool error = false;
+
+            for(int p = 0; p < countOfProcessors; p++)
+            {
+                if(process[p] != -1)
+                {
+                    int wstatus;
+
+                    waitpid(process[p], &wstatus, 0);
+
+                    if(!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != 0)
+                        error = true;
+                }
+            }
+
+            if(error)
+                elog(ERROR, "an index process failed");
+
 
             SPI_freetuptable(tuptable);
 
 
             count += processed;
-
-            lucy_commit(&lucy);
-            lucy_begin(&lucy);
 
             if(verbose)
                 elog(NOTICE, "already processed: %i", count);
@@ -708,6 +754,81 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
 
         if(unlikely(SPI_exec("delete from " AUDIT_TABLE, 0) != SPI_OK_DELETE))
             elog(ERROR, "%s: SPI_exec() failed", __func__);
+
+
+        int process[countOfProcessors];
+        int started = false;
+
+        for(int p = 0; p < countOfProcessors; p++)
+        {
+            int pid;
+
+            switch((pid = fork_process()))
+            {
+                case 0:
+                    /* in postmaster child ... */
+                    InitPostmasterChild();
+
+                    /* Close the postmaster's sockets */
+                    //ClosePostmasterPorts(false);
+
+                    /* Drop our connection to postmaster's shared memory, as well */
+                    dsm_detach_all();
+                    PGSharedMemoryDetach();
+
+                    PG_TRY();
+                    {
+                        lucy_set_folder(&lucy, subindexPath[p]);
+                        lucy_begin(&lucy);
+
+                        if(optimize)
+                            lucy_optimize(&lucy);
+
+                        lucy_commit(&lucy);
+                    }
+                    PG_CATCH();
+                    {
+                        _exit(2);
+                    }
+                    PG_END_TRY();
+                    _exit(0);
+
+                default:
+                    if(pid != -1)
+                        started = true;
+
+                    process[p] = pid;
+            }
+        }
+
+        if(!started)
+            elog(ERROR, "index processes failed");
+
+
+        bool error = false;
+
+        for(int p = 0; p < countOfProcessors; p++)
+        {
+            if(process[p] != -1)
+            {
+                int wstatus;
+
+                waitpid(process[p], &wstatus, 0);
+
+                if(WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0)
+                {
+                    lucy_add_index(&lucy, subindexPath[p]);
+                    lucy_delete_directory(subindexPath[p]);
+                }
+                else
+                {
+                    error = true;
+                }
+            }
+        }
+
+        if(error)
+            elog(ERROR, "an optimize process failed");
 
 
         if(optimize)

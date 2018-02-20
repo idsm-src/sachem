@@ -64,6 +64,14 @@ typedef struct
 typedef struct
 {
     Lucy *lucy;
+    const char *indexPath;
+    String *folder;
+} AddIndexRoutineContext;
+
+
+typedef struct
+{
+    Lucy *lucy;
     int32_t id;
     String *idValue;
 } DeleteRoutineContext;
@@ -275,6 +283,32 @@ void lucy_add(Lucy *lucy, int32_t id, Fingerprint fp)
         safeNothrowDecref(context.doc);
         safeNothrowDecref(context.idValue);
         safeNothrowDecref(context.fpValue);
+
+        throwError(error);
+    }
+}
+
+
+static void base_add_index(AddIndexRoutineContext *context)
+{
+    context->folder = Str_new_from_trusted_utf8(context->indexPath, strlen(context->indexPath));
+    Indexer_Add_Index(context->lucy->indexer, (Obj *) context->folder);
+    safeDecref(context->folder);
+}
+
+
+void lucy_add_index(Lucy *lucy, const char *indexPath)
+{
+    AddIndexRoutineContext context;
+    context.lucy = lucy;
+    context.indexPath = indexPath;
+    context.folder = NULL;
+
+    Err *error = Err_trap((Err_Attempt_t) &base_add_index, (void *) &context);
+
+    if(error != NULL)
+    {
+        safeNothrowDecref(context.folder);
 
         throwError(error);
     }
@@ -527,4 +561,60 @@ void lucy_link_directory(const char *oldPath, const char *newPath)
 
         link_directory_at(oldfd, newfd);
     }
+}
+
+
+static void unlink_directory_at(int dirfd)
+{
+    DIR *dp = fdopendir(dirfd);
+
+    if(dp == NULL)
+        elog(ERROR, "%s: fdopendir() failed", __func__);
+
+
+    struct dirent *ep;
+
+    while(ep = readdir (dp))
+    {
+        if(ep->d_name[0] == '.')
+            continue;
+
+        int subfd = openat(dirfd, ep->d_name, 0);
+
+        if(subfd == -1)
+            elog(ERROR, "%s: openat() failed", __func__);
+
+        struct stat statbuf;
+        if(fstat(subfd, &statbuf) != 0)
+            elog(ERROR, "%s: fstat() failed", __func__);
+
+        if(statbuf.st_mode & S_IFDIR)
+        {
+            unlink_directory_at(subfd);
+
+            if(unlinkat(dirfd, ep->d_name, AT_REMOVEDIR) != 0)
+               elog(ERROR, "%s: unlinkat() failed", __func__);
+        }
+        else if(statbuf.st_mode & S_IFREG)
+        {
+             if(unlinkat(dirfd, ep->d_name, 0) != 0)
+                elog(ERROR, "%s: unlinkat() failed", __func__);
+        }
+    }
+
+    (void) closedir (dp);
+}
+
+
+void lucy_delete_directory(const char *path)
+{
+    int fd = open(path, 0);
+
+    if(fd == -1)
+        elog(ERROR, "%s: open() failed", __func__);
+
+    unlink_directory_at(fd);
+
+    if(rmdir(path) != 0)
+       elog(ERROR, "%s: rmdir() failed", __func__);
 }
