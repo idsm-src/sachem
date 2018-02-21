@@ -9,7 +9,6 @@ volatile bool vf2Timeouted;
 
 void vf2_timeout_handler(void)
 {
-    elog(WARNING, "isomorphism: VF2 timeout expired");
     vf2Timeouted = true;
 }
 #endif

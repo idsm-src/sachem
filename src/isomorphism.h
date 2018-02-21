@@ -87,6 +87,8 @@ typedef struct
     IsotopeMode isotopeMode;
     StereoMode stereoMode;
 
+    int targetId;
+
     const Molecule *restrict query;
     const Molecule *restrict target;
 
@@ -702,7 +704,10 @@ inline bool vf2state_match_core(VF2State *const restrict vf2state)
 
 #if USE_VF2_TIMEOUT
             if(unlikely(vf2Timeouted))
+            {
+                elog(WARNING, "isomorphism: VF2 timeout expired for target %i", vf2state->targetId);
                 return false;
+            }
 #endif
 
             if(vf2state_is_feasible_pair(vf2state))
@@ -726,8 +731,10 @@ inline bool vf2state_match_core(VF2State *const restrict vf2state)
 }
 
 
-inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *const restrict target, int timeout)
+inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *const restrict target, int targetId, int timeout)
 {
+    vf2state->targetId = targetId;
+
     if(likely(vf2state->graphMode != GRAPH_EXACT))
     {
         if(vf2state->queryAtomCount > target->atomCount || vf2state->query->bondCount > target->bondCount)

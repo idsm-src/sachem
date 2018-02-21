@@ -365,7 +365,7 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
                 Molecule target;
                 molecule_init(&target, VARDATA(moleculeData), NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
                         info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
-                match = vf2state_match(&info->vf2state, &target, info->vf2_timeout);
+                match = vf2state_match(&info->vf2state, &target, DatumGetInt32(id), info->vf2_timeout);
                 PG_MEMCONTEXT_END();
                 MemoryContextReset(info->targetContext);
 
