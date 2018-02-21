@@ -33,13 +33,14 @@ import org.openscience.cdk.graph.Cycles;
 import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IBond;
+import org.openscience.cdk.interfaces.IPseudoAtom;
 import org.openscience.cdk.interfaces.IRing;
 import org.openscience.cdk.interfaces.IRingSet;
 import org.openscience.cdk.ringsearch.AllRingsFinder;
 import org.openscience.cdk.ringsearch.AllRingsFinder.Threshold;
+import org.openscience.cdk.ringsearch.RingPartitioner;
 import cz.iocb.sachem.fingerprint.bitpos.BitPosApi;
 import cz.iocb.sachem.fingerprint.bitpos.Neighbour;
-import org.openscience.cdk.ringsearch.RingPartitioner;
 
 
 
@@ -221,16 +222,20 @@ public class OrchemFingerprinter implements IFingerprinter
      */
     private void elementCounting(IAtomContainer molecule, BitSet fingerprint)
     {
-        String elemSymbol = null;
         Integer elemSymbCount = 0;
         Map<String, Integer> elemCounts = new HashMap<String, Integer>();
 
         /* Step 1: build map with counts per element. Map: key=>symbol, value=>total count */
-        Iterator<IAtom> it1 = molecule.atoms().iterator();
-
-        while(it1.hasNext())
+        for(IAtom atom : molecule.atoms())
         {
-            elemSymbol = it1.next().getSymbol();
+            if(atom instanceof IPseudoAtom)
+                continue;
+
+            String elemSymbol = atom.getSymbol();
+
+            if(elemSymbol.equals("H"))
+                continue;
+
             elemSymbCount = elemCounts.get(elemSymbol);
 
             if(elemSymbCount != null)
@@ -240,17 +245,13 @@ public class OrchemFingerprinter implements IFingerprinter
         }
 
         /* Step 2: finger print based on element count */
-        Iterator<String> it2 = elemCounts.keySet().iterator();
-
-        while(it2.hasNext())
+        for(String elemSymbol : elemCounts.keySet())
         {
-            elemSymbol = it2.next();
             int counted = elemCounts.get(elemSymbol);
 
             // if the element is 'rare' then it will not be in the
             // map of counts for elements. Instead we set an 'other element' bit
-            if(!BitPosApi.bp.elemFingerprinted.containsKey(elemSymbol) && !elemSymbol.equals("R")
-                    && !elemSymbol.equals("H"))
+            if(!BitPosApi.bp.elemFingerprinted.containsKey(elemSymbol))
             {
                 Integer bitPos = BitPosApi.bp.elemCntBits.get(BitPosApi.bp.otherElem);
                 fingerprint.set(bitPos, true);
@@ -429,6 +430,7 @@ public class OrchemFingerprinter implements IFingerprinter
 
             boolean hasNitrogen = false;
             boolean hasHeteroAtom = false;
+            boolean hasPseudoAtom = false;
             boolean hasOnlyCarbon = true;
             Iterator<IAtom> itr = ring.atoms().iterator();
 
@@ -436,14 +438,16 @@ public class OrchemFingerprinter implements IFingerprinter
             {
                 IAtom atom = itr.next();
 
-                if(atom.getSymbol().equals("N"))
+                if(atom instanceof IPseudoAtom)
+                    hasPseudoAtom = true;
+                else if(atom.getSymbol().equals("N"))
                     hasNitrogen = true;
-                else if(!atom.getSymbol().equals("C") && !atom.getSymbol().equals("R"))
+                else if(!atom.getSymbol().equals("C"))
                     hasHeteroAtom = true;
-
-                if(hasNitrogen && hasHeteroAtom)
-                    break;
             }
+
+            if(hasPseudoAtom)
+                continue;
 
             int dc = countDoubleBondsInRing(ring);
 
@@ -758,7 +762,7 @@ public class OrchemFingerprinter implements IFingerprinter
         {
             IAtom at = molecule.getAtom(atomPos);
 
-            if(!at.getSymbol().equals("R") && !at.getSymbol().equals("H"))
+            if(!(at instanceof IPseudoAtom) && !at.getSymbol().equals("H"))
             {
                 List<IAtom> atoms = new ArrayList<IAtom>();
                 atoms.add(at);
@@ -808,7 +812,7 @@ public class OrchemFingerprinter implements IFingerprinter
             else if(at2.equals(lastAtomInList) && !atomList.contains(at1))
                 nextAtom = at1;
 
-            if(nextAtom != null && nextAtom.getSymbol() != null && !nextAtom.getSymbol().equals("R")
+            if(nextAtom != null && nextAtom.getSymbol() != null && !(nextAtom instanceof IPseudoAtom)
                     && !nextAtom.getSymbol().equals("H"))
             {
                 String nextSMILES = null;

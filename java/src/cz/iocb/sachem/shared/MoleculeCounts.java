@@ -93,7 +93,7 @@ public class MoleculeCounts
         for(IBond bond : iac.bonds())
         {
             for(IAtom atom : bond.atoms())
-                if(atom.getSymbol().equals("H"))
+                if(atom.getSymbol().equals("H") || !isTarget && atom instanceof IPseudoAtom)
                     continue bondLoop;
 
 
