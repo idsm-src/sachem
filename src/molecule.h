@@ -413,18 +413,68 @@ inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, 
     int specialCount = *data << 8 | *(data + 1);
     data += 2;
 
+    int heavyAtomCount = xAtomCount + cAtomCount;
+
+
     for(int i = 0; i < xAtomCount; i++)
         if(((int8_t) data[i]) < 0)
+            return true;
+
+    data += xAtomCount;
+
+
+    int hBonds[hAtomCount];
+
+    for(int i = 0; i < hAtomCount; i++)
+        hBonds[i] = 0;
+
+    for(int i = 0; i < xBondCount; i++)
+    {
+        int offset = i * BOND_BLOCK_SIZE;
+
+        int b0 = data[offset + 0];
+        int b1 = data[offset + 1];
+        int b2 = data[offset + 2];
+
+        int x = b0 | b1 << 4 & 0xF00;
+        int y = b2 | b1 << 8 & 0xF00;
+
+        if(x >= heavyAtomCount)
+            hBonds[x - heavyAtomCount]++;
+
+        if(y >= heavyAtomCount)
+            hBonds[y - heavyAtomCount]++;
+    }
+
+    data += xBondCount * BOND_BLOCK_SIZE;
+
+
+    for(int i = 0; i < hAtomCount; i++)
+    {
+        int offset = i * HBOND_BLOCK_SIZE;
+        int value = data[offset + 0] * 256 | data[offset + 1];
+
+        if(value == 0)
+            continue;
+
+        hBonds[i]++;
+
+        int idx = value & 0xFFF;
+
+        if(idx >= heavyAtomCount)
+            hBonds[idx - heavyAtomCount]++;
+    }
+
+    data += hAtomCount * HBOND_BLOCK_SIZE;
+
+
+    for(int i = 0; i < hAtomCount; i++)
+        if(hBonds[i] != 1)
             return true;
 
 
     if(!withCharges && !withIsotopes)
         return false;
-
-    data += xAtomCount;
-    data += xBondCount * BOND_BLOCK_SIZE;
-    data += hAtomCount * HBOND_BLOCK_SIZE;
-
 
     for(int i = 0; i < specialCount; i++)
     {
@@ -435,12 +485,12 @@ inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, 
         switch(data[offset] >> 4)
         {
             case RECORD_CHARGE:
-                if(withCharges && idx >= xAtomCount + cAtomCount)
+                if(withCharges && idx >= heavyAtomCount)
                     return true;
                 break;
 
             case RECORD_ISOTOPE:
-                if(withIsotopes && idx >= xAtomCount + cAtomCount)
+                if(withIsotopes && idx >= heavyAtomCount)
                     return true;
                 break;
         }
