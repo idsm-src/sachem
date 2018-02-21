@@ -764,11 +764,13 @@ inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *co
 
 #if USE_VF2_TIMEOUT
     vf2Timeouted = false;
-    enable_timeout_after(vf2TimeoutId, timeout);
+    if(timeout > 0)
+        enable_timeout_after(vf2TimeoutId, timeout);
 #endif
     bool result = vf2state_match_core(vf2state);
 #if USE_VF2_TIMEOUT
-    disable_timeout(vf2TimeoutId, false);
+    if(timeout > 0)
+        disable_timeout(vf2TimeoutId, false);
 #endif
 
     return result;
