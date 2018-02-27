@@ -12,55 +12,11 @@
 #include "bitset.h"
 
 
-#define JavaDeleteRef(ref) \
-    do \
-    { \
-        if(likely(ref != NULL)) \
-        (*env)->DeleteLocalRef(env, ref); \
-        ref = NULL; \
-    } while(0)
-
-
-#define JavaDeleteBooleanArray(array, buffer, mode) \
-    do { \
-        if(likely(array != NULL && buffer != NULL)) (*env)->ReleaseBooleanArrayElements(env, array, buffer, mode); \
-        if(likely(array != NULL)) (*env)->DeleteLocalRef(env, array); \
-        array = NULL; \
-        buffer = NULL; \
-    } while(0)
-
-
-#define JavaDeleteByteArray(array, buffer, mode) \
-    do { \
-        if(likely(array != NULL && buffer != NULL)) (*env)->ReleaseByteArrayElements(env, array, buffer, mode); \
-        if(likely(array != NULL)) (*env)->DeleteLocalRef(env, array); \
-        array = NULL; \
-        buffer = NULL; \
-    } while(0)
-
-
-#define JavaDeleteShortArray(array, buffer, mode) \
-    do { \
-        if(likely(array != NULL && buffer != NULL)) (*env)->ReleaseShortArrayElements(env, array, buffer, mode); \
-        if(likely(array != NULL)) (*env)->DeleteLocalRef(env, array); \
-        array = NULL; \
-        buffer = NULL; \
-    } while(0)
-
-
-#define JavaDeleteLongArray(array, buffer, mode) \
-    do { \
-        if(likely(array != NULL && buffer != NULL)) (*env)->ReleaseLongArrayElements(env, array, buffer, mode); \
-        if(likely(array != NULL)) (*env)->DeleteLocalRef(env, array); \
-        array = NULL; \
-        buffer = NULL; \
-    } while(0)
-
+JavaVM* jvm = NULL;
+JNIEnv* env = NULL;
 
 static bool initialised = false;
 static pthread_t mainThread;
-static JavaVM* jvm = NULL;
-static JNIEnv* env = NULL;
 static jclass exceptionClass = NULL;
 static jclass byteArrayClass = NULL;
 static jmethodID toStringMethod = NULL;
@@ -95,7 +51,7 @@ static jfieldID lucyLoaderMoleculeField = NULL;
 static jmethodID lucyLoaderDataMethod = NULL;
 
 
-static inline void java_check_exception(const char *str)
+void java_check_exception(const char *str)
 {
     jthrowable exception = (*env)->ExceptionOccurred(env);
 
