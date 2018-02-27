@@ -50,11 +50,106 @@ static inline void write_bitword(char *buffer, uint32_t fp)
 }
 
 
-Fingerprint fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t))
+static inline IntegerFingerprint integer_fingerprint_create(std::set<uint32_t> &res, void *(*alloc)(size_t))
+{
+    if(res.size() > 0)
+    {
+        size_t size = res.size();
+        int32_t *data = (int *) (*alloc)(size * sizeof(int32_t));
+
+        if(data == NULL)
+            return {.size = (size_t) -1, .data = NULL};
+
+
+        IntegerFingerprint fp = {size : size, data: data};
+
+        for(uint32_t i : res)
+            *(data++) = i;
+
+        return fp;
+    }
+    else
+    {
+        return {.size = 0, .data = NULL};
+    }
+}
+
+
+static inline std::set<uint32_t> fingerprint_get_native(const Molecule *molecule)
+{
+    return iocb_fingerprint_get(molecule, GRAPH_SIZE, RING_SIZE, MAX_FEAT_LOGCOUNT);
+}
+
+
+static inline std::set<uint32_t> fingerprint_get_query_native(const Molecule *molecule)
+{
+    BitInfo info;
+    std::set<uint32_t> res = iocb_fingerprint_get(molecule, GRAPH_SIZE, RING_SIZE, MAX_FEAT_LOGCOUNT, true, &info);
+
+
+    // convert and pre-sort the fingerprints
+    std::map<int, uint32_t> fpi;
+    int unknownId = -1;
+
+    for(uint32_t i : res)
+    {
+        auto o = fporder.find(i);
+
+        if(o == fporder.end())
+            // if the fingerprint is not known to fporder (which it should be but keeping that database in shape
+            // is not very easy), let's assume it's very good (and put it on the beginning of the queue...
+            fpi[unknownId--] = i;
+        else
+            fpi[o->second] = i;
+    }
+
+
+    // find a decent coverage
+    std::set<uint32_t> fps;
+
+    std::vector<int> coverage;
+    int uncovered = molecule->atomCount;
+    int nfps = 0;
+    coverage.resize(uncovered, 0);
+
+    for(auto &i : fpi)
+    {
+        if(uncovered <= 0)
+            break;
+
+        if(nfps >= QUERY_MAX_FPS)
+            break;
+
+        bool found = false;
+
+        for(auto a : info[i.second])
+        {
+            if(coverage[a] < QUERY_ATOM_COVERAGE)
+            {
+                found = true;
+                coverage[a]++;
+
+                if(coverage[a] == QUERY_ATOM_COVERAGE)
+                    uncovered--;
+            }
+        }
+
+        if(found)
+        {
+            fps.insert(i.second);
+            nfps++;
+        }
+    }
+
+    return fps;
+}
+
+
+StringFingerprint string_fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t))
 {
     try
     {
-        std::set<uint32_t> res = iocb_fingerprint_get(molecule, GRAPH_SIZE, RING_SIZE, MAX_FEAT_LOGCOUNT);
+        std::set<uint32_t> res = fingerprint_get_native(molecule);
 
         if(res.size() > 0)
         {
@@ -65,7 +160,7 @@ Fingerprint fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t))
                 return {.size = (size_t) -1, .data = NULL};
 
 
-            Fingerprint fp = {size : size - 1, data: data};
+            StringFingerprint fp = {size : size - 1, data: data};
 
             for(uint32_t i : res)
             {
@@ -90,68 +185,11 @@ Fingerprint fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t))
 }
 
 
-Fingerprint fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_t))
+StringFingerprint string_fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_t))
 {
     try
     {
-        BitInfo info;
-        std::set<uint32_t> res = iocb_fingerprint_get(molecule, GRAPH_SIZE, RING_SIZE, MAX_FEAT_LOGCOUNT, true, &info);
-
-
-        // convert and pre-sort the fingerprints
-        std::map<int, uint32_t> fpi;
-        int unknownId = -1;
-
-        for(uint32_t i : res)
-        {
-            auto o = fporder.find(i);
-
-            if(o == fporder.end())
-                // if the fingerprint is not known to fporder (which it should be but keeping that database in shape
-                // is not very easy), let's assume it's very good (and put it on the beginning of the queue...
-                fpi[unknownId--] = i;
-            else
-                fpi[o->second] = i;
-        }
-
-
-        // find a decent coverage
-        std::set<uint32_t> fps;
-
-        std::vector<int> coverage;
-        int uncovered = molecule->atomCount;
-        int nfps = 0;
-        coverage.resize(uncovered, 0);
-
-        for(auto &i : fpi)
-        {
-            if(uncovered <= 0)
-                break;
-
-            if(nfps >= QUERY_MAX_FPS)
-                break;
-
-            bool found = false;
-
-            for(auto a : info[i.second])
-            {
-                if(coverage[a] < QUERY_ATOM_COVERAGE)
-                {
-                    found = true;
-                    coverage[a]++;
-
-                    if(coverage[a] == QUERY_ATOM_COVERAGE)
-                        uncovered--;
-                }
-            }
-
-            if(found)
-            {
-                fps.insert(i.second);
-                nfps++;
-            }
-        }
-
+        std::set<uint32_t> fps = fingerprint_get_query_native(molecule);
 
         if(fps.size() > 0)
         {
@@ -161,7 +199,7 @@ Fingerprint fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_
             if(data == NULL)
                 return {size : (size_t) -1, data : NULL};
 
-            Fingerprint fp = {size : size - 1, data: data};
+            StringFingerprint fp = {size : size - 1, data: data};
 
             for(uint32_t i : fps)
             {
@@ -179,6 +217,36 @@ Fingerprint fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_
         {
             return {.size = 0, .data = NULL};
         }
+    }
+    catch(...)
+    {
+    }
+
+    return {.size = (size_t) -1, .data = NULL};
+}
+
+
+IntegerFingerprint integer_fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t))
+{
+    try
+    {
+        std::set<uint32_t> res = fingerprint_get_native(molecule);
+        return integer_fingerprint_create(res, alloc);
+    }
+    catch(...)
+    {
+    }
+
+    return {.size = (size_t) -1, .data = NULL};
+}
+
+
+IntegerFingerprint integer_fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_t))
+{
+    try
+    {
+        std::set<uint32_t> res = fingerprint_get_query_native(molecule);
+        return integer_fingerprint_create(res, alloc);
     }
     catch(...)
     {

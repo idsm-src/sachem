@@ -279,9 +279,9 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
                         vf2state_init(&info->vf2state, &info->queryMolecule, info->graphMode, info->chargeMode, info->isotopeMode,
                                 info->stereoMode);
 
-                        Fingerprint fp = fingerprint_get_query(&info->queryMolecule, &palloc);
+                        StringFingerprint fp = string_fingerprint_get_query(&info->queryMolecule, &palloc);
 
-                        if(!fingerprint_is_valid(fp))
+                        if(!string_fingerprint_is_valid(fp))
                             elog(ERROR, "fingerprint cannot be generated");
 
                         info->resultSet = lucy_search(&lucy, fp, INT32_MAX);
@@ -630,9 +630,9 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
                                     if(!molecule_simple_init(&molecule, VARDATA(data[i].molecule), malloc))
                                         _exit(1);
 
-                                    Fingerprint result = fingerprint_get(&molecule, &malloc);
+                                    StringFingerprint result = string_fingerprint_get(&molecule, &malloc);
 
-                                    if(fingerprint_is_valid(result))
+                                    if(string_fingerprint_is_valid(result))
                                         lucy_add(&lucy, DatumGetInt32(ids[i]), result);
 
                                     molecule_simple_free(&molecule, free);

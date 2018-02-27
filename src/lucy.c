@@ -54,7 +54,7 @@ typedef struct
 {
     Lucy *lucy;
     int32_t id;
-    Fingerprint fp;
+    StringFingerprint fp;
     Doc *doc;
     String *idValue;
     String *fpValue;
@@ -80,7 +80,7 @@ typedef struct
 typedef struct
 {
     Lucy *lucy;
-    Fingerprint fp;
+    StringFingerprint fp;
     int max_results;
     String *queryStr;
     Query *query;
@@ -266,7 +266,7 @@ static void base_add(AddRoutineContext *context)
 }
 
 
-void lucy_add(Lucy *lucy, int32_t id, Fingerprint fp)
+void lucy_add(Lucy *lucy, int32_t id, StringFingerprint fp)
 {
     AddRoutineContext context;
     context.lucy = lucy;
@@ -408,7 +408,7 @@ static void base_search(SearchRoutineContext *context)
 }
 
 
-LucyResultSet lucy_search(Lucy *lucy, Fingerprint fp, int max_results)
+LucyResultSet lucy_search(Lucy *lucy, StringFingerprint fp, int max_results)
 {
     SearchRoutineContext context;
     context.lucy = lucy;
