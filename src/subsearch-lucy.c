@@ -73,15 +73,6 @@ typedef struct
 } SubstructureSearchData;
 
 
-typedef struct
-{
-    pg_atomic_uint32 possition;
-    uint32_t count;
-    Fingerprint *result;
-    LucyLoaderData *data;
-} ThreadData;
-
-
 static bool lucyInitialised = false;
 static int indexId = -1;
 static SPIPlanPtr mainQueryPlan;
