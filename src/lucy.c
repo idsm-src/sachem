@@ -496,48 +496,71 @@ void lucy_fail(Lucy *lucy, LucyResultSet *resultSet)
 
 static void link_directory_at(int olddirfd, int newdirfd)
 {
-    DIR *dp = fdopendir(olddirfd);
+    DIR *dp = NULL;
+    int subfd = -1;
+    int newsubfd = -1;
 
-    if(dp == NULL)
-        elog(ERROR, "%s: fdopendir() failed", __func__);
-
-
-    struct dirent *ep;
-
-    while(ep = readdir (dp))
+    PG_TRY();
     {
-        if(ep->d_name[0] == '.')
-            continue;
+        if((dp = fdopendir(olddirfd)) == NULL)
+            elog(ERROR, "%s: fdopendir() failed", __func__);
 
-        int subfd = openat(olddirfd, ep->d_name, 0);
 
-        if(subfd == -1)
-            elog(ERROR, "%s: openat() failed", __func__);
+        struct dirent *ep;
 
-        struct stat statbuf;
-        if(fstat(subfd, &statbuf) != 0)
-            elog(ERROR, "%s: fstat() failed", __func__);
-
-        if(statbuf.st_mode & S_IFDIR)
+        while(ep = readdir(dp))
         {
-            if(mkdirat(newdirfd, ep->d_name, 0700) != 0)
-                elog(ERROR, "%s: mkdirat() failed", __func__);
+            if(ep->d_name[0] == '.')
+                continue;
 
-            int newsubfd = openat(newdirfd, ep->d_name, 0);
-
-            if(newsubfd == -1)
+            if((subfd = openat(olddirfd, ep->d_name, 0)) == -1)
                 elog(ERROR, "%s: openat() failed", __func__);
 
-            link_directory_at(subfd, newsubfd);
-        }
-        else if(statbuf.st_mode & S_IFREG)
-        {
-             if(linkat(olddirfd, ep->d_name, newdirfd, ep->d_name, 0) != 0)
-                elog(ERROR, "%s: linkat() failed", __func__);
-        }
-    }
+            struct stat statbuf;
 
-    (void) closedir (dp);
+            if(fstat(subfd, &statbuf) != 0)
+                elog(ERROR, "%s: fstat() failed", __func__);
+
+            if(statbuf.st_mode & S_IFDIR)
+            {
+                if(mkdirat(newdirfd, ep->d_name, 0700) != 0)
+                    elog(ERROR, "%s: mkdirat() failed", __func__);
+
+                if((newsubfd = openat(newdirfd, ep->d_name, 0)) == -1)
+                    elog(ERROR, "%s: openat() failed", __func__);
+
+                link_directory_at(subfd, newsubfd);
+
+                close(newsubfd);
+                newsubfd = -1;
+            }
+            else if(statbuf.st_mode & S_IFREG)
+            {
+                if(linkat(olddirfd, ep->d_name, newdirfd, ep->d_name, 0) != 0)
+                    elog(ERROR, "%s: linkat() failed", __func__);
+            }
+
+            close(subfd);
+            subfd = -1;
+        }
+
+        closedir(dp);
+        dp = NULL;
+    }
+    PG_CATCH();
+    {
+        if(newsubfd != -1)
+            close(newsubfd);
+
+        if(subfd != -1)
+            close(subfd);
+
+        if(dp != NULL)
+            closedir(dp);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
 }
 
 
@@ -549,72 +572,122 @@ void lucy_link_directory(const char *oldPath, const char *newPath)
 
     if(oldPath != NULL)
     {
-        int newfd = open(newPath, 0);
+        int newfd = -1;
+        int oldfd = -1;
 
-        if(newfd == -1)
-            elog(ERROR, "%s: open() failed", __func__);
+        PG_TRY();
+        {
+            if((newfd = open(newPath, 0)) == -1)
+                elog(ERROR, "%s: open() failed", __func__);
 
-        int oldfd = open(oldPath, 0);
+            if((oldfd = open(oldPath, 0)) == -1)
+                elog(ERROR, "%s: open() failed", __func__);
 
-        if(oldfd == -1)
-            elog(ERROR, "%s: open() failed", __func__);
+            link_directory_at(oldfd, newfd);
 
-        link_directory_at(oldfd, newfd);
+            close(oldfd);
+            oldfd = -1;
+
+            close(newfd);
+            newfd = -1;
+        }
+        PG_CATCH();
+        {
+            if(oldfd != -1)
+                close(oldfd);
+
+            if(newfd != -1)
+                close(newfd);
+
+            PG_RE_THROW();
+        }
+        PG_END_TRY();
     }
 }
 
 
 static void unlink_directory_at(int dirfd)
 {
-    DIR *dp = fdopendir(dirfd);
+    DIR *dp = NULL;
+    int subfd = -1;
 
-    if(dp == NULL)
-        elog(ERROR, "%s: fdopendir() failed", __func__);
-
-
-    struct dirent *ep;
-
-    while(ep = readdir (dp))
+    PG_TRY();
     {
-        if(ep->d_name[0] == '.')
-            continue;
+        if((dp = fdopendir(dirfd)) == NULL)
+            elog(ERROR, "%s: fdopendir() failed", __func__);
 
-        int subfd = openat(dirfd, ep->d_name, 0);
 
-        if(subfd == -1)
-            elog(ERROR, "%s: openat() failed", __func__);
+        struct dirent *ep;
 
-        struct stat statbuf;
-        if(fstat(subfd, &statbuf) != 0)
-            elog(ERROR, "%s: fstat() failed", __func__);
-
-        if(statbuf.st_mode & S_IFDIR)
+        while(ep = readdir(dp))
         {
-            unlink_directory_at(subfd);
+            if(ep->d_name[0] == '.')
+                continue;
 
-            if(unlinkat(dirfd, ep->d_name, AT_REMOVEDIR) != 0)
-               elog(ERROR, "%s: unlinkat() failed", __func__);
+            if((subfd = openat(dirfd, ep->d_name, 0)) == -1)
+                elog(ERROR, "%s: openat() failed", __func__);
+
+            struct stat statbuf;
+            if(fstat(subfd, &statbuf) != 0)
+                elog(ERROR, "%s: fstat() failed", __func__);
+
+            if(statbuf.st_mode & S_IFDIR)
+            {
+                unlink_directory_at(subfd);
+
+                if(unlinkat(dirfd, ep->d_name, AT_REMOVEDIR) != 0)
+                   elog(ERROR, "%s: unlinkat() failed", __func__);
+            }
+            else if(statbuf.st_mode & S_IFREG)
+            {
+                if(unlinkat(dirfd, ep->d_name, 0) != 0)
+                    elog(ERROR, "%s: unlinkat() failed", __func__);
+            }
+
+            close(subfd);
+            subfd = -1;
         }
-        else if(statbuf.st_mode & S_IFREG)
-        {
-             if(unlinkat(dirfd, ep->d_name, 0) != 0)
-                elog(ERROR, "%s: unlinkat() failed", __func__);
-        }
+
+        closedir(dp);
+        dp = NULL;
     }
+    PG_CATCH();
+    {
+        if(subfd != -1)
+            close(subfd);
 
-    (void) closedir (dp);
+        if(dp != NULL)
+            closedir(dp);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
 }
 
 
 void lucy_delete_directory(const char *path)
 {
-    int fd = open(path, 0);
+    int fd = -1;
 
-    if(fd == -1)
-        elog(ERROR, "%s: open() failed", __func__);
+    PG_TRY();
+    {
+        if((fd = open(path, 0)) == -1)
+            elog(ERROR, "%s: open() failed", __func__);
 
-    unlink_directory_at(fd);
+        unlink_directory_at(fd);
 
-    if(rmdir(path) != 0)
-       elog(ERROR, "%s: rmdir() failed", __func__);
+        close(fd);
+        fd = -1;
+
+        if(rmdir(path) != 0)
+           elog(ERROR, "%s: rmdir() failed", __func__);
+    }
+    PG_CATCH();
+    {
+        if(fd != -1)
+            close(fd);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
 }
