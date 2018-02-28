@@ -11,10 +11,12 @@ libsachem_la_LIBADD = fingerprints/libfingerprints.la -llucy -lclownfish
 libsachem_la_SOURCES = \
 		isomorphism.c \
         java.c \
+        lucene.c \
         lucy.c \
         sachem.c \
         simsearch.c \
         subsearch.c \
+        subsearch-lucene.c \
         subsearch-lucy.c
 
 EXTRA_DIST = \
@@ -22,6 +24,7 @@ EXTRA_DIST = \
         heap.h \
         isomorphism.h \
         java.h \
+        lucene.h \
         lucy.h \
         molecule.h \
         sachem.h \

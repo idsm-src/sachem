@@ -108,7 +108,7 @@ void java_module_init(void)
         .version = JNI_VERSION_1_8,
         .nOptions = 2,
         .options = (JavaVMOption []) {
-            (JavaVMOption) { .optionString = "-Djava.class.path=" JARDIR "/sachem.jar:" JARDIR "/cdk-2.1.1.jar"},
+            (JavaVMOption) { .optionString = "-Djava.class.path=" JARDIR "/sachem.jar:" JARDIR "/cdk-2.1.1.jar:" JARDIR "/lucene-core-7.2.1.jar"},
             (JavaVMOption) { .optionString = "-Dinchi.path=" BINDIR "/inchi-1"}
         },
         .ignoreUnrecognized = JNI_FALSE
