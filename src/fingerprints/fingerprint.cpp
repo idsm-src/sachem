@@ -12,9 +12,6 @@ PG_MODULE_MAGIC;
 }
 
 
-#define GRAPH_SIZE              7
-#define RING_SIZE               3
-#define MAX_FEAT_LOGCOUNT       5
 #define QUERY_ATOM_COVERAGE     2
 #define QUERY_MAX_FPS          32
 
@@ -35,8 +32,6 @@ void __attribute__ ((constructor(300))) fingerprint_init(void)
         {
             uint32_t fp;
             stream.read((char *) &fp, sizeof(uint32_t));
-            fp = ntohl(fp);
-
             fporder[fp] = fpn++;
         }
     }

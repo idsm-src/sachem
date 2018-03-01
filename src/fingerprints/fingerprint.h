@@ -4,6 +4,11 @@
 #include <stdlib.h>
 
 
+#define GRAPH_SIZE              7
+#define RING_SIZE               3
+#define MAX_FEAT_LOGCOUNT       5
+
+
 typedef struct Molecule Molecule;
 
 
