@@ -27,7 +27,7 @@ if test "no$ANT" = no ; then
 fi
 
 dnl check for PostgreSQL
-AX_LIB_POSTGRESQL(9.5.0)
+AX_LIB_POSTGRESQL(9.6.0)
 
 dnl check for JDK8
 AX_JDK8

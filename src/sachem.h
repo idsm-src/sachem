@@ -16,6 +16,10 @@
 #if PG_VERSION_NUM < 100000
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)
+#define shm_toc_lookup_key(toc,key) shm_toc_lookup((toc),(key))
+#else
+#define CreateParallelContextForExternalFunction(contex,library,function) CreateParallelContext((contex),(library),(function))
+#define shm_toc_lookup_key(toc,key) shm_toc_lookup((toc),(key),false)
 #endif
 
 #define PG_MEMCONTEXT_BEGIN(context)    do { MemoryContext old = MemoryContextSwitchTo(context)

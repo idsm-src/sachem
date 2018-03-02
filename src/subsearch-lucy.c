@@ -6,6 +6,11 @@
 #include <utils/array.h>
 #include <utils/builtins.h>
 #include <utils/memutils.h>
+#include <access/xact.h>
+#include <access/parallel.h>
+#include <storage/shm_toc.h>
+#include <storage/ipc.h>
+#include <storage/spin.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -27,7 +32,12 @@
 
 #define SHOW_STATS                0
 #define FETCH_SIZE                1000
-#define SYNC_FETCH_SIZE           50000     // per process
+#define SYNC_FETCH_SIZE           100000
+#define SUBOPTIMIZE_PROCESSES     4
+#define HEADER_KEY                0
+#define ID_TABLE_KEY              1
+#define IDEX_KEY_OFFSET           2
+#define MOLECULE_KEY_OFFSET       10000
 #define COMPOUNDS_TABLE           "compounds"
 #define MOLECULES_TABLE           "sachem_molecules"
 #define MOLECULE_ERRORS_TABLE     "sachem_molecule_errors"
@@ -71,6 +81,23 @@ typedef struct
 #endif
 
 } SubstructureSearchData;
+
+
+typedef struct
+{
+    slock_t mutex;
+    int attachedWorkers;
+    int moleculeCount;
+    int moleculePosition;
+} IndexWorkerHeader;
+
+
+typedef struct
+{
+    slock_t mutex;
+    int subindexCount;
+    int subindexPosition;
+} OptimizeWorkerHeader;
 
 
 static bool lucyInitialised = false;
@@ -401,13 +428,100 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 }
 
 
+void lucy_index_worker(dsm_segment *seg, shm_toc *toc)
+{
+    volatile IndexWorkerHeader *header = shm_toc_lookup_key(toc, HEADER_KEY);
+    SpinLockAcquire(&header->mutex);
+    int workerNumber = header->attachedWorkers++;
+    SpinLockRelease(&header->mutex);
+
+    int *ids = shm_toc_lookup_key(toc, ID_TABLE_KEY);
+    char *indexPath = shm_toc_lookup_key(toc, IDEX_KEY_OFFSET + workerNumber);
+
+    lucy_init(&lucy);
+    lucy_set_folder(&lucy, indexPath);
+    lucy_begin(&lucy);
+
+    PG_TRY();
+    {
+        while(true)
+        {
+            SpinLockAcquire(&header->mutex);
+            int position = header->moleculePosition++;
+            SpinLockRelease(&header->mutex);
+
+            if(position >= header->moleculeCount)
+                break;
+
+            uint8_t *data = shm_toc_lookup_key(toc, MOLECULE_KEY_OFFSET + position);
+
+            Molecule molecule;
+
+            if(!molecule_simple_init(&molecule, data, malloc))
+                elog(ERROR, "%s: molecule_simple_init() failed", __func__);
+
+            StringFingerprint result = string_fingerprint_get(&molecule, &malloc);
+
+            if(string_fingerprint_is_valid(result))
+                lucy_add(&lucy, ids[position], result);
+
+            molecule_simple_free(&molecule, free);
+        }
+
+        lucy_commit(&lucy);
+    }
+    PG_CATCH();
+    {
+        lucy_rollback(&lucy);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
+}
+
+
+void lucy_optimize_worker(dsm_segment *seg, shm_toc *toc)
+{
+    volatile OptimizeWorkerHeader *header = shm_toc_lookup_key(toc, HEADER_KEY);
+
+    lucy_init(&lucy);
+
+    while(true)
+    {
+        SpinLockAcquire(&header->mutex);
+        int position = header->subindexPosition++;
+        SpinLockRelease(&header->mutex);
+
+        if(position >= header->subindexCount)
+            break;
+
+        char *indexPath = shm_toc_lookup_key(toc, IDEX_KEY_OFFSET + position);
+
+        lucy_set_folder(&lucy, indexPath);
+        lucy_begin(&lucy);
+
+        PG_TRY();
+        {
+            lucy_optimize(&lucy);
+            lucy_commit(&lucy);
+        }
+        PG_CATCH();
+        {
+            lucy_rollback(&lucy);
+
+            PG_RE_THROW();
+        }
+        PG_END_TRY();
+    }
+}
+
+
 PG_FUNCTION_INFO_V1(lucy_sync_data);
 Datum lucy_sync_data(PG_FUNCTION_ARGS)
 {
     bool verbose = PG_GETARG_BOOL(0);
     bool optimize = PG_GETARG_BOOL(1);
 
-    MemoryContext memoryContext = CurrentMemoryContext;
     createBasePath();
 
 
@@ -483,6 +597,8 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
 
 
     lucy_begin(&lucy);
+    int subindexCount = 0;
+
 
     PG_TRY();
     {
@@ -495,7 +611,7 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
 
         while(true)
         {
-            SPI_cursor_fetch(auditCursor, true, countOfProcessors * SYNC_FETCH_SIZE);
+            SPI_cursor_fetch(auditCursor, true, SYNC_FETCH_SIZE);
 
             if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
                 elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
@@ -553,15 +669,15 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
                 0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
 
-        Datum *ids = palloc(countOfProcessors * SYNC_FETCH_SIZE * sizeof(Datum));
-        VarChar **molfiles = palloc(countOfProcessors * SYNC_FETCH_SIZE * sizeof(VarChar *));
-        LucyLoaderData *data = palloc(countOfProcessors * SYNC_FETCH_SIZE * sizeof(LucyLoaderData));
+        Datum *ids = palloc(SYNC_FETCH_SIZE * sizeof(Datum));
+        VarChar **molfiles = palloc(SYNC_FETCH_SIZE * sizeof(VarChar *));
+        LucyLoaderData *data = palloc(SYNC_FETCH_SIZE * sizeof(LucyLoaderData));
         int count = 0;
 
 
         while(true)
         {
-            SPI_cursor_fetch(compoundCursor, true, countOfProcessors * SYNC_FETCH_SIZE);
+            SPI_cursor_fetch(compoundCursor, true, SYNC_FETCH_SIZE);
 
             if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
                 elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
@@ -596,144 +712,106 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
             java_parse_lucy_data(processed, molfiles, data);
 
 
-            int process[countOfProcessors];
-            int started = false;
+            EnterParallelMode();
 
-            for(int p = 0; p < countOfProcessors; p++)
+            ParallelContext *pcxt = CreateParallelContextForExternalFunction("libsachem", "lucy_index_worker", countOfProcessors);
+
+            shm_toc_estimate_keys(&pcxt->estimator, 2 + countOfProcessors + processed);
+            shm_toc_estimate_chunk(&pcxt->estimator, sizeof(IndexWorkerHeader));
+            shm_toc_estimate_chunk(&pcxt->estimator, processed * sizeof(int));
+
+            for(int i = 0; i < countOfProcessors; i++)
+                shm_toc_estimate_chunk(&pcxt->estimator, strlen(subindexPath[i]) + 1);
+
+            for(int i = 0; i < processed; i++)
+                if(data[i].molecule != NULL)
+                    shm_toc_estimate_chunk(&pcxt->estimator, VARSIZE(data[i].molecule) - VARHDRSZ);
+
+            InitializeParallelDSM(pcxt);
+
+            int *idValues = shm_toc_allocate(pcxt->toc, processed * sizeof(int));
+            shm_toc_insert(pcxt->toc, ID_TABLE_KEY, idValues);
+
+            for(int i = 0; i < countOfProcessors; i++)
             {
-                int pid;
+                void *path = shm_toc_allocate(pcxt->toc, strlen(subindexPath[i]) + 1);
+                strcpy(path, subindexPath[i]);
+                shm_toc_insert(pcxt->toc, IDEX_KEY_OFFSET + i, path);
+            }
 
-                switch((pid = fork_process()))
+
+            int valid = 0;
+
+            for(int i = 0; i < processed; i++)
+            {
+                if(likely(data[i].molecule != NULL))
                 {
-                    case 0:
-                        /* in postmaster child ... */
-                        InitPostmasterChild();
+                    void *molecule = shm_toc_allocate(pcxt->toc, VARSIZE(data[i].molecule) - VARHDRSZ);
+                    memcpy(molecule, VARDATA(data[i].molecule), VARSIZE(data[i].molecule) - VARHDRSZ);
+                    shm_toc_insert(pcxt->toc, MOLECULE_KEY_OFFSET + valid, molecule);
 
-                        /* Close the postmaster's sockets */
-                        //ClosePostmasterPorts(false);
-
-                        /* Drop our connection to postmaster's shared memory, as well */
-                        dsm_detach_all();
-                        PGSharedMemoryDetach();
-
-                        PG_TRY();
-                        {
-                            lucy_set_folder(&lucy, subindexPath[p]);
-                            lucy_begin(&lucy);
-
-                            for(int i = p * SYNC_FETCH_SIZE; i < processed && i < (p + 1) * SYNC_FETCH_SIZE; i++)
-                            {
-                                if(data[i].molecule)
-                                {
-                                    Molecule molecule;
-
-                                    if(!molecule_simple_init(&molecule, VARDATA(data[i].molecule), malloc))
-                                        _exit(1);
-
-                                    StringFingerprint result = string_fingerprint_get(&molecule, &malloc);
-
-                                    if(string_fingerprint_is_valid(result))
-                                        lucy_add(&lucy, DatumGetInt32(ids[i]), result);
-
-                                    molecule_simple_free(&molecule, free);
-                                }
-                            }
-
-                            lucy_commit(&lucy);
-                        }
-                        PG_CATCH();
-                        {
-                            _exit(2);
-                        }
-                        PG_END_TRY();
-                        _exit(0);
-
-                    default:
-                        if(pid != -1)
-                            started = true;
-
-                        process[p] = pid;
+                    idValues[valid] = DatumGetInt32(ids[i]);
+                    valid++;
                 }
             }
 
-            if(!started)
-                elog(ERROR, "index processes failed");
+            IndexWorkerHeader *header = shm_toc_allocate(pcxt->toc, sizeof(IndexWorkerHeader));
+            SpinLockInit(&header->mutex);
+            header->attachedWorkers = 0;
+            header->moleculePosition = 0;
+            header->moleculeCount = valid;
+            shm_toc_insert(pcxt->toc, HEADER_KEY, header);
+
+            LaunchParallelWorkers(pcxt);
+
+            if(subindexCount < pcxt->nworkers_launched)
+                subindexCount = pcxt->nworkers_launched;
+
+            WaitForParallelWorkersToFinish(pcxt);
+            DestroyParallelContext(pcxt);
+            ExitParallelMode();
 
 
-            PG_TRY();
+            for(int i = 0; i < processed; i++)
             {
-                for(int i = 0; i < processed; i++)
+                HeapTuple tuple = tuptable->vals[i];
+
+                if((char *) molfiles[i] != DatumGetPointer(SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag)))
+                    pfree(molfiles[i]);
+
+
+                if(data[i].error)
                 {
-                    HeapTuple tuple = tuptable->vals[i];
+                    if(data[i].error == NULL)
+                        data[i].error = cstring_to_text("fingerprint cannot be generated");
 
-                    if((char *) molfiles[i] != DatumGetPointer(SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag)))
-                        pfree(molfiles[i]);
+                    char *message = text_to_cstring(data[i].error);
+                    elog(NOTICE, "%i: %s", DatumGetInt32(ids[i]), message);
+                    pfree(message);
 
+                    Datum values[] = {ids[i], PointerGetDatum(data[i].error)};
 
-                    if(data[i].error)
-                    {
-                        if(data[i].error == NULL)
-                            data[i].error = cstring_to_text("fingerprint cannot be generated");
+                    if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)",
+                            2, (Oid[]) { INT4OID, TEXTOID }, values, NULL, false, 0) != SPI_OK_INSERT)
+                        elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
-                        char *message = text_to_cstring(data[i].error);
-                        elog(NOTICE, "%i: %s", DatumGetInt32(ids[i]), message);
-                        pfree(message);
-
-                        Datum values[] = {ids[i], PointerGetDatum(data[i].error)};
-
-                        if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)",
-                                2, (Oid[]) { INT4OID, TEXTOID }, values, NULL, false, 0) != SPI_OK_INSERT)
-                            elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
-
-                        pfree(data[i].error);
-                    }
-
-                    if(data[i].molecule == NULL)
-                        continue;
-
-
-                    Datum moleculesValues[] = {ids[i], PointerGetDatum(data[i].molecule)};
-
-                    if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
-                        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
-
-                    pfree(data[i].molecule);
+                    pfree(data[i].error);
                 }
+
+                if(data[i].molecule == NULL)
+                    continue;
+
+
+                Datum moleculesValues[] = {ids[i], PointerGetDatum(data[i].molecule)};
+
+                if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
+                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+                pfree(data[i].molecule);
             }
-            PG_CATCH();
-            {
-                int wstatus;
-
-                for(int p = 0; p < countOfProcessors; p++)
-                    if(process[p] != -1)
-                        waitpid(process[p], &wstatus, 0);
-
-                PG_RE_THROW();
-            }
-            PG_END_TRY();
-
-
-            bool error = false;
-
-            for(int p = 0; p < countOfProcessors; p++)
-            {
-                if(process[p] != -1)
-                {
-                    int wstatus;
-
-                    waitpid(process[p], &wstatus, 0);
-
-                    if(!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != 0)
-                        error = true;
-                }
-            }
-
-            if(error)
-                elog(ERROR, "an index process failed");
 
 
             SPI_freetuptable(tuptable);
-
 
             count += processed;
 
@@ -747,80 +825,45 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
             elog(ERROR, "%s: SPI_exec() failed", __func__);
 
 
-        int process[countOfProcessors];
-        int started = false;
-
-        for(int p = 0; p < countOfProcessors; p++)
+        if(optimize)
         {
-            int pid;
+            EnterParallelMode();
 
-            switch((pid = fork_process()))
+            ParallelContext *pcxt = CreateParallelContextForExternalFunction("libsachem", "lucy_optimize_worker",
+                    countOfProcessors > SUBOPTIMIZE_PROCESSES ? SUBOPTIMIZE_PROCESSES : countOfProcessors);
+
+            shm_toc_estimate_keys(&pcxt->estimator, 1 + countOfProcessors);
+            shm_toc_estimate_chunk(&pcxt->estimator, sizeof(OptimizeWorkerHeader));
+
+            for(int i = 0; i < countOfProcessors; i++)
+                shm_toc_estimate_chunk(&pcxt->estimator, strlen(subindexPath[i]) + 1);
+
+            InitializeParallelDSM(pcxt);
+
+            for(int i = 0; i < countOfProcessors; i++)
             {
-                case 0:
-                    /* in postmaster child ... */
-                    InitPostmasterChild();
-
-                    /* Close the postmaster's sockets */
-                    //ClosePostmasterPorts(false);
-
-                    /* Drop our connection to postmaster's shared memory, as well */
-                    dsm_detach_all();
-                    PGSharedMemoryDetach();
-
-                    PG_TRY();
-                    {
-                        lucy_set_folder(&lucy, subindexPath[p]);
-                        lucy_begin(&lucy);
-
-                        if(optimize)
-                            lucy_optimize(&lucy);
-
-                        lucy_commit(&lucy);
-                    }
-                    PG_CATCH();
-                    {
-                        _exit(2);
-                    }
-                    PG_END_TRY();
-                    _exit(0);
-
-                default:
-                    if(pid != -1)
-                        started = true;
-
-                    process[p] = pid;
+                void *path = shm_toc_allocate(pcxt->toc, strlen(subindexPath[i]) + 1);
+                strcpy(path, subindexPath[i]);
+                shm_toc_insert(pcxt->toc, IDEX_KEY_OFFSET + i, path);
             }
+
+            OptimizeWorkerHeader *header = shm_toc_allocate(pcxt->toc, sizeof(OptimizeWorkerHeader));
+            SpinLockInit(&header->mutex);
+            header->subindexPosition = 0;
+            header->subindexCount = subindexCount;
+            shm_toc_insert(pcxt->toc, HEADER_KEY, header);
+
+            LaunchParallelWorkers(pcxt);
+            WaitForParallelWorkersToFinish(pcxt);
+            DestroyParallelContext(pcxt);
+            ExitParallelMode();
         }
 
-        if(!started)
-            elog(ERROR, "index processes failed");
-
-
-        bool error = false;
-
-        for(int p = 0; p < countOfProcessors; p++)
+        for(int p = 0; p < subindexCount; p++)
         {
-            if(process[p] != -1)
-            {
-                int wstatus;
-
-                waitpid(process[p], &wstatus, 0);
-
-                if(WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0)
-                {
-                    lucy_add_index(&lucy, subindexPath[p]);
-                    lucy_delete_directory(subindexPath[p]);
-                }
-                else
-                {
-                    error = true;
-                }
-            }
+            lucy_add_index(&lucy, subindexPath[p]);
+            lucy_delete_directory(subindexPath[p]);
         }
-
-        if(error)
-            elog(ERROR, "an optimize process failed");
-
 
         if(optimize)
             lucy_optimize(&lucy);
