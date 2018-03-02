@@ -577,10 +577,10 @@ void lucy_link_directory(const char *oldPath, const char *newPath)
 
         PG_TRY();
         {
-            if((newfd = open(newPath, 0)) == -1)
+            if((newfd = open(newPath, O_DIRECTORY)) == -1)
                 elog(ERROR, "%s: open() failed", __func__);
 
-            if((oldfd = open(oldPath, 0)) == -1)
+            if((oldfd = open(oldPath, O_DIRECTORY)) == -1)
                 elog(ERROR, "%s: open() failed", __func__);
 
             link_directory_at(oldfd, newfd);
@@ -671,7 +671,7 @@ void lucy_delete_directory(const char *path)
 
     PG_TRY();
     {
-        if((fd = open(path, 0)) == -1)
+        if((fd = open(path, O_DIRECTORY)) == -1)
             elog(ERROR, "%s: open() failed", __func__);
 
         unlink_directory_at(fd);

@@ -236,10 +236,10 @@ void lucene_link_directory(const char *oldPath, const char *newPath)
 
         if(oldPath != NULL)
         {
-            if((newdirfd = open(newPath, 0)) == -1)
+            if((newdirfd = open(newPath, O_DIRECTORY)) == -1)
                 elog(ERROR, "%s: open() failed", __func__);
 
-            if((olddirfd = open(oldPath, 0)) == -1)
+            if((olddirfd = open(oldPath, O_DIRECTORY)) == -1)
                 elog(ERROR, "%s: open() failed", __func__);
 
             if((dp = fdopendir(olddirfd)) == NULL)
@@ -291,7 +291,7 @@ void lucene_delete_directory(const char *path)
 
     PG_TRY();
     {
-        if((dirfd = open(path, 0)) == -1)
+        if((dirfd = open(path, O_DIRECTORY)) == -1)
             elog(ERROR, "%s: open() failed", __func__);
 
         if((dp = fdopendir(dirfd)) == NULL)
