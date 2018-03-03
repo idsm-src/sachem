@@ -16,11 +16,12 @@ PG_MODULE_MAGIC;
 #define QUERY_MAX_FPS          32
 
 
+static bool initialized = false;
 static const unsigned char b64str[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-static std::map<uint32_t, int> fporder __attribute__ ((init_priority(200)));
+static std::map<uint32_t, int> fporder;
 
 
-void __attribute__ ((constructor(300))) fingerprint_init(void)
+void fingerprint_init(void)
 {
     std::ifstream stream(DATADIR "/fporder.bin", std::ios::in | std::ios::binary);
 
@@ -78,6 +79,13 @@ static inline std::set<uint32_t> fingerprint_get_native(const Molecule *molecule
 
 static inline std::set<uint32_t> fingerprint_get_query_native(const Molecule *molecule)
 {
+    if(unlikely(initialized == false))
+    {
+        fingerprint_init();
+        initialized = true;
+    }
+
+
     BitInfo info;
     std::set<uint32_t> res = iocb_fingerprint_get(molecule, GRAPH_SIZE, RING_SIZE, MAX_FEAT_LOGCOUNT, true, &info);
 
