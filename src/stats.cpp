@@ -63,21 +63,20 @@ bool stats_add(Stats *stats, const Molecule *molecule)
 }
 
 
-bool stats_merge(Stats *stats, Stats *substats)
+bool stats_merge(Stats *stats, StatItem *items, size_t size)
 {
     try
     {
         std::map<uint32_t,uint32_t> &map = *((std::map<uint32_t,uint32_t> *) stats);
-        std::map<uint32_t,uint32_t> &submap = *((std::map<uint32_t,uint32_t> *) substats);
 
-        for(auto i : submap)
+        for(size_t i = 0; i < size; i++)
         {
-            auto it = map.find(i.first);
+            auto it = map.find(items[i].fp);
 
             if(it == map.end())
-                map[i.first] = i.second;
+                map[items[i].fp] = items[i].count;
             else
-                map[i.first] = map[i.first] + i.second;
+                map[items[i].fp] = map[items[i].fp] + items[i].count;
         }
 
         return true;
@@ -87,6 +86,33 @@ bool stats_merge(Stats *stats, Stats *substats)
     }
 
     return false;
+}
+
+
+size_t stats_get_items(Stats *stats, StatItem **items)
+{
+    try
+    {
+        std::map<uint32_t,uint32_t> &map = *((std::map<uint32_t,uint32_t> *) stats);
+
+        *items = (StatItem *) palloc(map.size() * sizeof(StatItem));
+        StatItem *item = *items;
+
+        for(auto i : map)
+        {
+            item->fp = i.first;
+            item->count = i.second;
+            item++;
+        }
+
+        return map.size();
+    }
+    catch(...)
+    {
+    }
+
+    *items = NULL;
+    return 0;
 }
 
 

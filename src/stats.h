@@ -7,10 +7,18 @@
 typedef void *Stats;
 
 
+typedef struct
+{
+    uint32_t fp;
+    uint32_t count;
+} StatItem;
+
+
 Stats *stats_create();
 void stats_delete(Stats *stats);
 bool stats_add(Stats *stats, const Molecule *molecule);
-bool stats_merge(Stats *stats, Stats *substats);
+bool stats_merge(Stats *stats, StatItem *items, size_t size);
+size_t stats_get_items(Stats *stats, StatItem **items);
 bool stats_write(Stats *stats, const char *name, int limit);
 
 #endif /*STATS_H__*/
