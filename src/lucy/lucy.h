@@ -1,6 +1,8 @@
 #ifndef LUCY_H_
 #define LUCY_H_
 
+#include <stdbool.h>
+#include <stdint.h>
 #include "fingerprints/fingerprint.h"
 
 #define NULL_RESULT_SET     ((LucyResultSet) { .hits = NULL })

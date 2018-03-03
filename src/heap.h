@@ -1,3 +1,6 @@
+#include "sachem.h"
+
+
 #define HEAP_ROW_COUNT          128
 #define HEAP_ROW_SIZE           (1024*1024)
 #define HEAP_ITEM(heap, idx)    ((heap)->data[(idx) / HEAP_ROW_SIZE][(idx) % HEAP_ROW_SIZE])
