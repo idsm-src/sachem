@@ -12,23 +12,23 @@ libsachem_la_SOURCES = \
 		isomorphism.c \
 		fporder.c \
         java.c \
-        lucene.c \
-        lucy.c \
         sachem.c \
-        simsearch.c \
         stats.cpp \
-        subsearch.c \
-        subsearch-lucene.c \
-        subsearch-lucy.c
+        lucene/lucene.c \
+        lucene/subsearch.c \
+        lucy/lucy.c \
+        lucy/subsearch.c \
+        orchem/simsearch.c \
+        orchem/subsearch.c
 
 EXTRA_DIST = \
         bitset.h \
         heap.h \
         isomorphism.h \
         java.h \
-        lucene.h \
-        lucy.h \
         molecule.h \
         sachem.h \
         stats.h \
-        subsearch.h
+        subsearch.h \
+        lucene/lucene.h \
+        lucy/lucy.h
