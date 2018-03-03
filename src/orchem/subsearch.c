@@ -8,10 +8,10 @@
 #include "bitset.h"
 #include "common.h"
 #include "isomorphism.h"
-#include "java.h"
 #include "molecule.h"
 #include "sachem.h"
 #include "subsearch.h"
+#include "java/orchem.h"
 
 
 #define SHOW_STATS              0
@@ -57,6 +57,7 @@ typedef struct
 } SubstructureSearchData;
 
 
+static bool javaInitialized = false;
 static int indexId = -1;
 static uint64_t *base = MAP_FAILED;
 static size_t length;
@@ -72,6 +73,13 @@ static int16 (*counts)[COUNTS_SIZE];
 
 static void orchem_subsearch_init(void)
 {
+    if(unlikely(javaInitialized == false))
+    {
+        java_orchem_init();
+        javaInitialized = true;
+    }
+
+
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
         elog(ERROR, "%s: SPI_connect() failed", __func__);
 
@@ -217,7 +225,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
         info->stereoMode = stereoMode;
         info->vf2_timeout = vf2_timeout;
 
-        info->queryDataCount = java_parse_orchem_substructure_query(&info->queryData, VARDATA(query), VARSIZE(query) - VARHDRSZ,
+        info->queryDataCount = java_orchem_parse_substructure_query(&info->queryData, VARDATA(query), VARSIZE(query) - VARHDRSZ,
                 type, graphMode == GRAPH_EXACT, tautomerMode == TAUTOMER_INCHI);
 
         PG_FREE_IF_COPY(query, 0);

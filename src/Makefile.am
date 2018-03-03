@@ -11,9 +11,11 @@ libsachem_la_LIBADD = fingerprints/libfingerprints.la -llucy -lclownfish
 libsachem_la_SOURCES = \
 		isomorphism.c \
 		fporder.c \
-        java.c \
         sachem.c \
         stats.cpp \
+        java/java.c \
+        java/orchem.c \
+        java/parse.c \
         lucene/lucene.c \
         lucene/subsearch.c \
         lucene/sync.c \
@@ -28,11 +30,13 @@ EXTRA_DIST = \
         bitset.h \
         heap.h \
         isomorphism.h \
-        java.h \
         molecule.h \
         sachem.h \
         stats.h \
         subsearch.h \
+        java/java.h \
+        java/orchem.h \
+        java/parse.h \
         lucene/common.h \
         lucene/lucene.h \
         lucy/common.h \

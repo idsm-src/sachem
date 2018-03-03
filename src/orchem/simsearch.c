@@ -11,8 +11,8 @@
 #include "bitset.h"
 #include "common.h"
 #include "heap.h"
-#include "java.h"
 #include "sachem.h"
+#include "java/orchem.h"
 
 
 #define SHOW_STATS              0
@@ -45,12 +45,20 @@ typedef struct
 } SimilaritySearchData;
 
 
+static bool javaInitialized = false;
 static SPIPlanPtr mainQueryPlan = NULL;
 static TupleDesc tupdesc = NULL;
 
 
 static void orchem_simsearch_init(void)
 {
+    if(unlikely(javaInitialized == false))
+    {
+        java_orchem_init();
+        javaInitialized = true;
+    }
+
+
     /* prepare query plan */
     if(unlikely(mainQueryPlan == NULL))
     {
@@ -120,7 +128,7 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
         info->topN = topN;
 
         uint64_t *words;
-        int length =  java_parse_orchem_similarity_query(&words, VARDATA(query), VARSIZE(query) - VARHDRSZ, type);
+        int length =  java_orchem_parse_similarity_query(&words, VARDATA(query), VARSIZE(query) - VARHDRSZ, type);
 
         PG_FREE_IF_COPY(query, 0);
 

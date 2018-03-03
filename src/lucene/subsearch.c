@@ -6,11 +6,11 @@
 #include "bitset.h"
 #include "common.h"
 #include "isomorphism.h"
-#include "java.h"
 #include "molecule.h"
 #include "sachem.h"
 #include "subsearch.h"
 #include "lucene.h"
+#include "java/parse.h"
 #include "fingerprints/fingerprint.h"
 
 
@@ -56,6 +56,7 @@ typedef struct
 } SubstructureSearchData;
 
 
+static bool javaInitialized = false;
 static bool luceneInitialised = false;
 static int indexId = -1;
 static SPIPlanPtr mainQueryPlan;
@@ -65,6 +66,13 @@ static Lucene lucene;
 
 void lucene_subsearch_init(void)
 {
+    if(unlikely(javaInitialized == false))
+    {
+        java_parse_init();
+        javaInitialized = true;
+    }
+
+
     /* prepare lucene */
     if(unlikely(luceneInitialised == false))
     {
@@ -138,12 +146,12 @@ Datum lucene_substructure_search(PG_FUNCTION_ARGS)
 
     if(SRF_IS_FIRSTCALL())
     {
+        lucene_subsearch_init();
+
 #if SHOW_STATS
         struct timeval begin;
         gettimeofday(&begin, NULL);
 #endif
-
-        lucene_subsearch_init();
 
         VarChar *query = PG_GETARG_VARCHAR_P(0);
         int32_t type = PG_GETARG_INT32(1);

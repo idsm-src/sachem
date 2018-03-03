@@ -6,11 +6,11 @@
 #include "bitset.h"
 #include "common.h"
 #include "isomorphism.h"
-#include "java.h"
 #include "molecule.h"
 #include "sachem.h"
 #include "subsearch.h"
 #include "lucy.h"
+#include "java/parse.h"
 #include "fingerprints/fingerprint.h"
 
 
@@ -56,6 +56,7 @@ typedef struct
 } SubstructureSearchData;
 
 
+static bool javaInitialized = false;
 static bool lucyInitialised = false;
 static int indexId = -1;
 static SPIPlanPtr mainQueryPlan;
@@ -65,6 +66,13 @@ static Lucy lucy;
 
 void lucy_subsearch_init(void)
 {
+    if(unlikely(javaInitialized == false))
+    {
+        java_parse_init();
+        javaInitialized = true;
+    }
+
+
     /* prepare lucy */
     if(unlikely(lucyInitialised == false))
     {
@@ -138,12 +146,12 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 
     if(SRF_IS_FIRSTCALL())
     {
+        lucy_subsearch_init();
+
 #if SHOW_STATS
         struct timeval begin;
         gettimeofday(&begin, NULL);
 #endif
-
-        lucy_subsearch_init();
 
         VarChar *query = PG_GETARG_VARCHAR_P(0);
         int32_t type = PG_GETARG_INT32(1);

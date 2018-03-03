@@ -1,19 +1,30 @@
 #include <postgres.h>
 #include <catalog/pg_type.h>
 #include <executor/spi.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include "bitset.h"
 #include "common.h"
-#include "java.h"
 #include "sachem.h"
+#include "java/orchem.h"
 
 
 #define SYNC_FETCH_SIZE         100000
 
 
+static bool javaInitialized = false;
+
+
 PG_FUNCTION_INFO_V1(orchem_sync_data);
 Datum orchem_sync_data(PG_FUNCTION_ARGS)
 {
+    if(unlikely(javaInitialized == false))
+    {
+        java_orchem_init();
+        javaInitialized = true;
+    }
+
+
     bool verbose = PG_GETARG_BOOL(0);
 
 
@@ -291,7 +302,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
         }
 
 
-        java_parse_orchem_data(processed, molfiles, data);
+        java_orchem_parse_data(processed, molfiles, data);
 
 
         for(int i = 0; i < processed; i++)

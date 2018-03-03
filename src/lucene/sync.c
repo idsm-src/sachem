@@ -7,10 +7,10 @@
 #include <storage/spin.h>
 #include <unistd.h>
 #include "common.h"
-#include "java.h"
 #include "molecule.h"
 #include "sachem.h"
 #include "lucene.h"
+#include "java/parse.h"
 #include "fingerprints/fingerprint.h"
 
 
@@ -39,6 +39,7 @@ typedef struct
 } OptimizeWorkerHeader;
 
 
+static bool javaInitialized = false;
 static bool luceneInitialised = false;
 static Lucene lucene;
 
@@ -133,6 +134,13 @@ void lucene_optimize_worker(dsm_segment *seg, shm_toc *toc)
 PG_FUNCTION_INFO_V1(lucene_sync_data);
 Datum lucene_sync_data(PG_FUNCTION_ARGS)
 {
+    if(unlikely(javaInitialized == false))
+    {
+        java_parse_init();
+        javaInitialized = true;
+    }
+
+
     bool verbose = PG_GETARG_BOOL(0);
     bool optimize = PG_GETARG_BOOL(1);
 
@@ -285,7 +293,7 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
 
         Datum *ids = palloc(SYNC_FETCH_SIZE * sizeof(Datum));
         VarChar **molfiles = palloc(SYNC_FETCH_SIZE * sizeof(VarChar *));
-        LucyLoaderData *data = palloc(SYNC_FETCH_SIZE * sizeof(LucyLoaderData));
+        LoaderData *data = palloc(SYNC_FETCH_SIZE * sizeof(LoaderData));
         int count = 0;
 
 
@@ -323,7 +331,7 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
                 molfiles[i] = DatumGetVarCharP(molfile);
             }
 
-            java_parse_lucy_data(processed, molfiles, data);
+            java_parse_data(processed, molfiles, data);
 
 
             EnterParallelMode();

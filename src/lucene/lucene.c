@@ -6,7 +6,7 @@
 #include <sys/types.h>
 #include "sachem.h"
 #include "lucene.h"
-#include "java.h"
+#include "java/java.h"
 
 
 static jclass luceneClass;
@@ -24,6 +24,8 @@ static jmethodID getMethod;
 
 void lucene_init(Lucene *lucene)
 {
+    java_init();
+
     luceneClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/Lucene");
 
     setFolderMethod = (*env)->GetMethodID(env, luceneClass, "setFolder", "(Ljava/lang/String;)V");
