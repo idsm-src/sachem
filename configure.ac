@@ -76,5 +76,5 @@ AC_SUBST([LUCY_CPPFLAGS])
 AC_SUBST([LUCY_LDFLAGS])
 
 
-AC_CONFIG_FILES(Makefile src/Makefile src/fingerprints/Makefile java/Makefile lib/Makefile extension/Makefile script/Makefile)
+AC_CONFIG_FILES(Makefile src/Makefile java/Makefile lib/Makefile extension/Makefile script/Makefile)
 AC_OUTPUT

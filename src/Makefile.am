@@ -1,18 +1,22 @@
-SUBDIRS=fingerprints
-
 pglibdir = $(POSTGRESQL_LIBDIR)
 pglib_LTLIBRARIES = libsachem.la
 
 libsachem_la_CFLAGS = -std=gnu99 -Ofast -march=native
+libsachem_la_CXXFLAGS = -std=c++11 -Ofast -march=native
 libsachem_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(JDK8_CPPFLAGS) $(CLOWNFISH_CPPFLAGS) $(LUCY_CPPFLAGS) -DBINDIR=\"$(bindir)\" -DDATADIR=\"$(datadir)/$(PACKAGE)\" -DJARDIR=\"$(datadir)/$(PACKAGE)/jar\"
 libsachem_la_LDFLAGS = $(JDK8_LDFLAGS) $(CLOWNFISH_LDFLAGS) $(LUCY_LDFLAGS)
-libsachem_la_LIBADD = fingerprints/libfingerprints.la -llucy -lclownfish
+libsachem_la_LIBADD = -llucy -lclownfish
 
 libsachem_la_SOURCES = \
 		isomorphism.c \
 		fporder.c \
         sachem.c \
         stats.cpp \
+        fingerprints/fingerprint.cpp \
+	    fingerprints/IOCBFingerprint.cpp \
+	    fingerprints/AtomFingerprint.cpp \
+	    fingerprints/CRNGFingerprint.cpp \
+	    fingerprints/SGFingerprint.cpp \
         java/java.c \
         java/orchem.c \
         java/parse.c \
@@ -34,6 +38,12 @@ EXTRA_DIST = \
         sachem.h \
         stats.h \
         subsearch.h \
+        fingerprints/fingerprint.h \
+	    fingerprints/IOCBFingerprint.hpp \
+	    fingerprints/AtomFingerprint.hpp \
+	    fingerprints/CRNGFingerprint.hpp \
+	    fingerprints/SGFingerprint.hpp \
+	    fingerprints/SubstructureMatch.hpp \
         java/java.h \
         java/orchem.h \
         java/parse.h \

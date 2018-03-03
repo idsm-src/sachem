@@ -7,8 +7,6 @@ extern "C"
 {
 #include "molecule.h"
 #include "fingerprint.h"
-
-PG_MODULE_MAGIC;
 }
 
 
