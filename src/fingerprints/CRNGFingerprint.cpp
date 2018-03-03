@@ -369,7 +369,7 @@ void __attribute__ ((constructor)) crng_fingerprint_init(void)
 {
     PG_MEMCONTEXT_BEGIN(TopMemoryContext);
     for(int i = 0; i < PATTERN_COUNT; i++)
-        molecule_simple_init(patternMolecule + i, patterns[i], palloc);
+        molecule_simple_init(patternMolecule + i, patterns[i]);
     PG_MEMCONTEXT_END();
 }
 

@@ -457,15 +457,14 @@ void lucene_index_worker(dsm_segment *seg, shm_toc *toc)
 
             Molecule molecule;
 
-            if(!molecule_simple_init(&molecule, data, malloc))
-                elog(ERROR, "%s: molecule_simple_init() failed", __func__);
+            molecule_simple_init(&molecule, data);
 
             IntegerFingerprint result = integer_fingerprint_get(&molecule, &malloc);
 
             if(integer_fingerprint_is_valid(result))
                 lucene_add(&lucene, ids[position], result);
 
-            molecule_simple_free(&molecule, free);
+            molecule_simple_free(&molecule);
         }
 
         lucene_commit(&lucene);

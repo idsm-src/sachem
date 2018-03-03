@@ -285,29 +285,29 @@ inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *r
 }
 
 
-inline void molecule_simple_free(Molecule *const molecule, void (*free)(void *))
+inline void molecule_simple_free(Molecule *const molecule)
 {
     if(molecule->atomNumbers)
-        (*free)(molecule->atomNumbers);
+        pfree(molecule->atomNumbers);
 
     if(molecule->bondTypes)
-        (*free)(molecule->bondTypes);
+        pfree(molecule->bondTypes);
 
     if(molecule->bondLists)
-        (*free)(molecule->bondLists);
+        pfree(molecule->bondLists);
 
     if(molecule->bondListSizes)
-        (*free)(molecule->bondListSizes);
+        pfree(molecule->bondListSizes);
 
     if(molecule->contains)
-        (*free)(molecule->contains);
+        pfree(molecule->contains);
 
     if(molecule->bondMatrix)
-        (*free)(molecule->bondMatrix);
+        pfree(molecule->bondMatrix);
 }
 
 
-inline bool molecule_simple_init(Molecule *const molecule, const uint8_t *data, void *(*alloc)(size_t))
+inline void molecule_simple_init(Molecule *const molecule, const uint8_t *data)
 {
     memset(molecule, 0, sizeof(Molecule));
 
@@ -329,16 +329,12 @@ inline bool molecule_simple_init(Molecule *const molecule, const uint8_t *data, 
     molecule->atomCount = atomCount;
     molecule->bondCount = bondCount;
 
-    molecule->atomNumbers = (uint8_t *) (*alloc)(atomCount);
-    molecule->bondTypes = (uint8_t *) (*alloc)(bondCount);
-    molecule->bondLists = (int *) (*alloc)(BOND_LIST_BASE_SIZE * atomCount * sizeof(int));
-    molecule->bondListSizes = (int *) (*alloc)(atomCount * sizeof(int));
-    molecule->contains = (int (*)[2]) (*alloc)(bondCount * 2 * sizeof(int));
-    molecule->bondMatrix = (int *) (*alloc)(atomCount * atomCount * sizeof(int));
-
-    if(unlikely(!molecule->atomNumbers || !molecule->bondTypes || !molecule->bondLists || !molecule->bondListSizes ||
-            !molecule->contains || !molecule->bondMatrix))
-        return false;
+    molecule->atomNumbers = (uint8_t *) palloc(atomCount);
+    molecule->bondTypes = (uint8_t *) palloc(bondCount);
+    molecule->bondLists = (int *) palloc(BOND_LIST_BASE_SIZE * atomCount * sizeof(int));
+    molecule->bondListSizes = (int *) palloc0(atomCount * sizeof(int));
+    molecule->contains = (int (*)[2]) palloc(bondCount * 2 * sizeof(int));
+    molecule->bondMatrix = (int *) palloc(atomCount * atomCount * sizeof(int));
 
 
     for(int i = 0; i < xAtomCount; i++)
@@ -346,9 +342,6 @@ inline bool molecule_simple_init(Molecule *const molecule, const uint8_t *data, 
 
     for(int i = xAtomCount; i < atomCount; i++)
         molecule->atomNumbers[i] = C_ATOM_NUMBER;
-
-    for(int i = 0; i < atomCount; i++)
-        molecule->bondListSizes[i] = 0;
 
     data += xAtomCount;
 
@@ -391,8 +384,6 @@ inline bool molecule_simple_init(Molecule *const molecule, const uint8_t *data, 
 
         boundIdx++;
     }
-
-    return true;
 }
 
 

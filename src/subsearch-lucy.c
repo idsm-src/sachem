@@ -457,15 +457,14 @@ void lucy_index_worker(dsm_segment *seg, shm_toc *toc)
 
             Molecule molecule;
 
-            if(!molecule_simple_init(&molecule, data, malloc))
-                elog(ERROR, "%s: molecule_simple_init() failed", __func__);
+            molecule_simple_init(&molecule, data);
 
             StringFingerprint result = string_fingerprint_get(&molecule, &malloc);
 
             if(string_fingerprint_is_valid(result))
                 lucy_add(&lucy, ids[position], result);
 
-            molecule_simple_free(&molecule, free);
+            molecule_simple_free(&molecule);
         }
 
         lucy_commit(&lucy);

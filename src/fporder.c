@@ -91,13 +91,12 @@ void fporder_worker(dsm_segment *seg, shm_toc *toc)
             bytea *data = DatumGetByteaP(mol);
 
             Molecule molecule;
-            if(molecule_simple_init(&molecule, VARDATA(data), malloc))
-            {
-                if(!stats_add(stats, &molecule))
-                    elog(ERROR, "%s: stats_add() failed", __func__);
+            molecule_simple_init(&molecule, VARDATA(data));
 
-                molecule_simple_free(&molecule, free);
-            }
+            if(!stats_add(stats, &molecule))
+                elog(ERROR, "%s: stats_add() failed", __func__);
+
+            molecule_simple_free(&molecule);
 
             if((char *) data != DatumGetPointer(mol))
                 pfree(data);
