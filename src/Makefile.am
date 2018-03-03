@@ -16,6 +16,7 @@ libsachem_la_SOURCES = \
         stats.cpp \
         lucene/lucene.c \
         lucene/subsearch.c \
+        lucene/sync.c \
         lucy/lucy.c \
         lucy/subsearch.c \
         lucy/sync.c \
@@ -32,6 +33,7 @@ EXTRA_DIST = \
         sachem.h \
         stats.h \
         subsearch.h \
+        lucene/common.h \
         lucene/lucene.h \
         lucy/common.h \
         lucy/lucy.h \
