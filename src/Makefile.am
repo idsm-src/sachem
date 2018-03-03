@@ -19,7 +19,8 @@ libsachem_la_SOURCES = \
         lucy/lucy.c \
         lucy/subsearch.c \
         orchem/simsearch.c \
-        orchem/subsearch.c
+        orchem/subsearch.c \
+        orchem/sync.c
 
 EXTRA_DIST = \
         bitset.h \
@@ -31,4 +32,5 @@ EXTRA_DIST = \
         stats.h \
         subsearch.h \
         lucene/lucene.h \
-        lucy/lucy.h
+        lucy/lucy.h \
+        orchem/common.h

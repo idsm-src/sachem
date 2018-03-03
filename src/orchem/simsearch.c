@@ -9,14 +9,13 @@
 #include <utils/memutils.h>
 #include <access/htup_details.h>
 #include "bitset.h"
+#include "common.h"
 #include "heap.h"
 #include "java.h"
 #include "sachem.h"
 
 
-#define SHOW_STATS          0
-#define EXTFP_SIZE          907
-#define FINGERPRINT_TABLE   "sachem_fingerprint"
+#define SHOW_STATS              0
 
 
 typedef struct
