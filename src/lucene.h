@@ -22,6 +22,7 @@ void lucene_init(Lucene *lucene);
 void lucene_set_folder(Lucene *lucene, const char *path);
 void lucene_begin(Lucene *lucene);
 void lucene_add(Lucene *lucene, int32_t id, IntegerFingerprint fp);
+void lucene_add_index(Lucene *lucene, const char *path);
 void lucene_delete(Lucene *lucene, int32_t id);
 void lucene_optimize(Lucene *lucene);
 void lucene_commit(Lucene *lucene);

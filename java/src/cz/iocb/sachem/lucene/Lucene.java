@@ -96,6 +96,13 @@ public class Lucene
     }
 
 
+    void addIndex(String path) throws IOException
+    {
+        Directory subFolder = FSDirectory.open(Paths.get(path));
+        indexer.addIndexes(subFolder);
+    }
+
+
     void delete(int id) throws IOException
     {
         indexer.deleteDocuments(IntPoint.newExactQuery(idFieldName, id));

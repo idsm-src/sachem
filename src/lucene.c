@@ -13,6 +13,7 @@ static jclass luceneClass;
 static jmethodID setFolderMethod;
 static jmethodID beginMethod;
 static jmethodID addMethod;
+static jmethodID addIndexMethod;
 static jmethodID deleteMethod;
 static jmethodID optimizeMethod;
 static jmethodID commitMethod;
@@ -32,6 +33,9 @@ void lucene_init(Lucene *lucene)
     java_check_exception(__func__);
 
     addMethod = (*env)->GetMethodID(env, luceneClass, "add", "(I[I)V");
+    java_check_exception(__func__);
+
+    addIndexMethod = (*env)->GetMethodID(env, luceneClass, "addIndex", "(Ljava/lang/String;)V");
     java_check_exception(__func__);
 
     deleteMethod = (*env)->GetMethodID(env, luceneClass, "delete", "(I)V");
@@ -111,6 +115,30 @@ void lucene_add(Lucene *lucene, int32_t id, IntegerFingerprint fp)
     PG_CATCH();
     {
         JavaDeleteRef(fpArray);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
+}
+
+
+void lucene_add_index(Lucene *lucene, const char *path)
+{
+    jstring folder = NULL;
+
+    PG_TRY();
+    {
+        folder = (*env)->NewStringUTF(env, path);
+        java_check_exception(__func__);
+
+        (*env)->CallVoidMethod(env, *lucene, addIndexMethod, folder);
+        java_check_exception(__func__);
+
+        JavaDeleteRef(folder);
+    }
+    PG_CATCH();
+    {
+        JavaDeleteRef(folder);
 
         PG_RE_THROW();
     }

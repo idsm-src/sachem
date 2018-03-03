@@ -6,10 +6,20 @@
 #include <utils/array.h>
 #include <utils/builtins.h>
 #include <utils/memutils.h>
-#include <pthread.h>
+#include <access/xact.h>
+#include <access/parallel.h>
+#include <storage/shm_toc.h>
+#include <storage/ipc.h>
+#include <storage/spin.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
+#include <postmaster/postmaster.h>
+#include <postmaster/fork_process.h>
+#include <storage/dsm.h>
+#include <storage/pg_shmem.h>
 #include "bitset.h"
 #include "isomorphism.h"
 #include "java.h"
@@ -23,6 +33,11 @@
 #define SHOW_STATS                0
 #define FETCH_SIZE                1000
 #define SYNC_FETCH_SIZE           100000
+#define SUBOPTIMIZE_PROCESSES     4
+#define HEADER_KEY                0
+#define ID_TABLE_KEY              1
+#define IDEX_KEY_OFFSET           2
+#define MOLECULE_KEY_OFFSET       10000
 #define COMPOUNDS_TABLE           "compounds"
 #define MOLECULES_TABLE           "sachem_molecules"
 #define MOLECULE_ERRORS_TABLE     "sachem_molecule_errors"
@@ -70,11 +85,19 @@ typedef struct
 
 typedef struct
 {
-    pg_atomic_uint32 possition;
-    uint32_t count;
-    IntegerFingerprint *result;
-    LucyLoaderData *data;
-} ThreadData;
+    slock_t mutex;
+    int attachedWorkers;
+    int moleculeCount;
+    int moleculePosition;
+} IndexWorkerHeader;
+
+
+typedef struct
+{
+    slock_t mutex;
+    int subindexCount;
+    int subindexPosition;
+} OptimizeWorkerHeader;
 
 
 static bool luceneInitialised = false;
@@ -405,32 +428,91 @@ Datum lucene_substructure_search(PG_FUNCTION_ARGS)
 }
 
 
-void *lucene_substructure_process_data(void *dataPtr)
+void lucene_index_worker(dsm_segment *seg, shm_toc *toc)
 {
-    ThreadData *data = (ThreadData *) dataPtr;
-    Molecule molecule;
+    volatile IndexWorkerHeader *header = shm_toc_lookup_key(toc, HEADER_KEY);
+    SpinLockAcquire(&header->mutex);
+    int workerNumber = header->attachedWorkers++;
+    SpinLockRelease(&header->mutex);
 
-    while(true)
+    int *ids = shm_toc_lookup_key(toc, ID_TABLE_KEY);
+    char *indexPath = shm_toc_lookup_key(toc, IDEX_KEY_OFFSET + workerNumber);
+
+    lucene_init(&lucene);
+    lucene_set_folder(&lucene, indexPath);
+    lucene_begin(&lucene);
+
+    PG_TRY();
     {
-        uint32_t i = pg_atomic_fetch_add_u32(&data->possition, 1);
-
-        if(i >= data->count)
-            break;
-
-        if(data->data[i].molecule)
+        while(true)
         {
-            if(molecule_simple_init(&molecule, VARDATA(data->data[i].molecule), malloc))
-                data->result[i] = integer_fingerprint_get(&molecule, &malloc);
+            SpinLockAcquire(&header->mutex);
+            int position = header->moleculePosition++;
+            SpinLockRelease(&header->mutex);
+
+            if(position >= header->moleculeCount)
+                break;
+
+            uint8_t *data = shm_toc_lookup_key(toc, MOLECULE_KEY_OFFSET + position);
+
+            Molecule molecule;
+
+            if(!molecule_simple_init(&molecule, data, malloc))
+                elog(ERROR, "%s: molecule_simple_init() failed", __func__);
+
+            IntegerFingerprint result = integer_fingerprint_get(&molecule, &malloc);
+
+            if(integer_fingerprint_is_valid(result))
+                lucene_add(&lucene, ids[position], result);
 
             molecule_simple_free(&molecule, free);
         }
-        else
-        {
-            data->result[i] = (IntegerFingerprint) {.size = -1, .data = NULL};
-        }
-    }
 
-    pthread_exit((void *) 0);
+        lucene_commit(&lucene);
+    }
+    PG_CATCH();
+    {
+        lucene_rollback(&lucene);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
+}
+
+
+void lucene_optimize_worker(dsm_segment *seg, shm_toc *toc)
+{
+    volatile OptimizeWorkerHeader *header = shm_toc_lookup_key(toc, HEADER_KEY);
+
+    lucene_init(&lucene);
+
+    while(true)
+    {
+        SpinLockAcquire(&header->mutex);
+        int position = header->subindexPosition++;
+        SpinLockRelease(&header->mutex);
+
+        if(position >= header->subindexCount)
+            break;
+
+        char *indexPath = shm_toc_lookup_key(toc, IDEX_KEY_OFFSET + position);
+
+        lucene_set_folder(&lucene, indexPath);
+        lucene_begin(&lucene);
+
+        PG_TRY();
+        {
+            lucene_optimize(&lucene);
+            lucene_commit(&lucene);
+        }
+        PG_CATCH();
+        {
+            lucene_rollback(&lucene);
+
+            PG_RE_THROW();
+        }
+        PG_END_TRY();
+    }
 }
 
 
@@ -440,7 +522,6 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
     bool verbose = PG_GETARG_BOOL(0);
     bool optimize = PG_GETARG_BOOL(1);
 
-    MemoryContext memoryContext = CurrentMemoryContext;
     createBasePath();
 
 
@@ -490,8 +571,19 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
     size_t basePathLength = strlen(DataDir);
     size_t databaseLength = strlen(database->data);
 
+    int countOfProcessors = sysconf(_SC_NPROCESSORS_ONLN);
+
     char *indexPath = (char *) palloc(basePathLength +  databaseLength + 64);
     sprintf(indexPath, "%s/%s/lucene-%i", DataDir, database->data, indexNumber);
+
+    char *subindexPath[countOfProcessors];
+
+    for(int p = 0; p < countOfProcessors; p++)
+    {
+        subindexPath[p] = (char *) palloc(basePathLength +  databaseLength + 64);
+        sprintf(subindexPath[p], "%s/%s/lucene-%i.%i", DataDir, database->data, indexNumber, p);
+    }
+
 
     lucene_link_directory(oldIndexPath, indexPath);
     lucene_set_folder(&lucene, indexPath);
@@ -504,16 +596,9 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
         elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
 
-    /*
-     * perepare reqired thread data
-     */
-    int countOfThread = sysconf(_SC_NPROCESSORS_ONLN);
-
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-
-
     lucene_begin(&lucene);
+    int subindexCount = 0;
+
 
     PG_TRY();
     {
@@ -584,9 +669,9 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
                 0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
 
+        Datum *ids = palloc(SYNC_FETCH_SIZE * sizeof(Datum));
         VarChar **molfiles = palloc(SYNC_FETCH_SIZE * sizeof(VarChar *));
         LucyLoaderData *data = palloc(SYNC_FETCH_SIZE * sizeof(LucyLoaderData));
-        IntegerFingerprint *result = palloc(SYNC_FETCH_SIZE * sizeof(IntegerFingerprint));
         int count = 0;
 
 
@@ -607,6 +692,15 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
             {
                 HeapTuple tuple = tuptable->vals[i];
 
+
+                Datum id = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
+
+                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+                ids[i] = id;
+
+
                 Datum molfile = SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag);
 
                 if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
@@ -617,83 +711,107 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
 
             java_parse_lucy_data(processed, molfiles, data);
 
-            pthread_t threads[countOfThread];
-            ThreadData threadData = {.count = processed, .data = data, .result = result};
-            pg_atomic_init_u32(&threadData.possition, 0);
 
-            PG_MEMCONTEXT_BEGIN(memoryContext);
-            for(int i = 0; i < countOfThread; i++)
-                pthread_create(&threads[i], &attr, lucene_substructure_process_data, (void *) &threadData);
-            PG_MEMCONTEXT_END();
+            EnterParallelMode();
 
-            void *status;
+            ParallelContext *pcxt = CreateParallelContextForExternalFunction("libsachem", "lucene_index_worker", countOfProcessors);
 
-            for(int i = 0; i < countOfThread; i++)
-                pthread_join(threads[i], &status);
+            shm_toc_estimate_keys(&pcxt->estimator, 2 + countOfProcessors + processed);
+            shm_toc_estimate_chunk(&pcxt->estimator, sizeof(IndexWorkerHeader));
+            shm_toc_estimate_chunk(&pcxt->estimator, processed * sizeof(int));
 
-            PG_TRY();
-            {
-                for(int i = 0; i < processed; i++)
-                {
-                    HeapTuple tuple = tuptable->vals[i];
-
-                    if((char *) molfiles[i] != DatumGetPointer(SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag)))
-                        pfree(molfiles[i]);
-
-
-                    Datum id = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
-
-                    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                        elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-
-                    if(data[i].error || !integer_fingerprint_is_valid(result[i]))
-                    {
-                        if(data[i].error == NULL)
-                            data[i].error = cstring_to_text("fingerprint cannot be generated");
-
-                        char *message = text_to_cstring(data[i].error);
-                        elog(NOTICE, "%i: %s", DatumGetInt32(id), message);
-                        pfree(message);
-
-                        Datum values[] = {id, PointerGetDatum(data[i].error)};
-
-                        if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)",
-                                2, (Oid[]) { INT4OID, TEXTOID }, values, NULL, false, 0) != SPI_OK_INSERT)
-                            elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
-
-                        pfree(data[i].error);
-                    }
-
-                    if(data[i].molecule == NULL)
-                        continue;
-
-
-                    Datum moleculesValues[] = {id, PointerGetDatum(data[i].molecule)};
-
-                    if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
-                        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
-
-                    if(integer_fingerprint_is_valid(result[i]))
-                        lucene_add(&lucene, DatumGetInt32(id), result[i]);
-
-                    pfree(data[i].molecule);
-                }
-            }
-            PG_CATCH();
-            {
-                for(int i = 0; i < processed; i++)
-                    free(result[i].data);
-
-                PG_RE_THROW();
-            }
-            PG_END_TRY();
+            for(int i = 0; i < countOfProcessors; i++)
+                shm_toc_estimate_chunk(&pcxt->estimator, strlen(subindexPath[i]) + 1);
 
             for(int i = 0; i < processed; i++)
-                free(result[i].data);
+                if(data[i].molecule != NULL)
+                    shm_toc_estimate_chunk(&pcxt->estimator, VARSIZE(data[i].molecule) - VARHDRSZ);
+
+            InitializeParallelDSM(pcxt);
+
+            int *idValues = shm_toc_allocate(pcxt->toc, processed * sizeof(int));
+            shm_toc_insert(pcxt->toc, ID_TABLE_KEY, idValues);
+
+            for(int i = 0; i < countOfProcessors; i++)
+            {
+                void *path = shm_toc_allocate(pcxt->toc, strlen(subindexPath[i]) + 1);
+                strcpy(path, subindexPath[i]);
+                shm_toc_insert(pcxt->toc, IDEX_KEY_OFFSET + i, path);
+            }
+
+
+            int valid = 0;
+
+            for(int i = 0; i < processed; i++)
+            {
+                if(likely(data[i].molecule != NULL))
+                {
+                    void *molecule = shm_toc_allocate(pcxt->toc, VARSIZE(data[i].molecule) - VARHDRSZ);
+                    memcpy(molecule, VARDATA(data[i].molecule), VARSIZE(data[i].molecule) - VARHDRSZ);
+                    shm_toc_insert(pcxt->toc, MOLECULE_KEY_OFFSET + valid, molecule);
+
+                    idValues[valid] = DatumGetInt32(ids[i]);
+                    valid++;
+                }
+            }
+
+            IndexWorkerHeader *header = shm_toc_allocate(pcxt->toc, sizeof(IndexWorkerHeader));
+            SpinLockInit(&header->mutex);
+            header->attachedWorkers = 0;
+            header->moleculePosition = 0;
+            header->moleculeCount = valid;
+            shm_toc_insert(pcxt->toc, HEADER_KEY, header);
+
+            LaunchParallelWorkers(pcxt);
+
+            if(subindexCount < pcxt->nworkers_launched)
+                subindexCount = pcxt->nworkers_launched;
+
+            WaitForParallelWorkersToFinish(pcxt);
+            DestroyParallelContext(pcxt);
+            ExitParallelMode();
+
+
+            for(int i = 0; i < processed; i++)
+            {
+                HeapTuple tuple = tuptable->vals[i];
+
+                if((char *) molfiles[i] != DatumGetPointer(SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag)))
+                    pfree(molfiles[i]);
+
+
+                if(data[i].error)
+                {
+                    if(data[i].error == NULL)
+                        data[i].error = cstring_to_text("fingerprint cannot be generated");
+
+                    char *message = text_to_cstring(data[i].error);
+                    elog(NOTICE, "%i: %s", DatumGetInt32(ids[i]), message);
+                    pfree(message);
+
+                    Datum values[] = {ids[i], PointerGetDatum(data[i].error)};
+
+                    if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)",
+                            2, (Oid[]) { INT4OID, TEXTOID }, values, NULL, false, 0) != SPI_OK_INSERT)
+                        elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
+
+                    pfree(data[i].error);
+                }
+
+                if(data[i].molecule == NULL)
+                    continue;
+
+
+                Datum moleculesValues[] = {ids[i], PointerGetDatum(data[i].molecule)};
+
+                if(SPI_execute_plan(moleculesPlan, moleculesValues, NULL, false, 0) != SPI_OK_INSERT)
+                    elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+                pfree(data[i].molecule);
+            }
+
 
             SPI_freetuptable(tuptable);
-
 
             count += processed;
 
@@ -706,6 +824,46 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
         if(unlikely(SPI_exec("delete from " AUDIT_TABLE, 0) != SPI_OK_DELETE))
             elog(ERROR, "%s: SPI_exec() failed", __func__);
 
+
+        if(optimize)
+        {
+            EnterParallelMode();
+
+            ParallelContext *pcxt = CreateParallelContextForExternalFunction("libsachem", "lucene_optimize_worker",
+                    countOfProcessors > SUBOPTIMIZE_PROCESSES ? SUBOPTIMIZE_PROCESSES : countOfProcessors);
+
+            shm_toc_estimate_keys(&pcxt->estimator, 1 + countOfProcessors);
+            shm_toc_estimate_chunk(&pcxt->estimator, sizeof(OptimizeWorkerHeader));
+
+            for(int i = 0; i < countOfProcessors; i++)
+                shm_toc_estimate_chunk(&pcxt->estimator, strlen(subindexPath[i]) + 1);
+
+            InitializeParallelDSM(pcxt);
+
+            for(int i = 0; i < countOfProcessors; i++)
+            {
+                void *path = shm_toc_allocate(pcxt->toc, strlen(subindexPath[i]) + 1);
+                strcpy(path, subindexPath[i]);
+                shm_toc_insert(pcxt->toc, IDEX_KEY_OFFSET + i, path);
+            }
+
+            OptimizeWorkerHeader *header = shm_toc_allocate(pcxt->toc, sizeof(OptimizeWorkerHeader));
+            SpinLockInit(&header->mutex);
+            header->subindexPosition = 0;
+            header->subindexCount = subindexCount;
+            shm_toc_insert(pcxt->toc, HEADER_KEY, header);
+
+            LaunchParallelWorkers(pcxt);
+            WaitForParallelWorkersToFinish(pcxt);
+            DestroyParallelContext(pcxt);
+            ExitParallelMode();
+        }
+
+        for(int p = 0; p < subindexCount; p++)
+        {
+            lucene_add_index(&lucene, subindexPath[p]);
+            lucene_delete_directory(subindexPath[p]);
+        }
 
         if(optimize)
             lucene_optimize(&lucene);
