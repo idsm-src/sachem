@@ -14,9 +14,10 @@ extern "C"
 #define PATTERN_COUNT 345
 
 
-Molecule patternMolecule[PATTERN_COUNT];
+static bool initialized = false;
+static Molecule patternMolecule[PATTERN_COUNT];
 
-uint8_t *patterns[PATTERN_COUNT] = {
+static uint8_t *patterns[PATTERN_COUNT] = {
     (uint8_t []) {0,0,0,10,0,0,0,10,0,2,0,0,1,2,1,0,2,1,2,0,3,1,3,0,4,1,4,0,5,1,5,0,6,2,6,0,7,1,7,0,8,1,8,0,9,1,0,0,9,1,48,0,3,48,5,3},
     (uint8_t []) {0,0,0,12,0,0,0,12,0,1,0,0,1,2,1,0,2,1,2,0,3,1,3,0,4,1,4,0,5,1,5,0,6,1,6,0,7,1,7,0,8,1,8,0,9,1,9,0,10,1,10,0,11,1,0,0,11,1,48,0,3},
     (uint8_t []) {0,1,0,11,0,0,0,12,0,0,8,1,0,2,1,2,0,3,1,3,0,4,1,4,0,5,1,5,0,6,1,6,0,0,1,0,0,7,1,7,0,8,1,8,0,9,1,9,0,10,1,10,0,11,1,1,0,11,1},
@@ -365,7 +366,7 @@ uint8_t *patterns[PATTERN_COUNT] = {
 };
 
 
-void __attribute__ ((constructor)) crng_fingerprint_init(void)
+void crng_fingerprint_init(void)
 {
     PG_MEMCONTEXT_BEGIN(TopMemoryContext);
     for(int i = 0; i < PATTERN_COUNT; i++)
@@ -376,7 +377,14 @@ void __attribute__ ((constructor)) crng_fingerprint_init(void)
 
 std::map<uint32_t, int> crng_fingerprint_get(const Molecule *molecule, BitInfo *info)
 {
-     std::map<uint32_t, int> fp;
+    if(unlikely(initialized == false))
+    {
+        crng_fingerprint_init();
+        initialized = true;
+    }
+
+
+    std::map<uint32_t, int> fp;
 
     for(int i = 0; i < PATTERN_COUNT; i++)
     {
