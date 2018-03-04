@@ -7,6 +7,7 @@
 #include <storage/shm_toc.h>
 #include <storage/ipc.h>
 #include <storage/spin.h>
+#include "fporder.h"
 #include "molecule.h"
 #include "sachem.h"
 #include "stats.h"
@@ -17,7 +18,6 @@
 #define SYNC_FETCH_SIZE           100000
 #define QUEUE_SIZE                1000
 #define MOLECULES_TABLE           "sachem_molecules"
-#define ORDER_FILE                "fporder.bin"
 
 
 typedef struct

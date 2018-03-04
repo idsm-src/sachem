@@ -5,6 +5,7 @@
 
 extern "C"
 {
+#include "fporder.h"
 #include "molecule.h"
 #include "fingerprint.h"
 #include "sachem.h"
@@ -22,7 +23,14 @@ static std::map<uint32_t, int> fporder;
 
 void fingerprint_init(void)
 {
-    std::ifstream stream(DATADIR "/fporder.bin", std::ios::in | std::ios::binary);
+    Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
+    size_t basePathLength = strlen(DataDir);
+    size_t databaseLength = strlen(database->data);
+
+    char *fporderPath = (char *) palloc(basePathLength +  databaseLength + strlen(ORDER_FILE) + 3);
+    sprintf(fporderPath, "%s/%s/" ORDER_FILE, DataDir, database->data);
+
+    std::ifstream stream(fporderPath, std::ios::in | std::ios::binary);
 
     if(stream.is_open())
     {
@@ -34,6 +42,10 @@ void fingerprint_init(void)
             stream.read((char *) &fp, sizeof(uint32_t));
             fporder[fp] = fpn++;
         }
+    }
+    else
+    {
+        elog(WARNING, "cannot load the fporder file: %s", fporderPath);
     }
 }
 
