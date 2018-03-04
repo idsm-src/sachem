@@ -16,9 +16,9 @@ typedef struct
 
 Stats *stats_create();
 void stats_delete(Stats *stats);
-bool stats_add(Stats *stats, const Molecule *molecule);
-bool stats_merge(Stats *stats, StatItem *items, size_t size);
+void stats_add(Stats *stats, const Molecule *molecule);
+void stats_merge(Stats *stats, StatItem *items, size_t size);
 size_t stats_get_items(Stats *stats, StatItem **items);
-bool stats_write(Stats *stats, const char *name, int limit);
+void stats_write(Stats *stats, const char *name, int limit);
 
 #endif /*STATS_H__*/

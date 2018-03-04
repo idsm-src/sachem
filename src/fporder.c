@@ -43,94 +43,101 @@ void fporder_worker(dsm_segment *seg, shm_toc *toc)
     shm_mq_handle *out = shm_mq_attach(queue, seg, NULL);
 
 
-    Stats *stats = NULL;
-
-    if((stats = stats_create()) == NULL)
-        elog(ERROR, "%s: stats_create() failed", __func__);
+    Stats *stats = stats = stats_create();
 
 
-    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-        elog(ERROR, "%s: SPI_connect() failed", __func__);
-
-    char isNullFlag;
-
-    SPIPlanPtr queryPlan = SPI_prepare("select molecule from " MOLECULES_TABLE " offset $1 limit $2", 2, (Oid[]) { INT4OID, INT4OID });
-
-
-    while(true)
+    PG_TRY();
     {
-        SpinLockAcquire(&header->mutex);
-        int offset = header->offset;
-        header->offset += SYNC_FETCH_SIZE;
-        SpinLockRelease(&header->mutex);
+        if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+            elog(ERROR, "%s: SPI_connect() failed", __func__);
+
+        char isNullFlag;
+
+        SPIPlanPtr queryPlan = SPI_prepare("select molecule from " MOLECULES_TABLE " offset $1 limit $2", 2, (Oid[]) { INT4OID, INT4OID });
 
 
-        Datum values[] = { Int32GetDatum(offset), Int32GetDatum(SYNC_FETCH_SIZE)};
-
-        if(unlikely(SPI_execute_plan(queryPlan, values, NULL, true, 0) != SPI_OK_SELECT))
-            elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
-
-        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-            elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
-
-        if(SPI_processed == 0)
-            break;
-
-        int processed = SPI_processed;
-        SPITupleTable *tuptable = SPI_tuptable;
-
-        for(int i = 0; i < processed; i++)
+        while(true)
         {
-            HeapTuple tuple = tuptable->vals[i];
+            SpinLockAcquire(&header->mutex);
+            int offset = header->offset;
+            header->offset += SYNC_FETCH_SIZE;
+            SpinLockRelease(&header->mutex);
 
-            Datum mol = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
 
-            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+            Datum values[] = { Int32GetDatum(offset), Int32GetDatum(SYNC_FETCH_SIZE)};
 
-            bytea *data = DatumGetByteaP(mol);
+            if(unlikely(SPI_execute_plan(queryPlan, values, NULL, true, 0) != SPI_OK_SELECT))
+                elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
-            Molecule molecule;
-            molecule_simple_init(&molecule, VARDATA(data));
+            if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
+                elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
 
-            if(!stats_add(stats, &molecule))
-                elog(ERROR, "%s: stats_add() failed", __func__);
+            if(SPI_processed == 0)
+                break;
 
-            molecule_simple_free(&molecule);
+            int processed = SPI_processed;
+            SPITupleTable *tuptable = SPI_tuptable;
 
-            if((char *) data != DatumGetPointer(mol))
-                pfree(data);
+            for(int i = 0; i < processed; i++)
+            {
+                HeapTuple tuple = tuptable->vals[i];
+
+                Datum mol = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
+
+                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+                bytea *data = DatumGetByteaP(mol);
+
+                Molecule molecule;
+                molecule_simple_init(&molecule, VARDATA(data));
+
+                stats_add(stats, &molecule);
+
+                molecule_simple_free(&molecule);
+
+                if((char *) data != DatumGetPointer(mol))
+                    pfree(data);
+            }
+
+            SPI_freetuptable(tuptable);
+
+            SpinLockAcquire(&header->mutex);
+            header->processed += processed;
+            int count = header->processed;
+            SpinLockRelease(&header->mutex);
+
+            if(header->verbose)
+                elog(NOTICE, "already processed: %i", count);
         }
 
-        SPI_freetuptable(tuptable);
+        SPI_finish();
 
-        SpinLockAcquire(&header->mutex);
-        header->processed += processed;
-        int count = header->processed;
-        SpinLockRelease(&header->mutex);
 
-        if(header->verbose)
-            elog(NOTICE, "already processed: %i", count);
+        StatItem *items;
+        size_t count = stats_get_items(stats, &items);
+
+        for(int i = 0; i < count; i += QUEUE_SIZE)
+        {
+            size_t size = count - i;
+
+            if(size > QUEUE_SIZE)
+                size = QUEUE_SIZE;
+
+            shm_mq_result result = shm_mq_send(out, size * sizeof(StatItem), items + i, false);
+
+            if (result != SHM_MQ_SUCCESS)
+                elog(ERROR, "%s: shm_mq_send() failed", __func__);
+        }
     }
-
-    SPI_finish();
-
-
-    StatItem *items;
-    size_t count = stats_get_items(stats, &items);
-
-    for(int i = 0; i < count; i += QUEUE_SIZE)
+    PG_CATCH();
     {
-        size_t size = count - i;
+        stats_delete(stats);
 
-        if(size > QUEUE_SIZE)
-            size = QUEUE_SIZE;
-
-        shm_mq_result result = shm_mq_send(out, size * sizeof(StatItem), items + i, false);
-
-        if (result != SHM_MQ_SUCCESS)
-            elog(ERROR, "%s: shm_mq_send() failed", __func__);
+        PG_RE_THROW();
     }
+    PG_END_TRY();
+
 
     shm_mq_detach(queue);
     stats_delete(stats);
@@ -146,76 +153,81 @@ Datum sachem_generate_fporder(PG_FUNCTION_ARGS)
     int countOfProcessors = sysconf(_SC_NPROCESSORS_ONLN);
 
 
-    Stats *stats = NULL;
+    Stats *stats = stats_create();
 
-    if((stats = stats_create()) == NULL)
-        elog(ERROR, "%s: stats_create() failed", __func__);
-
-
-    EnterParallelMode();
-
-    ParallelContext *pcxt = CreateParallelContextForExternalFunction("libsachem", "fporder_worker", countOfProcessors);
-
-    shm_toc_estimate_keys(&pcxt->estimator, 2);
-    shm_toc_estimate_chunk(&pcxt->estimator, sizeof(WorkerHeader));
-    shm_toc_estimate_chunk(&pcxt->estimator, countOfProcessors * QUEUE_SIZE * sizeof(StatItem));
-
-    InitializeParallelDSM(pcxt);
-
-    WorkerHeader *header = shm_toc_allocate(pcxt->toc, sizeof(WorkerHeader));
-    SpinLockInit(&header->mutex);
-    header->offset = 0;
-    header->processed = 0;
-    header->verbose = verbose;
-    shm_toc_insert(pcxt->toc, HEADER_KEY, header);
-
-    void *queueBase = shm_toc_allocate(pcxt->toc, countOfProcessors * QUEUE_SIZE * sizeof(StatItem));
-    shm_toc_insert(pcxt->toc, QUEUE_KEY, queueBase);
-
-    for(int w = 0; w < countOfProcessors; w++)
-        shm_mq_create(queueBase + w * QUEUE_SIZE * sizeof(StatItem), QUEUE_SIZE * sizeof(StatItem));
-
-
-    LaunchParallelWorkers(pcxt);
-
-    for(int w = 0; w < pcxt->nworkers_launched; w++)
+    PG_TRY();
     {
-        shm_mq *queue = queueBase + w * QUEUE_SIZE * sizeof(StatItem);
-        shm_mq_set_receiver(queue, MyProc);
-        shm_mq_handle *in = shm_mq_attach(queue, pcxt->seg, NULL);
+        EnterParallelMode();
 
-        while(true)
+        ParallelContext *pcxt = CreateParallelContextForExternalFunction("libsachem", "fporder_worker", countOfProcessors);
+
+        shm_toc_estimate_keys(&pcxt->estimator, 2);
+        shm_toc_estimate_chunk(&pcxt->estimator, sizeof(WorkerHeader));
+        shm_toc_estimate_chunk(&pcxt->estimator, countOfProcessors * QUEUE_SIZE * sizeof(StatItem));
+
+        InitializeParallelDSM(pcxt);
+
+        WorkerHeader *header = shm_toc_allocate(pcxt->toc, sizeof(WorkerHeader));
+        SpinLockInit(&header->mutex);
+        header->offset = 0;
+        header->processed = 0;
+        header->verbose = verbose;
+        shm_toc_insert(pcxt->toc, HEADER_KEY, header);
+
+        void *queueBase = shm_toc_allocate(pcxt->toc, countOfProcessors * QUEUE_SIZE * sizeof(StatItem));
+        shm_toc_insert(pcxt->toc, QUEUE_KEY, queueBase);
+
+        for(int w = 0; w < countOfProcessors; w++)
+            shm_mq_create(queueBase + w * QUEUE_SIZE * sizeof(StatItem), QUEUE_SIZE * sizeof(StatItem));
+
+
+        LaunchParallelWorkers(pcxt);
+
+        for(int w = 0; w < pcxt->nworkers_launched; w++)
         {
-            Size bytes;
-            StatItem *items;
-            shm_mq_result result = shm_mq_receive(in, &bytes, (void *) &items, false);
+            shm_mq *queue = queueBase + w * QUEUE_SIZE * sizeof(StatItem);
+            shm_mq_set_receiver(queue, MyProc);
+            shm_mq_handle *in = shm_mq_attach(queue, pcxt->seg, NULL);
 
-            if(result == SHM_MQ_SUCCESS)
-                stats_merge(stats, items, bytes / sizeof(StatItem));
-            else if(result != SHM_MQ_DETACHED)
-                elog(ERROR, "%s: shm_mq_receive() failed", __func__);
-            else
-                break;
+            while(true)
+            {
+                Size bytes;
+                StatItem *items;
+                shm_mq_result result = shm_mq_receive(in, &bytes, (void *) &items, false);
+
+                if(result == SHM_MQ_SUCCESS)
+                    stats_merge(stats, items, bytes / sizeof(StatItem));
+                else if(result != SHM_MQ_DETACHED)
+                    elog(ERROR, "%s: shm_mq_receive() failed", __func__);
+                else
+                    break;
+            }
+
+            shm_mq_detach(queue);
         }
 
-        shm_mq_detach(queue);
+        WaitForParallelWorkersToFinish(pcxt);
+        DestroyParallelContext(pcxt);
+        ExitParallelMode();
+
+
+        Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
+        size_t basePathLength = strlen(DataDir);
+        size_t databaseLength = strlen(database->data);
+
+        char *fporderPath = (char *) palloc(basePathLength +  databaseLength + strlen(ORDER_FILE) + 3);
+        sprintf(fporderPath, "%s/%s/" ORDER_FILE, DataDir, database->data);
+
+        stats_write(stats, fporderPath, limit);
     }
+    PG_CATCH();
+    {
+        stats_delete(stats);
 
-    WaitForParallelWorkersToFinish(pcxt);
-    DestroyParallelContext(pcxt);
-    ExitParallelMode();
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
 
-
-    Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
-    size_t basePathLength = strlen(DataDir);
-    size_t databaseLength = strlen(database->data);
-
-    char *fporderPath = (char *) palloc(basePathLength +  databaseLength + strlen(ORDER_FILE) + 3);
-    sprintf(fporderPath, "%s/%s/" ORDER_FILE, DataDir, database->data);
-
-    if(!stats_write(stats, fporderPath, limit))
-        elog(ERROR, "%s: stats_write() failed", __func__);
-
-
+    stats_delete(stats);
     PG_RETURN_VOID();
 }
