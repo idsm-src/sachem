@@ -7,6 +7,7 @@ extern "C"
 {
 #include "molecule.h"
 #include "fingerprint.h"
+#include "sachem.h"
 }
 
 
@@ -44,15 +45,15 @@ static inline void write_bitword(char *buffer, uint32_t fp)
 }
 
 
-static inline IntegerFingerprint integer_fingerprint_create(std::set<uint32_t> &res, void *(*alloc)(size_t))
+static inline IntegerFingerprint integer_fingerprint_create(std::set<uint32_t> &res)
 {
     if(res.size() > 0)
     {
         size_t size = res.size();
-        int32_t *data = (int *) (*alloc)(size * sizeof(int32_t));
+        int32_t *data = (int *) palloc_extended(size * sizeof(int32_t), MCXT_ALLOC_NO_OOM);
 
         if(data == NULL)
-            return {.size = (size_t) -1, .data = NULL};
+            throw std::bad_alloc();
 
 
         IntegerFingerprint fp = {size : size, data: data};
@@ -146,112 +147,96 @@ static inline std::set<uint32_t> fingerprint_get_query_native(const Molecule *mo
 }
 
 
-StringFingerprint string_fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t))
+StringFingerprint string_fingerprint_get(const Molecule *molecule)
 {
-    try
+    SAFE_CPP_BEGIN;
+
+    std::set<uint32_t> res = fingerprint_get_native(molecule);
+
+    if(res.size() > 0)
     {
-        std::set<uint32_t> res = fingerprint_get_native(molecule);
+        size_t size = res.size() * 7;
+        char *data = (char *) palloc_extended(size, MCXT_ALLOC_NO_OOM);
 
-        if(res.size() > 0)
+        if(data == NULL)
+            throw std::bad_alloc();
+
+
+        StringFingerprint fp = {size : size - 1, data: data};
+
+        for(uint32_t i : res)
         {
-            size_t size = res.size() * 7;
-            char *data = (char *) (*alloc)(size);
-
-            if(data == NULL)
-                return {.size = (size_t) -1, .data = NULL};
-
-
-            StringFingerprint fp = {size : size - 1, data: data};
-
-            for(uint32_t i : res)
-            {
-                write_bitword(data, i);
-                data[6] = ' ';
-                data += 7;
-            }
-
-            data[-1] = '\0';
-            return fp;
+            write_bitword(data, i);
+            data[6] = ' ';
+            data += 7;
         }
-        else
-        {
-            return {.size = 0, .data = NULL};
-        }
+
+        data[-1] = '\0';
+        return fp;
     }
-    catch(...)
+    else
     {
+        return {.size = 0, .data = NULL};
     }
 
-    return {.size = (size_t) -1, .data = NULL};
+    SAFE_CPP_END;
 }
 
 
-StringFingerprint string_fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_t))
+StringFingerprint string_fingerprint_get_query(const Molecule *molecule)
 {
-    try
+    SAFE_CPP_BEGIN;
+
+    std::set<uint32_t> fps = fingerprint_get_query_native(molecule);
+
+    if(fps.size() > 0)
     {
-        std::set<uint32_t> fps = fingerprint_get_query_native(molecule);
+        size_t size = fps.size() * 9;
+        char *data = (char *) palloc_extended(size, MCXT_ALLOC_NO_OOM);
 
-        if(fps.size() > 0)
+        if(data == NULL)
+            throw std::bad_alloc();
+
+        StringFingerprint fp = {size : size - 1, data: data};
+
+        for(uint32_t i : fps)
         {
-            size_t size = fps.size() * 9;
-            char *data = (char *) (*alloc)(size);
-
-            if(data == NULL)
-                return {size : (size_t) -1, data : NULL};
-
-            StringFingerprint fp = {size : size - 1, data: data};
-
-            for(uint32_t i : fps)
-            {
-                data[0] = '"';
-                write_bitword(data + 1, i);
-                data[7] = '"';
-                data[8] = ' ';
-                data += 9;
-            }
-
-            data[-1] = '\0';
-            return fp;
+            data[0] = '"';
+            write_bitword(data + 1, i);
+            data[7] = '"';
+            data[8] = ' ';
+            data += 9;
         }
-        else
-        {
-            return {.size = 0, .data = NULL};
-        }
+
+        data[-1] = '\0';
+        return fp;
     }
-    catch(...)
+    else
     {
+        return {.size = 0, .data = NULL};
     }
 
-    return {.size = (size_t) -1, .data = NULL};
+    SAFE_CPP_END;
 }
 
 
-IntegerFingerprint integer_fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t))
+IntegerFingerprint integer_fingerprint_get(const Molecule *molecule)
 {
-    try
-    {
-        std::set<uint32_t> res = fingerprint_get_native(molecule);
-        return integer_fingerprint_create(res, alloc);
-    }
-    catch(...)
-    {
-    }
+    SAFE_CPP_BEGIN;
 
-    return {.size = (size_t) -1, .data = NULL};
+    std::set<uint32_t> res = fingerprint_get_native(molecule);
+    return integer_fingerprint_create(res);
+
+    SAFE_CPP_END;
 }
 
 
-IntegerFingerprint integer_fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_t))
+IntegerFingerprint integer_fingerprint_get_query(const Molecule *molecule)
 {
-    try
-    {
-        std::set<uint32_t> res = fingerprint_get_query_native(molecule);
-        return integer_fingerprint_create(res, alloc);
-    }
-    catch(...)
-    {
-    }
+    SAFE_CPP_BEGIN;
 
-    return {.size = (size_t) -1, .data = NULL};
+    std::set<uint32_t> res = fingerprint_get_query_native(molecule);
+    return integer_fingerprint_create(res);
+
+    SAFE_CPP_END;
 }

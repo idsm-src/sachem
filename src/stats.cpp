@@ -1,11 +1,11 @@
 #include <map>
 #include <fstream>
-#include "fingerprints/fingerprint.h"
 #include "fingerprints/IOCBFingerprint.hpp"
 
 extern "C"
 {
 #include "stats.h"
+#include "fingerprints/fingerprint.h"
 }
 
 

@@ -26,6 +26,27 @@
 #define PG_MEMCONTEXT_END()             MemoryContextSwitchTo(old);} while(0)
 
 
+#define SAFE_CPP_BEGIN                                                                              \
+    bool badAlloc = false;                                                                          \
+    try                                                                                             \
+    {
+
+
+#define SAFE_CPP_END                                                                                \
+    }                                                                                               \
+    catch(std::bad_alloc &e)                                                                        \
+    {                                                                                               \
+        badAlloc = true;                                                                            \
+    }                                                                                               \
+    catch(...)                                                                                      \
+    {                                                                                               \
+    }                                                                                               \
+    if(badAlloc)                                                                                    \
+        ereport(ERROR, (errcode(ERRCODE_OUT_OF_MEMORY), errmsg("out of memory"), errdetail("")));   \
+    else                                                                                            \
+        elog(ERROR, "%s: unexpected exception", __func__);
+
+
 inline void createBasePath(void)
 {
     Name database = DatumGetName(DirectFunctionCall1(current_database, 0));

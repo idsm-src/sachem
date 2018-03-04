@@ -75,11 +75,10 @@ void lucene_index_worker(dsm_segment *seg, shm_toc *toc)
 
             molecule_simple_init(&molecule, data);
 
-            IntegerFingerprint result = integer_fingerprint_get(&molecule, &malloc);
+            IntegerFingerprint result = integer_fingerprint_get(&molecule);
+            lucene_add(&lucene, ids[position], result);
 
-            if(integer_fingerprint_is_valid(result))
-                lucene_add(&lucene, ids[position], result);
-
+            integer_fingerprint_free(result);
             molecule_simple_free(&molecule);
         }
 

@@ -1,6 +1,7 @@
 #ifndef FINGERPRINT_H__
 #define FINGERPRINT_H__
 
+#include <postgres.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
@@ -27,22 +28,24 @@ typedef struct
 } IntegerFingerprint;
 
 
-StringFingerprint string_fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t));
-StringFingerprint string_fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_t));
+StringFingerprint string_fingerprint_get(const Molecule *molecule);
+StringFingerprint string_fingerprint_get_query(const Molecule *molecule);
 
-IntegerFingerprint integer_fingerprint_get(const Molecule *molecule, void *(*alloc)(size_t));
-IntegerFingerprint integer_fingerprint_get_query(const Molecule *molecule, void *(*alloc)(size_t));
+IntegerFingerprint integer_fingerprint_get(const Molecule *molecule);
+IntegerFingerprint integer_fingerprint_get_query(const Molecule *molecule);
 
 
-inline bool string_fingerprint_is_valid(StringFingerprint fingerprint)
+inline void string_fingerprint_free(StringFingerprint fingerprint)
 {
-    return fingerprint.size != (size_t) -1;
+    if(fingerprint.data)
+        pfree(fingerprint.data);
 }
 
 
-inline bool integer_fingerprint_is_valid(IntegerFingerprint fingerprint)
+inline void integer_fingerprint_free(IntegerFingerprint fingerprint)
 {
-    return fingerprint.size != (size_t) -1;
+    if(fingerprint.data)
+        pfree(fingerprint.data);
 }
 
 #endif

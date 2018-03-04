@@ -270,11 +270,7 @@ Datum lucene_substructure_search(PG_FUNCTION_ARGS)
                         vf2state_init(&info->vf2state, &info->queryMolecule, info->graphMode, info->chargeMode, info->isotopeMode,
                                 info->stereoMode);
 
-                        IntegerFingerprint fp = integer_fingerprint_get_query(&info->queryMolecule, &palloc);
-
-                        if(!integer_fingerprint_is_valid(fp))
-                            elog(ERROR, "fingerprint cannot be generated");
-
+                        IntegerFingerprint fp = integer_fingerprint_get_query(&info->queryMolecule);
                         info->resultSet = lucene_search(&lucene, fp, INT32_MAX);
 
 
