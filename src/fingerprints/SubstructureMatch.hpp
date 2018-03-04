@@ -74,7 +74,7 @@ class SubstructureMatch
 
         std::vector<VF2Undo> undos;
         std::vector<std::vector<int>> matches;
-        int limit;
+        size_t limit;
 
 
     public:

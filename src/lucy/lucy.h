@@ -28,7 +28,7 @@ typedef struct
 } LucyResultSet;
 
 
-inline bool lucy_is_open(Lucy *lucy, LucyResultSet *resultSet)
+inline bool lucy_is_open(LucyResultSet *resultSet)
 {
     return resultSet->hits != NULL;
 }

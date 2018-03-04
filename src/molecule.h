@@ -171,8 +171,8 @@ inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *r
         int b1 = data[offset + 1];
         int b2 = data[offset + 2];
 
-        int x = b0 | b1 << 4 & 0xF00;
-        int y = b2 | b1 << 8 & 0xF00;
+        int x = b0 | (b1 << 4 & 0xF00);
+        int y = b2 | (b1 << 8 & 0xF00);
 
         if(x >= heavyAtomCount && y < atomCount)
             atomHydrogens[y]++;
@@ -361,8 +361,8 @@ inline void molecule_simple_init(Molecule *const molecule, const uint8_t *data)
         int b1 = data[offset + 1];
         int b2 = data[offset + 2];
 
-        int x = b0 | b1 << 4 & 0xF00;
-        int y = b2 | b1 << 8 & 0xF00;
+        int x = b0 | (b1 << 4 & 0xF00);
+        int y = b2 | (b1 << 8 & 0xF00);
 
         if(x >= atomCount || y >= atomCount)
         {
@@ -427,8 +427,8 @@ inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, 
         int b1 = data[offset + 1];
         int b2 = data[offset + 2];
 
-        int x = b0 | b1 << 4 & 0xF00;
-        int y = b2 | b1 << 8 & 0xF00;
+        int x = b0 | (b1 << 4 & 0xF00);
+        int y = b2 | (b1 << 8 & 0xF00);
 
         if(x >= heavyAtomCount)
             hBonds[x - heavyAtomCount]++;

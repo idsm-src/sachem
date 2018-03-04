@@ -314,7 +314,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                 int32 *arrayData = (int32 *) ARR_DATA_PTR(info->arrayBuffer);
                 OrchemSubstructureQueryData *data = &(info->queryData[info->queryDataPosition]);
 
-                int count = 0;
+                size_t count = 0;
 
                 while(count < FETCH_SIZE && info->candidatePosition >= 0)
                 {
@@ -397,7 +397,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
             PG_MEMCONTEXT_BEGIN(info->targetContext);
             Molecule target;
-            molecule_init(&target, VARDATA(moleculeData), NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
+            molecule_init(&target, (uint8_t *) VARDATA(moleculeData), NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
                     info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
             match = vf2state_match(&info->vf2state, &target, DatumGetInt32(id), info->vf2_timeout);
             PG_MEMCONTEXT_END();

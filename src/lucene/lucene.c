@@ -224,7 +224,7 @@ size_t lucene_get(Lucene *lucene, LuceneResultSet *resultSet, int *buffer, size_
         results = (*env)->GetIntArrayElements(env, resultArray, 0);
         java_check_exception(__func__);
 
-        for(int i = 0; i < count; i++)
+        for(size_t i = 0; i < count; i++)
             buffer[i] = results[i];
 
         if(count == 0)
@@ -278,7 +278,7 @@ void lucene_link_directory(const char *oldPath, const char *newPath)
 
             struct dirent *ep;
 
-            while(ep = readdir (dp))
+            while((ep = readdir(dp)))
             {
                 if(ep->d_name[0] == '.')
                     continue;
@@ -330,7 +330,7 @@ void lucene_delete_directory(const char *path)
 
         struct dirent *ep;
 
-        while(ep = readdir(dp))
+        while((ep = readdir(dp)))
         {
             if(ep->d_name[0] == '.')
                 continue;

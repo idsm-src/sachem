@@ -84,7 +84,7 @@ static inline IntegerFingerprint integer_fingerprint_create(std::set<uint32_t> &
 
 static inline std::set<uint32_t> fingerprint_get_native(const Molecule *molecule)
 {
-    return iocb_fingerprint_get(molecule, GRAPH_SIZE, RING_SIZE, MAX_FEAT_LOGCOUNT);
+    return iocb_fingerprint_get(molecule, GRAPH_SIZE, MAX_FEAT_LOGCOUNT);
 }
 
 
@@ -98,7 +98,7 @@ static inline std::set<uint32_t> fingerprint_get_query_native(const Molecule *mo
 
 
     BitInfo info;
-    std::set<uint32_t> res = iocb_fingerprint_get(molecule, GRAPH_SIZE, RING_SIZE, MAX_FEAT_LOGCOUNT, true, &info);
+    std::set<uint32_t> res = iocb_fingerprint_get(molecule, GRAPH_SIZE, MAX_FEAT_LOGCOUNT, true, &info);
 
 
     // convert and pre-sort the fingerprints

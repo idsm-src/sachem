@@ -19,6 +19,6 @@ void stats_delete(Stats *stats);
 void stats_add(Stats *stats, const Molecule *molecule);
 void stats_merge(Stats *stats, StatItem *items, size_t size);
 size_t stats_get_items(Stats *stats, StatItem **items);
-void stats_write(Stats *stats, const char *name, int limit);
+void stats_write(Stats *stats, const char *name, size_t limit);
 
 #endif /*STATS_H__*/

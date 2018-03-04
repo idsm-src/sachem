@@ -12,7 +12,7 @@ typedef jobject Lucene;
 typedef jobject LuceneResultSet;
 
 
-inline bool lucene_is_open(Lucene *lucene, LuceneResultSet *resultSet)
+inline bool lucene_is_open(LuceneResultSet *resultSet)
 {
     return *resultSet != NULL;
 }

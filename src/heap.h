@@ -64,7 +64,7 @@ static inline void heap_add(Heap *const heap, HeapItem const item)
         heap->data = (HeapItem **) repalloc(heap->data, 2 * heap->rows * sizeof(HeapItem *));
         PG_MEMCONTEXT_END();
 
-        for(int i = heap->rows; i < 2 * heap->rows; i++)
+        for(uint32_t i = heap->rows; i < 2 * heap->rows; i++)
             heap->data[i] = NULL;
 
         heap->rows *= 2;

@@ -109,7 +109,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             break;
 
 
-        for(int i = 0; i < SPI_processed; i++)
+        for(size_t i = 0; i < SPI_processed; i++)
         {
             int32_t seqid = DatumGetInt32(SPI_getbinval(SPI_tuptable->vals[i], SPI_tuptable->tupdesc, 1, &isNullFlag));
 
@@ -148,7 +148,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             break;
 
 
-        for(int i = 0; i < SPI_processed; i++)
+        for(size_t i = 0; i < SPI_processed; i++)
         {
             HeapTuple tuple = SPI_tuptable->vals[i];
 
@@ -205,7 +205,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             break;
 
 
-        for(int i = 0; i < SPI_processed; i++)
+        for(size_t i = 0; i < SPI_processed; i++)
         {
             HeapTuple tuple = SPI_tuptable->vals[i];
 
@@ -462,12 +462,12 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
 #if USE_COUNT_FINGERPRINT
         for(int i = 0; i < COUNTS_SIZE; i++)
-            if(write(fd, (int16 *) counts + i * indexSize, indexSize * sizeof(int16)) != indexSize * sizeof(int16))
+            if(write(fd, (int16 *) counts + i * indexSize, indexSize * sizeof(int16)) != (ssize_t) (indexSize * sizeof(int16)))
                 elog(ERROR, "%s: write() failed", __func__);
 
 
         uint64_t zero = 0;
-        size_t padding = (sizeof(uint64_t) - (indexSize * COUNTS_SIZE * sizeof(uint16)) % sizeof(uint64_t)) % sizeof(uint64_t);
+        ssize_t padding = (sizeof(uint64_t) - (indexSize * COUNTS_SIZE * sizeof(uint16)) % sizeof(uint64_t)) % sizeof(uint64_t);
 
         if(write(fd, &zero, padding) != padding)
             elog(ERROR, "%s: write() failed", __func__);
@@ -481,7 +481,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             if(write(fd, &wordsInUse, sizeof(uint64_t)) != sizeof(uint64_t))
                 elog(ERROR, "%s: write() failed", __func__);
 
-            if(write(fd, bitmap[i].words, wordsInUse * sizeof(uint64_t)) != wordsInUse * sizeof(uint64_t))
+            if(write(fd, bitmap[i].words, wordsInUse * sizeof(uint64_t)) != (ssize_t) (wordsInUse * sizeof(uint64_t)))
                 elog(ERROR, "%s: write() failed", __func__);
         }
 

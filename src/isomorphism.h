@@ -286,11 +286,11 @@ inline bool vf2state_atom_matches(const VF2State *const restrict vf2state, int q
 
             case M_ATOM_NUMBER:
                 return molecule_is_metal(vf2state->target, targetAtom) ||
-                        molecule_is_pseudo_atom(vf2state->target, targetAtom) && targetAtom != X_ATOM_NUMBER;
+                        (molecule_is_pseudo_atom(vf2state->target, targetAtom) && targetAtom != X_ATOM_NUMBER);
 
             case X_ATOM_NUMBER:
                 return molecule_is_halogen(vf2state->target, targetAtom) ||
-                        molecule_is_pseudo_atom(vf2state->target, targetAtom) && targetAtom != M_ATOM_NUMBER;
+                        (molecule_is_pseudo_atom(vf2state->target, targetAtom) && targetAtom != M_ATOM_NUMBER);
 
             default:
                 return true;
@@ -306,11 +306,11 @@ inline bool vf2state_atom_matches(const VF2State *const restrict vf2state, int q
 
             case M_ATOM_NUMBER:
                 return molecule_is_metal(vf2state->query, queryAtom) ||
-                        molecule_is_pseudo_atom(vf2state->query, queryAtom) && queryAtom != X_ATOM_NUMBER;
+                        (molecule_is_pseudo_atom(vf2state->query, queryAtom) && queryAtom != X_ATOM_NUMBER);
 
             case X_ATOM_NUMBER:
                 return molecule_is_halogen(vf2state->query, queryAtom) ||
-                        molecule_is_pseudo_atom(vf2state->query, queryAtom) && queryAtom != M_ATOM_NUMBER;
+                        (molecule_is_pseudo_atom(vf2state->query, queryAtom) && queryAtom != M_ATOM_NUMBER);
 
             default:
                 return true;
@@ -491,10 +491,7 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
     const Molecule *const restrict target = vf2state->target;
 
     int queryAtomCount = query->atomCount;
-    int targetAtomCount = target->atomCount;
-
     int queryBondCount = query->bondCount;
-    int targetBondCount = target->bondCount;
 
 
     for(int queryAtomIdx = 0; queryAtomIdx < queryAtomCount; queryAtomIdx++)
@@ -525,7 +522,7 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
             sort_stereo_atoms(queryAtoms);
 
 
-            int targetAtoms[4];
+            int targetAtoms[4] = { -1, -1, -1, -1 };
 
             for(int i = 0; i < listSize; i++)
                 targetAtoms[i] = vf2state->core_query[queryAtoms[i]];
@@ -590,7 +587,7 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
             sort_bond_atoms(queryAtoms);
 
 
-            int targetAtoms[4];
+            int targetAtoms[4] = { -1, -1, -1, -1 };
 
             for(int i = 0; i < 4; i++)
                 if(queryAtoms[i] != INT_MAX)
@@ -623,7 +620,6 @@ inline bool vf2state_is_match_valid(const VF2State *const restrict vf2state)
     const Molecule *const restrict target = vf2state->target;
 
     int queryAtomCount = query->atomCount;
-    int targetAtomCount = target->atomCount;
 
     int queryBondCount = query->bondCount;
     int targetBondCount = target->bondCount;

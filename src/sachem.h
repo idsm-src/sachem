@@ -42,7 +42,7 @@
     {                                                                                               \
     }                                                                                               \
     if(badAlloc)                                                                                    \
-        ereport(ERROR, (errcode(ERRCODE_OUT_OF_MEMORY), errmsg("out of memory"), errdetail("")));   \
+        ereport(ERROR, (errcode(ERRCODE_OUT_OF_MEMORY), errmsg("out of memory")));                  \
     else                                                                                            \
         elog(ERROR, "%s: unexpected exception", __func__);
 

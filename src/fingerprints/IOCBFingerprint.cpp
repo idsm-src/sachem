@@ -56,7 +56,7 @@ static inline void process_elements(std::map<uint32_t, int> &var, BitInfo &vari,
 }
 
 
-std::set<uint32_t> iocb_fingerprint_get(const Molecule *molecule, int graphSize, int circSize, int maxFeatLogCount,
+std::set<uint32_t> iocb_fingerprint_get(const Molecule *molecule, int graphSize, int maxFeatLogCount,
         bool forQuery, BitInfo *info)
 {
     std::set<uint32_t> fp;

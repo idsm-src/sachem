@@ -414,7 +414,7 @@ static inline void fragment_walk(const Molecule *molecule, int atom, std::vector
 }
 
 
-std::map<uint32_t, int> sg_fingerprint_get(const Molecule *molecule, uint minLen, uint maxLen, bool forQuery, BitInfo *info)
+std::map<uint32_t, int> sg_fingerprint_get(const Molecule *molecule, int minLen, int maxLen, bool forQuery, BitInfo *info)
 {
     if(forQuery)
     {

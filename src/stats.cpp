@@ -37,7 +37,7 @@ void stats_add(Stats *stats, const Molecule *molecule)
 
     std::map<uint32_t,uint32_t> &map = *((std::map<uint32_t,uint32_t> *) stats);
 
-    std::set<uint32_t> fp = iocb_fingerprint_get(molecule, GRAPH_SIZE, RING_SIZE, MAX_FEAT_LOGCOUNT);
+    std::set<uint32_t> fp = iocb_fingerprint_get(molecule, GRAPH_SIZE, MAX_FEAT_LOGCOUNT);
 
     for(uint32_t i : fp)
     {
@@ -99,7 +99,7 @@ size_t stats_get_items(Stats *stats, StatItem **items)
 }
 
 
-void stats_write(Stats *stats, const char *name, int limit)
+void stats_write(Stats *stats, const char *name, size_t limit)
 {
     SAFE_CPP_BEGIN;
 

@@ -90,7 +90,7 @@ void fporder_worker(dsm_segment *seg, shm_toc *toc)
                 bytea *data = DatumGetByteaP(mol);
 
                 Molecule molecule;
-                molecule_simple_init(&molecule, VARDATA(data));
+                molecule_simple_init(&molecule, (uint8_t *) VARDATA(data));
 
                 stats_add(stats, &molecule);
 
@@ -117,7 +117,7 @@ void fporder_worker(dsm_segment *seg, shm_toc *toc)
         StatItem *items;
         size_t count = stats_get_items(stats, &items);
 
-        for(int i = 0; i < count; i += QUEUE_SIZE)
+        for(size_t i = 0; i < count; i += QUEUE_SIZE)
         {
             size_t size = count - i;
 

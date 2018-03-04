@@ -240,7 +240,7 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
             if(SPI_processed == 0)
                 break;
 
-            for(int i = 0; i < SPI_processed; i++)
+            for(size_t i = 0; i < SPI_processed; i++)
             {
                 HeapTuple tuple = SPI_tuptable->vals[i];
 

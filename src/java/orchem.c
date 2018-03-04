@@ -162,7 +162,7 @@ int java_orchem_parse_substructure_query(OrchemSubstructureQueryData **data, cha
             results[i].fp = (jshort *) palloc(fpSize * sizeof(jshort));
             memcpy(results[i].fp, fp, fpSize * sizeof(jshort));
 
-            results[i].molecule = (char *) palloc(moleculeSize);
+            results[i].molecule = (uint8_t *) palloc(moleculeSize);
             memcpy(results[i].molecule, molecule, moleculeSize);
 
 
@@ -234,7 +234,7 @@ int java_orchem_parse_similarity_query(uint64_t **data, char* query, size_t quer
             words = (*env)->GetLongArrayElements(env, result, NULL);
             java_check_exception(__func__);
 
-            *data = (jlong *) palloc(length * sizeof(jlong));
+            *data = (uint64_t *) palloc(length * sizeof(jlong));
             memcpy(*data, words, length * sizeof(jlong));
 
             JavaDeleteLongArray(result, words, JNI_ABORT);
@@ -277,7 +277,7 @@ void java_orchem_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *
         molfileArrayArg = (*env)->NewObjectArray(env, count, byteArrayClass, NULL);
         java_check_exception(__func__);
 
-        for(int i = 0; i < count; i++)
+        for(size_t i = 0; i < count; i++)
         {
             int length = VARSIZE(molfiles[i]) - VARHDRSZ;
             molfileArg = (*env)->NewByteArray(env, length);
@@ -296,7 +296,7 @@ void java_orchem_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *
         JavaDeleteRef(molfileArrayArg);
 
 
-        for(int i = 0; i < count; i++)
+        for(size_t i = 0; i < count; i++)
         {
             resultElement = (*env)->GetObjectArrayElement(env, resultArray, i);
             exception = (*env)->GetObjectField(env, resultElement, orchemLoaderExceptionField);
@@ -344,7 +344,7 @@ void java_orchem_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *
                 SET_VARSIZE(data[i].fp, fpSize * sizeof(uint64_t) + ARR_OVERHEAD_NONULLS(1));
 
                 BitSet bitset;
-                bitset_init(&bitset, fp, fpSize);
+                bitset_init(&bitset, (uint64_t *) fp, fpSize);
                 data[i].bitCount = bitset_cardinality(&bitset);
 
                 data[i].counts = (ArrayType *) palloc(countsSize * sizeof(int16) + ARR_OVERHEAD_NONULLS(1));

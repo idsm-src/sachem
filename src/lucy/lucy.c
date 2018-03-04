@@ -508,7 +508,7 @@ static void link_directory_at(int olddirfd, int newdirfd)
 
         struct dirent *ep;
 
-        while(ep = readdir(dp))
+        while((ep = readdir(dp)))
         {
             if(ep->d_name[0] == '.')
                 continue;
@@ -619,7 +619,7 @@ static void unlink_directory_at(int dirfd)
 
         struct dirent *ep;
 
-        while(ep = readdir(dp))
+        while((ep = readdir(dp)))
         {
             if(ep->d_name[0] == '.')
                 continue;

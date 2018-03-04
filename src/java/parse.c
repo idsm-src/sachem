@@ -74,8 +74,6 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
     jbyteArray queryArg = NULL;
     jobjectArray result = NULL;
     jobject element = NULL;
-    jshortArray countsArray = NULL;
-    jshortArray fpArray = NULL;
     jbyteArray moleculeArray = NULL;
     jbooleanArray  restHArray = NULL;
     jbyte *molecule = NULL;
@@ -117,7 +115,7 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
             java_check_exception(__func__);
 
 
-            results[i].molecule = (char *) palloc(moleculeSize);
+            results[i].molecule = (uint8_t *) palloc(moleculeSize);
             memcpy(results[i].molecule, molecule, moleculeSize);
 
 
@@ -173,7 +171,7 @@ void java_parse_data(size_t count, VarChar **molfiles, LoaderData *data)
         molfileArrayArg = (*env)->NewObjectArray(env, count, byteArrayClass, NULL);
         java_check_exception(__func__);
 
-        for(int i = 0; i < count; i++)
+        for(size_t i = 0; i < count; i++)
         {
             int length = VARSIZE(molfiles[i]) - VARHDRSZ;
             molfileArg = (*env)->NewByteArray(env, length);
@@ -192,7 +190,7 @@ void java_parse_data(size_t count, VarChar **molfiles, LoaderData *data)
         JavaDeleteRef(molfileArrayArg);
 
 
-        for(int i = 0; i < count; i++)
+        for(size_t i = 0; i < count; i++)
         {
             resultElement = (*env)->GetObjectArrayElement(env, resultArray, i);
             exception = (*env)->GetObjectField(env, resultElement, lucyLoaderExceptionField);
