@@ -62,6 +62,8 @@ void lucene_index_worker(dsm_segment *seg, shm_toc *toc)
     {
         while(true)
         {
+            CHECK_FOR_INTERRUPTS();
+
             SpinLockAcquire(&header->mutex);
             int position = header->moleculePosition++;
             SpinLockRelease(&header->mutex);
@@ -102,6 +104,8 @@ void lucene_optimize_worker(dsm_segment *seg, shm_toc *toc)
 
     while(true)
     {
+        CHECK_FOR_INTERRUPTS();
+
         SpinLockAcquire(&header->mutex);
         int position = header->subindexPosition++;
         SpinLockRelease(&header->mutex);

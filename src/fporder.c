@@ -80,6 +80,8 @@ void fporder_worker(dsm_segment *seg, shm_toc *toc)
 
             for(int i = 0; i < processed; i++)
             {
+                CHECK_FOR_INTERRUPTS();
+
                 HeapTuple tuple = tuptable->vals[i];
 
                 Datum mol = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
