@@ -15,7 +15,7 @@
 
 
 #define SHOW_STATS              0
-#define FETCH_SIZE              1000
+#define FETCH_SIZE              10000
 
 
 typedef struct
