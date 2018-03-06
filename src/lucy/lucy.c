@@ -1,4 +1,5 @@
 #include <postgres.h>
+#include <utils/memutils.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -22,6 +23,7 @@
 #include <Lucy/Search/QueryParser.h>
 #include <Lucy/Search/TermQuery.h>
 #include "lucy.h"
+#include "sachem.h"
 
 
 #define ID_NAME     "id"
@@ -29,6 +31,7 @@
 #define FP_PATTERN  "[a-zA-Z0-9+/]+"
 #define BOOLOP      "AND"
 
+#define safePfree(x)            do { void *ptr = x; x = NULL; if(ptr) pfree(ptr); } while(0)
 #define safeDecref(x)           do { void *obj = x; x = NULL; DECREF(obj); } while(0)
 #define safeNothrowDecref(x)    do { void *obj = x; x = NULL; nothrowDecref(obj); } while(0)
 
@@ -85,6 +88,10 @@ typedef struct
     int max_results;
     String *queryStr;
     Query *query;
+#if USE_ID_TABLE
+    HitDoc *hit;
+    String *id;
+#endif
 } SearchRoutineContext;
 
 
@@ -95,8 +102,10 @@ typedef struct
     int *results;
     size_t size;
     size_t loaded;
+#if USE_ID_TABLE == 0
     HitDoc *hit;
     String *id;
+#endif
 } GetRoutineContext;
 
 
@@ -175,6 +184,9 @@ void lucy_init(Lucy *lucy)
     lucy->searcher = NULL;
     lucy->collector = NULL;
     lucy->hits = NULL;
+#if USE_ID_TABLE
+    lucy->idTable = NULL;
+#endif
 
     InitRoutineContext context;
     context.lucy = lucy;
@@ -213,6 +225,9 @@ static void base_set_folder(SetFolderRoutineContext *context)
     safeDecref(context->lucy->searcher);
     safeDecref(context->lucy->collector);
     safeDecref(context->lucy->hits);
+#if USE_ID_TABLE
+    safePfree(context->lucy->idTable);
+#endif
 
     lucy->folder = Str_new_from_trusted_utf8(context->indexPath, strlen(context->indexPath));
 }
@@ -232,6 +247,9 @@ void lucy_set_folder(Lucy *lucy, const char *indexPath)
         safeNothrowDecref(lucy->searcher);
         safeNothrowDecref(lucy->collector);
         safeNothrowDecref(lucy->hits);
+#if USE_ID_TABLE
+        safePfree(lucy->idTable);
+#endif
 
         throwError(error);
     }
@@ -403,6 +421,38 @@ static void base_search(SearchRoutineContext *context)
         context->lucy->hits = BitVec_new(maxId + 1);
 
         context->lucy->collector = (Collector *) BitColl_new(context->lucy->hits);
+
+#if USE_ID_TABLE
+        PG_MEMCONTEXT_BEGIN(TopMemoryContext);
+        context->lucy->idTable = (int32_t *) palloc_extended((maxId + 1) * sizeof(int32_t), MCXT_ALLOC_HUGE | MCXT_ALLOC_NO_OOM);
+        PG_MEMCONTEXT_END();
+
+        if(context->lucy->idTable == NULL)
+            THROW(ERR, "out of memory");
+
+        context->query = (Query *) MatchAllQuery_new();
+        IxSearcher_Collect(context->lucy->searcher, context->query, context->lucy->collector);
+
+        int32_t possition = 0;
+
+        while(true)
+        {
+            size_t docId = BitVec_Next_Hit(context->lucy->hits, possition);
+
+            if(docId == -1)
+                break;
+
+            possition++;
+
+            context->hit = IxSearcher_Fetch_Doc(context->lucy->searcher, docId);
+
+            context->id = (String *) HitDoc_Extract(context->hit, context->lucy->idF);
+            context->lucy->idTable[docId] = Str_To_I64(context->id);
+
+            safeDecref(context->id);
+            safeDecref(context->hit);
+        }
+#endif
     }
 
 
@@ -432,20 +482,35 @@ LucyResultSet lucy_search(Lucy *lucy, StringFingerprint fp, int max_results)
     context.max_results = max_results;
     context.queryStr = NULL;
     context.query = NULL;
+#if USE_ID_TABLE
+    context.hit = NULL;
+    context.id = NULL;
+#endif
 
     Err *error = Err_trap((Err_Attempt_t) &base_search, (void *) &context);
 
     if(error != NULL)
     {
+#if USE_ID_TABLE
+        if(lucy->searcher == NULL || lucy->collector == NULL || lucy->hits == NULL || lucy->idTable)
+#else
         if(lucy->searcher == NULL || lucy->collector == NULL || lucy->hits == NULL)
+#endif
         {
             safeNothrowDecref(lucy->searcher);
             safeNothrowDecref(lucy->collector);
             safeNothrowDecref(lucy->hits);
+#if USE_ID_TABLE
+            safePfree(lucy->idTable);
+#endif
         }
 
         safeNothrowDecref(context.query);
         safeNothrowDecref(context.queryStr);
+#if USE_ID_TABLE
+        safeNothrowDecref(context.hit);
+        safeNothrowDecref(context.id);
+#endif
 
         throwError(error);
     }
@@ -468,16 +533,20 @@ static void base_get(GetRoutineContext *context)
         if(docId == -1)
             break;
 
+#if USE_ID_TABLE
+        *(results++) = context->lucy->idTable[docId];
+#else
         context->hit = IxSearcher_Fetch_Doc(context->lucy->searcher, docId);
 
         context->id = (String *) HitDoc_Extract(context->hit, context->lucy->idF);
         *(results++) = Str_To_I64(context->id);
 
-        ret++;
-        size--;
-
         safeDecref(context->id);
         safeDecref(context->hit);
+#endif
+
+        ret++;
+        size--;
     }
 
     context->loaded = ret;
@@ -492,15 +561,19 @@ size_t lucy_get(Lucy *lucy, LucyResultSet *resultSet, int *results, size_t size)
     context.results = results;
     context.size = size;
     context.loaded = 0;
+#if USE_ID_TABLE == 0
     context.hit = NULL;
     context.id = NULL;
+#endif
 
     Err *error = Err_trap((Err_Attempt_t) &base_get, (void *) &context);
 
     if(error != NULL)
     {
+#if USE_ID_TABLE == 0
         safeNothrowDecref(context.hit);
         safeNothrowDecref(context.id);
+#endif
 
         throwError(error);
     }

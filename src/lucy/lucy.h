@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "fingerprints/fingerprint.h"
 
+#define USE_ID_TABLE        1
 #define NULL_RESULT_SET     ((LucyResultSet) { .possition = -1 })
 
 
@@ -21,6 +22,10 @@ typedef struct
     struct lucy_BitVector *hits;
 
     struct lucy_Indexer *indexer;
+
+#if USE_ID_TABLE
+    int32_t *idTable;
+#endif
 } Lucy;
 
 
