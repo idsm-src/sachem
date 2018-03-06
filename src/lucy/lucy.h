@@ -14,6 +14,7 @@ typedef struct
     struct cfish_String *fpF;
     struct cfish_String *folder;
     struct lucy_Schema *schema;
+    struct lucy_SortSpec *sort;
 
     struct lucy_QueryParser *qparser;
     struct lucy_IndexSearcher *searcher;

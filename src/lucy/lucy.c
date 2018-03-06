@@ -18,6 +18,8 @@
 #include <Lucy/Search/Hits.h>
 #include <Lucy/Search/IndexSearcher.h>
 #include <Lucy/Search/MatchAllQuery.h>
+#include <Lucy/Search/SortRule.h>
+#include <Lucy/Search/SortSpec.h>
 #include <Lucy/Search/QueryParser.h>
 #include <Lucy/Search/TermQuery.h>
 #include "lucy.h"
@@ -39,6 +41,8 @@ typedef struct
     RegexTokenizer *rt;
     String *re;
     FullTextType *fttype;
+    Vector *rules;
+    SortRule *rule;
     String *boolop;
 } InitRoutineContext;
 
@@ -158,6 +162,13 @@ static void base_init(InitRoutineContext *context)
     safeDecref(context->rt);
     safeDecref(context->fttype);
 
+    context->rules = Vec_new(1);
+    context->rule = SortRule_new(SortRule_DOC_ID, NULL, 0);
+    Vec_Push(context->rules, (Obj*) context->rule);
+    context->rule = NULL;
+    lucy->sort = SortSpec_new(context->rules);
+    safeDecref(context->rules);
+
     context->boolop = Str_new_wrap_trusted_utf8(BOOLOP, sizeof(BOOLOP) - 1);
     lucy->qparser = QParser_new(lucy->schema, NULL, context->boolop, NULL);
     safeDecref(context->boolop);
@@ -190,12 +201,15 @@ void lucy_init(Lucy *lucy)
         safeNothrowDecref(lucy->idF);
         safeNothrowDecref(lucy->fpF);
         safeNothrowDecref(lucy->schema);
+        safeNothrowDecref(lucy->sort);
         safeNothrowDecref(lucy->qparser);
 
         safeNothrowDecref(context.stype);
         safeNothrowDecref(context.rt);
         safeNothrowDecref(context.re);
         safeNothrowDecref(context.fttype);
+        safeNothrowDecref(context.rules);
+        safeNothrowDecref(context.rule);
         safeNothrowDecref(context.boolop);
 
         throwError(error);
@@ -401,7 +415,7 @@ static void base_search(SearchRoutineContext *context)
         context->query = (Query *) MatchAllQuery_new();
     }
 
-    context->hits = IxSearcher_Hits(context->lucy->searcher, (Obj *) context->query, 0, context->max_results, NULL);
+    context->hits = IxSearcher_Hits(context->lucy->searcher, (Obj *) context->query, 0, context->max_results, context->lucy->sort);
 
     safeDecref(context->query);
     safeDecref(context->queryStr);
