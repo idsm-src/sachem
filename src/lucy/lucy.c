@@ -11,15 +11,14 @@
 #include <Lucy/Document/Doc.h>
 #include <Lucy/Document/HitDoc.h>
 #include <Lucy/Index/Indexer.h>
+#include <Lucy/Object/BitVector.h>
 #include <Lucy/Plan/FullTextType.h>
 #include <Lucy/Plan/Schema.h>
 #include <Lucy/Plan/StringType.h>
 #include <Lucy/Search/ANDQuery.h>
-#include <Lucy/Search/Hits.h>
+#include <Lucy/Search/Collector.h>
 #include <Lucy/Search/IndexSearcher.h>
 #include <Lucy/Search/MatchAllQuery.h>
-#include <Lucy/Search/SortRule.h>
-#include <Lucy/Search/SortSpec.h>
 #include <Lucy/Search/QueryParser.h>
 #include <Lucy/Search/TermQuery.h>
 #include "lucy.h"
@@ -41,8 +40,6 @@ typedef struct
     RegexTokenizer *rt;
     String *re;
     FullTextType *fttype;
-    Vector *rules;
-    SortRule *rule;
     String *boolop;
 } InitRoutineContext;
 
@@ -88,7 +85,6 @@ typedef struct
     int max_results;
     String *queryStr;
     Query *query;
-    Hits *hits;
 } SearchRoutineContext;
 
 
@@ -162,13 +158,6 @@ static void base_init(InitRoutineContext *context)
     safeDecref(context->rt);
     safeDecref(context->fttype);
 
-    context->rules = Vec_new(1);
-    context->rule = SortRule_new(SortRule_DOC_ID, NULL, 0);
-    Vec_Push(context->rules, (Obj*) context->rule);
-    context->rule = NULL;
-    lucy->sort = SortSpec_new(context->rules);
-    safeDecref(context->rules);
-
     context->boolop = Str_new_wrap_trusted_utf8(BOOLOP, sizeof(BOOLOP) - 1);
     lucy->qparser = QParser_new(lucy->schema, NULL, context->boolop, NULL);
     safeDecref(context->boolop);
@@ -184,6 +173,8 @@ void lucy_init(Lucy *lucy)
     lucy->qparser = NULL;
     lucy->indexer = NULL;
     lucy->searcher = NULL;
+    lucy->collector = NULL;
+    lucy->hits = NULL;
 
     InitRoutineContext context;
     context.lucy = lucy;
@@ -201,15 +192,12 @@ void lucy_init(Lucy *lucy)
         safeNothrowDecref(lucy->idF);
         safeNothrowDecref(lucy->fpF);
         safeNothrowDecref(lucy->schema);
-        safeNothrowDecref(lucy->sort);
         safeNothrowDecref(lucy->qparser);
 
         safeNothrowDecref(context.stype);
         safeNothrowDecref(context.rt);
         safeNothrowDecref(context.re);
         safeNothrowDecref(context.fttype);
-        safeNothrowDecref(context.rules);
-        safeNothrowDecref(context.rule);
         safeNothrowDecref(context.boolop);
 
         throwError(error);
@@ -221,11 +209,10 @@ static void base_set_folder(SetFolderRoutineContext *context)
 {
     Lucy *lucy = context->lucy;
 
-    if(lucy->folder != NULL)
-        safeDecref(lucy->folder);
-
-    if(context->lucy->searcher != NULL)
-        safeDecref(context->lucy->searcher);
+    safeDecref(lucy->folder);
+    safeDecref(context->lucy->searcher);
+    safeDecref(context->lucy->collector);
+    safeDecref(context->lucy->hits);
 
     lucy->folder = Str_new_from_trusted_utf8(context->indexPath, strlen(context->indexPath));
 }
@@ -240,7 +227,14 @@ void lucy_set_folder(Lucy *lucy, const char *indexPath)
     Err *error = Err_trap((Err_Attempt_t) &base_set_folder, (void *) &context);
 
     if(error != NULL)
+    {
+        safeNothrowDecref(lucy->folder);
+        safeNothrowDecref(lucy->searcher);
+        safeNothrowDecref(lucy->collector);
+        safeNothrowDecref(lucy->hits);
+
         throwError(error);
+    }
 }
 
 
@@ -402,7 +396,14 @@ void lucy_rollback(Lucy *lucy)
 static void base_search(SearchRoutineContext *context)
 {
     if(context->lucy->searcher == NULL)
+    {
         context->lucy->searcher = IxSearcher_new((Obj *) (context->lucy->folder));
+
+        int32_t maxId = IxSearcher_Doc_Max(context->lucy->searcher);
+        context->lucy->hits = BitVec_new(maxId + 1);
+
+        context->lucy->collector = (Collector *) BitColl_new(context->lucy->hits);
+    }
 
 
     if(context->fp.size != 0)
@@ -415,7 +416,8 @@ static void base_search(SearchRoutineContext *context)
         context->query = (Query *) MatchAllQuery_new();
     }
 
-    context->hits = IxSearcher_Hits(context->lucy->searcher, (Obj *) context->query, 0, context->max_results, context->lucy->sort);
+    BitVec_Clear_All(context->lucy->hits);
+    IxSearcher_Collect(context->lucy->searcher, context->query, context->lucy->collector);
 
     safeDecref(context->query);
     safeDecref(context->queryStr);
@@ -430,20 +432,25 @@ LucyResultSet lucy_search(Lucy *lucy, StringFingerprint fp, int max_results)
     context.max_results = max_results;
     context.queryStr = NULL;
     context.query = NULL;
-    context.hits = NULL;
 
     Err *error = Err_trap((Err_Attempt_t) &base_search, (void *) &context);
 
     if(error != NULL)
     {
+        if(lucy->searcher == NULL || lucy->collector == NULL || lucy->hits == NULL)
+        {
+            safeNothrowDecref(lucy->searcher);
+            safeNothrowDecref(lucy->collector);
+            safeNothrowDecref(lucy->hits);
+        }
+
         safeNothrowDecref(context.query);
         safeNothrowDecref(context.queryStr);
-        safeNothrowDecref(context.hits);
 
         throwError(error);
     }
 
-    return (LucyResultSet) { .hits = context.hits };
+    return (LucyResultSet) { .possition = 0 };
 }
 
 
@@ -455,13 +462,13 @@ static void base_get(GetRoutineContext *context)
 
     while(size > 0)
     {
-        context->hit = Hits_Next(context->resultSet->hits);
+        size_t docId = BitVec_Next_Hit(context->lucy->hits, context->resultSet->possition);
+        context->resultSet->possition = docId == -1 ? -1 : docId + 1;
 
-        if(context->hit == NULL)
-        {
-            safeDecref(context->resultSet->hits);
+        if(docId == -1)
             break;
-        }
+
+        context->hit = IxSearcher_Fetch_Doc(context->lucy->searcher, docId);
 
         context->id = (String *) HitDoc_Extract(context->hit, context->lucy->idF);
         *(results++) = Str_To_I64(context->id);
@@ -504,7 +511,6 @@ size_t lucy_get(Lucy *lucy, LucyResultSet *resultSet, int *results, size_t size)
 
 void lucy_fail(Lucy *lucy, LucyResultSet *resultSet)
 {
-    safeNothrowDecref(resultSet->hits);
 }
 
 

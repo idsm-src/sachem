@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include "fingerprints/fingerprint.h"
 
-#define NULL_RESULT_SET     ((LucyResultSet) { .hits = NULL })
+#define NULL_RESULT_SET     ((LucyResultSet) { .possition = -1 })
 
 
 typedef struct
@@ -14,10 +14,11 @@ typedef struct
     struct cfish_String *fpF;
     struct cfish_String *folder;
     struct lucy_Schema *schema;
-    struct lucy_SortSpec *sort;
 
     struct lucy_QueryParser *qparser;
     struct lucy_IndexSearcher *searcher;
+    struct lucy_Collector *collector;
+    struct lucy_BitVector *hits;
 
     struct lucy_Indexer *indexer;
 } Lucy;
@@ -25,13 +26,13 @@ typedef struct
 
 typedef struct
 {
-    struct lucy_Hits *hits;
+    size_t possition;
 } LucyResultSet;
 
 
 inline bool lucy_is_open(LucyResultSet *resultSet)
 {
-    return resultSet->hits != NULL;
+    return resultSet->possition != -1;
 }
 
 
