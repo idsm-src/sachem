@@ -62,6 +62,7 @@ static int indexId = -1;
 static SPIPlanPtr mainQueryPlan;
 static SPIPlanPtr snapshotQueryPlan;
 static Lucy lucy;
+static int moleculeCount;
 
 
 void lucy_subsearch_init(void)
@@ -130,6 +131,22 @@ void lucy_subsearch_init(void)
         if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
             elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
+
+        if(unlikely(SPI_execute("select max(id) + 1 from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
+            elog(ERROR, "%s: SPI_execute() failed", __func__);
+
+        if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
+            elog(ERROR, "%s: SPI_execute() failed", __func__);
+
+        char isNullFlag;
+        moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
+
+        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+        SPI_freetuptable(SPI_tuptable);
+
+
         lucy_set_folder(&lucy, TextDatumGetCString(path));
         indexId = DatumGetInt32(id);
     }
@@ -164,27 +181,6 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
         int32_t vf2_timeout = PG_GETARG_INT32(8);
 
         FuncCallContext *funcctx = SRF_FIRSTCALL_INIT();
-
-
-        if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-             elog(ERROR, "%s: SPI_connect() failed", __func__);
-
-        connected = true;
-
-        if(unlikely(SPI_execute("select max(id) + 1 from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
-            elog(ERROR, "%s: SPI_execute() failed", __func__);
-
-        if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
-            elog(ERROR, "%s: SPI_execute() failed", __func__);
-
-        char isNullFlag;
-        int64_t moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
-
-        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-        SPI_freetuptable(SPI_tuptable);
-
 
         PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
 
