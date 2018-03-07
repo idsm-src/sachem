@@ -99,7 +99,7 @@ typedef struct
 {
     Lucy *lucy;
     LucyResultSet *resultSet;
-    int *results;
+    int32_t *results;
     size_t size;
     size_t loaded;
 #if USE_ID_TABLE == 0
@@ -553,7 +553,7 @@ static void base_get(GetRoutineContext *context)
 }
 
 
-size_t lucy_get(Lucy *lucy, LucyResultSet *resultSet, int *results, size_t size)
+size_t lucy_get(Lucy *lucy, LucyResultSet *resultSet, int32_t *results, size_t size)
 {
     GetRoutineContext context;
     context.lucy = lucy;

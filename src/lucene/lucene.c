@@ -207,7 +207,7 @@ LuceneResultSet lucene_search(Lucene *lucene, IntegerFingerprint fp, int maxResu
 }
 
 
-size_t lucene_get(Lucene *lucene, LuceneResultSet *resultSet, int *buffer, size_t size)
+size_t lucene_get(Lucene *lucene, LuceneResultSet *resultSet, int32_t *buffer, size_t size)
 {
     jintArray resultArray = NULL;
     jint *results = NULL;

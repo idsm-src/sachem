@@ -28,7 +28,7 @@ void lucene_optimize(Lucene *lucene);
 void lucene_commit(Lucene *lucene);
 void lucene_rollback(Lucene *lucene);
 LuceneResultSet lucene_search(Lucene *lucene, IntegerFingerprint fp, int max_results);
-size_t lucene_get(Lucene *lucene, LuceneResultSet *resultSet, int *buffer, size_t size);
+size_t lucene_get(Lucene *lucene, LuceneResultSet *resultSet, int32_t *buffer, size_t size);
 void lucene_fail(Lucene *lucene, LuceneResultSet *resultSet);
 void lucene_link_directory(const char *oldPath, const char *newPath);
 void lucene_delete_directory(const char *path);
