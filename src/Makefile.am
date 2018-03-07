@@ -35,6 +35,7 @@ EXTRA_DIST = \
         heap.h \
         fporder.h \
         isomorphism.h \
+        measurement.h \
         molecule.h \
         sachem.h \
         stats.h \

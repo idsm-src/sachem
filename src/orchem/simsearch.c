@@ -12,6 +12,7 @@
 #include "common.h"
 #include "heap.h"
 #include "sachem.h"
+#include "measurement.h"
 #include "java/orchem.h"
 
 
@@ -109,8 +110,7 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
         orchem_simsearch_init();
 
 #if SHOW_STATS
-        struct timeval begin;
-        gettimeofday(&begin, NULL);
+        struct timeval begin = time_get();
 #endif
 
         VarChar *query = PG_GETARG_VARCHAR_P(0);
@@ -286,11 +286,10 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
     if(unlikely(isNull))
     {
 #if SHOW_STATS
-        struct timeval begin = ((SimilaritySearchData *) funcctx->user_fctx)->begin;
-        struct timeval end;
-        gettimeofday(&end, NULL);
-        int32_t time_spent = ((int64_t) end.tv_sec - (int64_t) begin.tv_sec) * 1000000 + ((int64_t) end.tv_usec - (int64_t) begin.tv_usec);
-        elog(NOTICE, "stat: %i %i.%i ms", info->resultCount, time_spent / 1000, time_spent % 1000);
+        struct timeval end = time_get();
+        int64_t spentTime = time_spent(info->begin, end);
+        elog(NOTICE, "stat: %i", info->foundResults);
+        elog(NOTICE, "time: %.3fms", time_to_ms(spentTime));
 #endif
 
         SRF_RETURN_DONE(funcctx);

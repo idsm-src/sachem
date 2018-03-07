@@ -11,6 +11,7 @@
 #include "molecule.h"
 #include "sachem.h"
 #include "subsearch.h"
+#include "measurement.h"
 #include "java/orchem.h"
 
 
@@ -52,6 +53,9 @@ typedef struct
 #if SHOW_STATS
     int candidateCount;
     struct timeval begin;
+    int64_t prepareTime;
+    int64_t indexTime;
+    int64_t matchTime;
 #endif
 
 } SubstructureSearchData;
@@ -68,6 +72,10 @@ static SPIPlanPtr mainQueryPlan = NULL;
 
 #if USE_COUNT_FINGERPRINT
 static int16 (*counts)[COUNTS_SIZE];
+#endif
+
+#if SHOW_STATS
+static int dbSize;
 #endif
 
 
@@ -183,6 +191,21 @@ static void orchem_subsearch_init(void)
         counts = (int16 (*)[COUNTS_SIZE]) (base + FP_SIZE + 1);
 #endif
 
+#if SHOW_STATS
+        if(unlikely(SPI_execute("select count(*) from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
+            elog(ERROR, "%s: SPI_execute() failed", __func__);
+
+        if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
+            elog(ERROR, "%s: SPI_execute() failed", __func__);
+
+        dbSize = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
+
+        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+        SPI_freetuptable(SPI_tuptable);
+#endif
+
         indexId = DatumGetInt32(id);
     }
 
@@ -195,12 +218,10 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 {
     if(SRF_IS_FIRSTCALL())
     {
-        orchem_subsearch_init();
-
 #if SHOW_STATS
-        struct timeval begin;
-        gettimeofday(&begin, NULL);
+        struct timeval begin = time_get();
 #endif
+        orchem_subsearch_init();
 
         VarChar *query = PG_GETARG_VARCHAR_P(0);
         int32_t type = PG_GETARG_INT32(1);
@@ -225,8 +246,14 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
         info->stereoMode = stereoMode;
         info->vf2_timeout = vf2_timeout;
 
+#if SHOW_STATS
+        struct timeval java_begin = time_get();
+#endif
         info->queryDataCount = java_orchem_parse_substructure_query(&info->queryData, VARDATA(query), VARSIZE(query) - VARHDRSZ,
                 type, graphMode == GRAPH_EXACT, tautomerMode == TAUTOMER_INCHI);
+#if SHOW_STATS
+        struct timeval java_end = time_get();
+#endif
 
         PG_FREE_IF_COPY(query, 0);
 
@@ -253,6 +280,9 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 #if SHOW_STATS
         info->begin = begin;
         info->candidateCount = 0;
+        info->prepareTime = time_spent(java_begin, java_end);
+        info->indexTime = 0;
+        info->matchTime = 0;
 #endif
 
         PG_MEMCONTEXT_END();
@@ -286,7 +316,9 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                     if(unlikely(info->queryDataPosition == info->queryDataCount))
                         break;
 
-
+#if SHOW_STATS
+                    struct timeval search_begin = time_get();
+#endif
                     bitset_copy(&info->candidates, &info->resultMask);
 
                     for(int i = 0; i < info->queryData[info->queryDataPosition].fpLength; i++)
@@ -294,17 +326,29 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                         int idx = Int16GetDatum(info->queryData[info->queryDataPosition].fp[i]);
                         bitset_merge(&info->candidates, bitmap + idx);
                     }
+#if SHOW_STATS
+                    struct timeval search_end = time_get();
+                    info->indexTime += time_spent(search_begin, search_end);
+#endif
 
                     OrchemSubstructureQueryData *data = &(info->queryData[info->queryDataPosition]);
 
                     MemoryContextReset(info->isomorphismContext);
-
                     PG_MEMCONTEXT_BEGIN(info->isomorphismContext);
+
+#if SHOW_STATS
+                    struct timeval vf2init_begin = time_get();
+#endif
                     info->extended = molecule_is_extended_search_needed(data->molecule, info->chargeMode, info->isotopeMode);
                     molecule_init(&info->queryMolecule, data->molecule, data->restH, info->extended,
                             info->chargeMode != CHARGE_IGNORE, info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
                     vf2state_init(&info->vf2state, &info->queryMolecule, info->graphMode, info->chargeMode,
                             info->isotopeMode, info->stereoMode);
+#if SHOW_STATS
+                    struct timeval vf2init_end = time_get();
+                    info->prepareTime += time_spent(vf2init_begin, vf2init_end);
+#endif
+
                     PG_MEMCONTEXT_END();
 
                     info->candidatePosition = bitset_next_set_bit(&info->candidates, 0);
@@ -316,6 +360,9 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
                 size_t count = 0;
 
+#if SHOW_STATS
+                struct timeval get_begin = time_get();
+#endif
                 while(count < FETCH_SIZE && info->candidatePosition >= 0)
                 {
 #if USE_COUNT_FINGERPRINT
@@ -336,11 +383,17 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
                     info->candidatePosition = bitset_next_set_bit(&info->candidates, info->candidatePosition + 1);
                 }
+#if SHOW_STATS
+                struct timeval get_end = time_get();
+                info->indexTime += time_spent(get_begin, get_end);
+#endif
 
                 if(unlikely(count == 0))
                     continue;
 
-
+#if SHOW_STATS
+                struct timeval load_begin = time_get();
+#endif
                 *(ARR_DIMS(info->arrayBuffer)) = count;
                 SET_VARSIZE(info->arrayBuffer, count * sizeof(int32) + ARR_OVERHEAD_NONULLS(1));
 
@@ -364,7 +417,15 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                 info->tableRowPosition = 0;
 
                 MemoryContextSetParent(SPI_tuptable->tuptabcxt, funcctx->multi_call_memory_ctx);
+#if SHOW_STATS
+                struct timeval load_end = time_get();
+                info->matchTime += time_spent(load_begin, load_end);
+#endif
             }
+
+#if SHOW_STATS
+            struct timeval match_begin = time_get();
+#endif
 
             TupleDesc tupdesc = info->table->tupdesc;
             HeapTuple tuple = info->table->vals[info->tableRowPosition++];
@@ -403,6 +464,11 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
             PG_MEMCONTEXT_END();
             MemoryContextReset(info->targetContext);
 
+#if SHOW_STATS
+            struct timeval match_end = time_get();
+            info->matchTime += time_spent(match_begin, match_end);
+#endif
+
             if(match)
             {
                 bitset_unset(&info->resultMask, DatumGetInt32(seqid));
@@ -420,11 +486,24 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
     if(unlikely(isNull))
     {
 #if SHOW_STATS
-        struct timeval begin = ((SubstructureSearchData *) funcctx->user_fctx)->begin;
-        struct timeval end;
-        gettimeofday(&end, NULL);
-        int32_t time_spent = ((int64_t) end.tv_sec - (int64_t) begin.tv_sec) * 1000000 + ((int64_t) end.tv_usec - (int64_t) begin.tv_usec);
-        elog(NOTICE, "stat: %i %i %i.%i ms", info->candidateCount, info->foundResults, time_spent / 1000, time_spent % 1000);
+        struct timeval end = time_get();
+        int64_t spentTime = time_spent(info->begin, end);
+        int64_t sumTime = info->prepareTime + info->indexTime + info->matchTime;
+        double scale = spentTime / 100.0;
+
+        double specificity = 100.0 * (dbSize - info->candidateCount) / (dbSize - info->foundResults);
+        double precision = 100.0 * info->foundResults / info->candidateCount;
+
+        if(info->candidateCount == 0 && info->foundResults == 0)
+            precision = 100.0;
+
+        elog(NOTICE, "stat:   candidates      results  specificity    precision");
+        elog(NOTICE, "stat: %12i %12i %11.3f%% %11.3f%%", info->candidateCount, info->foundResults, specificity, precision);
+        elog(NOTICE, "time:  fingerprint        index        match          sum        total");
+        elog(NOTICE, "time: %10.3fms %10.3fms %10.3fms %10.3fms %10.3fms", time_to_ms(info->prepareTime),
+                time_to_ms(info->indexTime), time_to_ms(info->matchTime), time_to_ms(sumTime), time_to_ms(spentTime));
+        elog(NOTICE, "time: %11.2f%% %11.2f%% %11.2f%% %11.2f%% ", info->prepareTime / scale,
+                info->indexTime / scale, info->matchTime / scale, sumTime / scale);
 #endif
 
         SRF_RETURN_DONE(funcctx);
