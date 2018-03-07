@@ -236,7 +236,7 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
         info->targetContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx,
                 "subsearch-lucy target context", ALLOCSET_DEFAULT_SIZES);
 
-        info->arrayBuffer = (ArrayType *) palloc(FETCH_SIZE * sizeof(int32) + ARR_OVERHEAD_NONULLS(1));
+        info->arrayBuffer = (ArrayType *) palloc(FETCH_SIZE * sizeof(int32_t) + ARR_OVERHEAD_NONULLS(1));
         info->arrayBuffer->ndim = 1;
         info->arrayBuffer->dataoffset = 0;
         info->arrayBuffer->elemtype = INT4OID;
@@ -320,7 +320,7 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
                     }
 
 
-                    int32 *arrayData = (int32 *) ARR_DATA_PTR(info->arrayBuffer);
+                    int32_t *arrayData = (int32_t *) ARR_DATA_PTR(info->arrayBuffer);
 
 #if SHOW_STATS
                     struct timeval get_begin = time_get();
@@ -338,7 +338,7 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
                     struct timeval load_begin = time_get();
 #endif
                     *(ARR_DIMS(info->arrayBuffer)) = count;
-                    SET_VARSIZE(info->arrayBuffer, count * sizeof(int32) + ARR_OVERHEAD_NONULLS(1));
+                    SET_VARSIZE(info->arrayBuffer, count * sizeof(int32_t) + ARR_OVERHEAD_NONULLS(1));
 
                     Datum values[] = { PointerGetDatum(info->arrayBuffer)};
 
