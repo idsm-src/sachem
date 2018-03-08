@@ -2,6 +2,7 @@ package cz.iocb.sachem.lucene;
 
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.BitSet;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.IntPoint;
 import org.apache.lucene.document.StoredField;
@@ -11,6 +12,7 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.TieredMergePolicy;
 import org.apache.lucene.search.BooleanClause;
@@ -18,7 +20,7 @@ import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.BooleanQuery.Builder;
 import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.SimpleCollector;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -33,31 +35,59 @@ public class Lucene
     };
 
 
+    private class BitSetCollector extends SimpleCollector
+    {
+        private final BitSet bitset;
+        int docBase;
+
+        BitSetCollector()
+        {
+            this.bitset = new BitSet(maxMoleculeId);
+        }
+
+        @Override
+        protected void doSetNextReader(LeafReaderContext context) throws IOException
+        {
+            docBase = context.docBase;
+        }
+
+        @Override
+        public void collect(int docId) throws IOException
+        {
+            Document doc = searcher.doc(docBase + docId);
+            IndexableField id = doc.getField(idFieldName);
+            int moleculeID = id.numericValue().intValue();
+
+            bitset.set(moleculeID);
+        }
+
+        @Override
+        public boolean needsScores()
+        {
+            return false;
+        }
+
+        public BitSet getBitSet()
+        {
+            return bitset;
+        }
+    }
+
+
     private static final IndexType indexType = IndexType.POINTS;
     private static final String idFieldName = "id";
     private static final String fpFieldName = "fp";
 
+    private int maxMoleculeId;
     private Directory folder;
     private IndexSearcher searcher;
     private IndexWriter indexer;
     private final FingerprintTokenizer tokenizer = new FingerprintTokenizer();
 
 
-    public static class ResultSet
+    void setFolder(String path, int maxId) throws IOException
     {
-        final ScoreDoc[] docs;
-        int position;
-
-        public ResultSet(ScoreDoc[] docs)
-        {
-            this.docs = docs;
-            this.position = 0;
-        }
-    }
-
-
-    void setFolder(String path) throws IOException
-    {
+        maxMoleculeId = maxId;
         folder = FSDirectory.open(Paths.get(path));
         searcher = null;
     }
@@ -129,7 +159,7 @@ public class Lucene
     }
 
 
-    ResultSet search(int fp[], int maxResults) throws IOException
+    long[] search(int fp[], int maxResults) throws IOException
     {
         if(searcher == null)
         {
@@ -151,24 +181,9 @@ public class Lucene
                 builder.add(IntPoint.newExactQuery(fpFieldName, bit), BooleanClause.Occur.MUST);
         }
 
-        return new ResultSet(searcher.search(new ConstantScoreQuery(builder.build()), maxResults).scoreDocs);
-    }
+        BitSetCollector collector = new BitSetCollector();
+        searcher.search(new ConstantScoreQuery(builder.build()), collector);
 
-
-    int get(ResultSet set, int buffer[]) throws IOException
-    {
-        for(int i = 0; i < buffer.length; i++)
-        {
-            if(set.position == set.docs.length)
-                return i;
-
-            Document doc = searcher.doc(set.docs[set.position].doc);
-            IndexableField id = doc.getField(idFieldName);
-            buffer[i] = id.numericValue().intValue();
-
-            set.position++;
-        }
-
-        return buffer.length;
+        return collector.getBitSet().toLongArray();
     }
 }

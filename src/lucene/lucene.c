@@ -4,11 +4,13 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include "bitset.h"
 #include "sachem.h"
 #include "lucene.h"
 #include "java/java.h"
 
 
+static bool luceneInitialized = false;
 static jclass luceneClass;
 static jmethodID setFolderMethod;
 static jmethodID beginMethod;
@@ -19,54 +21,58 @@ static jmethodID optimizeMethod;
 static jmethodID commitMethod;
 static jmethodID rollbackMethod;
 static jmethodID searchMethod;
-static jmethodID getMethod;
 
 
 void lucene_init(Lucene *lucene)
 {
-    java_init();
+    if(luceneInitialized == false)
+    {
+        java_init();
 
-    luceneClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/Lucene");
+        luceneClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/Lucene");
 
-    setFolderMethod = (*env)->GetMethodID(env, luceneClass, "setFolder", "(Ljava/lang/String;)V");
-    java_check_exception(__func__);
+        setFolderMethod = (*env)->GetMethodID(env, luceneClass, "setFolder", "(Ljava/lang/String;I)V");
+        java_check_exception(__func__);
 
-    beginMethod = (*env)->GetMethodID(env, luceneClass, "begin", "()V");
-    java_check_exception(__func__);
+        beginMethod = (*env)->GetMethodID(env, luceneClass, "begin", "()V");
+        java_check_exception(__func__);
 
-    addMethod = (*env)->GetMethodID(env, luceneClass, "add", "(I[I)V");
-    java_check_exception(__func__);
+        addMethod = (*env)->GetMethodID(env, luceneClass, "add", "(I[I)V");
+        java_check_exception(__func__);
 
-    addIndexMethod = (*env)->GetMethodID(env, luceneClass, "addIndex", "(Ljava/lang/String;)V");
-    java_check_exception(__func__);
+        addIndexMethod = (*env)->GetMethodID(env, luceneClass, "addIndex", "(Ljava/lang/String;)V");
+        java_check_exception(__func__);
 
-    deleteMethod = (*env)->GetMethodID(env, luceneClass, "delete", "(I)V");
-    java_check_exception(__func__);
+        deleteMethod = (*env)->GetMethodID(env, luceneClass, "delete", "(I)V");
+        java_check_exception(__func__);
 
-    optimizeMethod = (*env)->GetMethodID(env, luceneClass, "optimize", "()V");
-    java_check_exception(__func__);
+        optimizeMethod = (*env)->GetMethodID(env, luceneClass, "optimize", "()V");
+        java_check_exception(__func__);
 
-    commitMethod = (*env)->GetMethodID(env, luceneClass, "commit", "()V");
-    java_check_exception(__func__);
+        commitMethod = (*env)->GetMethodID(env, luceneClass, "commit", "()V");
+        java_check_exception(__func__);
 
-    rollbackMethod = (*env)->GetMethodID(env, luceneClass, "rollback", "()V");
-    java_check_exception(__func__);
+        rollbackMethod = (*env)->GetMethodID(env, luceneClass, "rollback", "()V");
+        java_check_exception(__func__);
 
-    searchMethod = (*env)->GetMethodID(env, luceneClass, "search", "([II)Lcz/iocb/sachem/lucene/Lucene$ResultSet;");
-    java_check_exception(__func__);
+        searchMethod = (*env)->GetMethodID(env, luceneClass, "search", "([II)[J");
+        java_check_exception(__func__);
 
-    getMethod = (*env)->GetMethodID(env, luceneClass, "get", "(Lcz/iocb/sachem/lucene/Lucene$ResultSet;[I)I");
-    java_check_exception(__func__);
+        jmethodID constructor = (*env)->GetMethodID(env, luceneClass, "<init>", "()V");
+        java_check_exception(__func__);
 
-    jmethodID constructor = (*env)->GetMethodID(env, luceneClass, "<init>", "()V");
-    java_check_exception(__func__);
+        lucene->instance = (*env)->NewObject(env, luceneClass, constructor);
+        java_check_exception(__func__);
 
-    *lucene = (*env)->NewObject(env, luceneClass, constructor);
-    java_check_exception(__func__);
+        luceneInitialized = true;
+    }
+
+    lucene->bitsetArray = NULL;
+    lucene->bitsetWords = NULL;
 }
 
 
-void lucene_set_folder(Lucene *lucene, const char *path)
+void lucene_set_folder(Lucene *lucene, const char *path, int32_t maxId)
 {
     jstring folder = NULL;
 
@@ -75,7 +81,7 @@ void lucene_set_folder(Lucene *lucene, const char *path)
         folder = (*env)->NewStringUTF(env, path);
         java_check_exception(__func__);
 
-        (*env)->CallVoidMethod(env, *lucene, setFolderMethod, folder);
+        (*env)->CallVoidMethod(env, lucene->instance, setFolderMethod, folder, maxId);
         java_check_exception(__func__);
 
         JavaDeleteRef(folder);
@@ -92,7 +98,7 @@ void lucene_set_folder(Lucene *lucene, const char *path)
 
 void lucene_begin(Lucene *lucene)
 {
-    (*env)->CallVoidMethod(env, *lucene, beginMethod);
+    (*env)->CallVoidMethod(env, lucene->instance, beginMethod);
     java_check_exception(__func__);
 }
 
@@ -109,7 +115,7 @@ void lucene_add(Lucene *lucene, int32_t id, IntegerFingerprint fp)
         (*env)->SetIntArrayRegion(env, fpArray, 0, fp.size, (jint*) fp.data);
         java_check_exception(__func__);
 
-        (*env)->CallVoidMethod(env, *lucene, addMethod, (jint) id, fpArray);
+        (*env)->CallVoidMethod(env, lucene->instance, addMethod, (jint) id, fpArray);
         java_check_exception(__func__);
 
         JavaDeleteRef(fpArray);
@@ -133,7 +139,7 @@ void lucene_add_index(Lucene *lucene, const char *path)
         folder = (*env)->NewStringUTF(env, path);
         java_check_exception(__func__);
 
-        (*env)->CallVoidMethod(env, *lucene, addIndexMethod, folder);
+        (*env)->CallVoidMethod(env, lucene->instance, addIndexMethod, folder);
         java_check_exception(__func__);
 
         JavaDeleteRef(folder);
@@ -150,35 +156,34 @@ void lucene_add_index(Lucene *lucene, const char *path)
 
 void lucene_delete(Lucene *lucene, int32_t id)
 {
-    (*env)->CallVoidMethod(env, *lucene, deleteMethod, (jint) id);
+    (*env)->CallVoidMethod(env, lucene->instance, deleteMethod, (jint) id);
     java_check_exception(__func__);
 }
 
 
 void lucene_optimize(Lucene *lucene)
 {
-    (*env)->CallVoidMethod(env, *lucene, optimizeMethod);
+    (*env)->CallVoidMethod(env, lucene->instance, optimizeMethod);
     java_check_exception(__func__);
 }
 
 
 void lucene_commit(Lucene *lucene)
 {
-    (*env)->CallVoidMethod(env, *lucene, commitMethod);
+    (*env)->CallVoidMethod(env, lucene->instance, commitMethod);
     java_check_exception(__func__);
 }
 
 
 void lucene_rollback(Lucene *lucene)
 {
-    (*env)->CallVoidMethod(env, *lucene, rollbackMethod);
+    (*env)->CallVoidMethod(env, lucene->instance, rollbackMethod);
     java_check_exception(__func__);
 }
 
 
 LuceneResultSet lucene_search(Lucene *lucene, IntegerFingerprint fp, int maxResultCount)
 {
-    jobject result = NULL;
     jintArray fpArray = NULL;
 
     PG_TRY();
@@ -189,65 +194,58 @@ LuceneResultSet lucene_search(Lucene *lucene, IntegerFingerprint fp, int maxResu
         (*env)->SetIntArrayRegion(env, fpArray, 0, fp.size, (jint*) fp.data);
         java_check_exception(__func__);
 
-        result = (*env)->CallObjectMethod(env, *lucene, searchMethod, fpArray, (jint) maxResultCount);
+        lucene->bitsetArray = (jlongArray) (*env)->CallObjectMethod(env, lucene->instance, searchMethod, fpArray, (jint) maxResultCount);
         java_check_exception(__func__);
+
+        jsize size = (*env)->GetArrayLength(env, lucene->bitsetArray);
+        lucene->bitsetWords = (*env)->GetLongArrayElements(env, lucene->bitsetArray, NULL);
+        java_check_exception(__func__);
+
+        bitset_init(&lucene->hits, (uint64_t *) lucene->bitsetWords, size);
 
         JavaDeleteRef(fpArray);
     }
     PG_CATCH();
     {
         JavaDeleteRef(fpArray);
-        JavaDeleteRef(result);
+        JavaDeleteLongArray(lucene->bitsetArray, lucene->bitsetWords, JNI_ABORT);
 
         PG_RE_THROW();
     }
     PG_END_TRY();
 
-    return result;
+    return (LuceneResultSet) { .possition = 0 };;
 }
 
 
 size_t lucene_get(Lucene *lucene, LuceneResultSet *resultSet, int32_t *buffer, size_t size)
 {
-    jintArray resultArray = NULL;
-    jint *results = NULL;
-    size_t count = 0;
+    int ret = 0;
 
-    PG_TRY();
+    while(size > 0)
     {
-        resultArray = (jintArray) (*env)->NewIntArray(env, size);
-        java_check_exception(__func__);
+        int id = bitset_next_set_bit(&lucene->hits, resultSet->possition);
+        resultSet->possition = id == -1 ? -1 : id + 1;
 
-        count = (*env)->CallIntMethod(env, *lucene, getMethod, *resultSet, resultArray);
-        java_check_exception(__func__);
+        if(id == -1)
+        {
+            JavaDeleteLongArray(lucene->bitsetArray, lucene->bitsetWords, JNI_ABORT);
+            break;
+        }
 
-        results = (*env)->GetIntArrayElements(env, resultArray, 0);
-        java_check_exception(__func__);
+        *(buffer++) = id;
 
-        for(size_t i = 0; i < count; i++)
-            buffer[i] = results[i];
-
-        if(count == 0)
-            JavaDeleteRef(*resultSet);
-
-        JavaDeleteIntegerArray(resultArray, results, JNI_ABORT);
+        ret++;
+        size--;
     }
-    PG_CATCH();
-    {
-        JavaDeleteIntegerArray(resultArray, results, JNI_ABORT);
-        JavaDeleteRef(*resultSet);
 
-        PG_RE_THROW();
-    }
-    PG_END_TRY();
-
-    return count;
+    return ret;
 }
 
 
 void lucene_fail(Lucene *lucene, LuceneResultSet *resultSet)
 {
-    JavaDeleteRef(*resultSet);
+    JavaDeleteLongArray(lucene->bitsetArray, lucene->bitsetWords, JNI_ABORT);
 }
 
 

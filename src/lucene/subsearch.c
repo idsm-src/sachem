@@ -169,7 +169,7 @@ void lucene_subsearch_init(void)
         SPI_freetuptable(SPI_tuptable);
 #endif
 
-        lucene_set_folder(&lucene, TextDatumGetCString(path));
+        lucene_set_folder(&lucene, TextDatumGetCString(path), moleculeCount);
         indexId = DatumGetInt32(id);
     }
 

@@ -3,23 +3,37 @@
 
 #include <stdbool.h>
 #include <jni.h>
+#include "bitset.h"
 #include "fingerprints/fingerprint.h"
 
-#define NULL_RESULT_SET     NULL
+
+#define NULL_RESULT_SET         ((LuceneResultSet) { .possition = -1 })
 
 
-typedef jobject Lucene;
-typedef jobject LuceneResultSet;
+typedef struct
+{
+    jobject instance;
+
+    jlongArray bitsetArray;
+    jlong *bitsetWords;
+    BitSet hits;
+} Lucene;
+
+
+typedef struct
+{
+    size_t possition;
+} LuceneResultSet;
 
 
 inline bool lucene_is_open(LuceneResultSet *resultSet)
 {
-    return *resultSet != NULL;
+    return resultSet->possition != -1;
 }
 
 
 void lucene_init(Lucene *lucene);
-void lucene_set_folder(Lucene *lucene, const char *path);
+void lucene_set_folder(Lucene *lucene, const char *path, int32_t maxId);
 void lucene_begin(Lucene *lucene);
 void lucene_add(Lucene *lucene, int32_t id, IntegerFingerprint fp);
 void lucene_add_index(Lucene *lucene, const char *path);

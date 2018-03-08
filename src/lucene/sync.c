@@ -55,7 +55,7 @@ void lucene_index_worker(dsm_segment *seg, shm_toc *toc)
     char *indexPath = shm_toc_lookup_key(toc, IDEX_KEY_OFFSET + workerNumber);
 
     lucene_init(&lucene);
-    lucene_set_folder(&lucene, indexPath);
+    lucene_set_folder(&lucene, indexPath, 0);
     lucene_begin(&lucene);
 
     PG_TRY();
@@ -115,7 +115,7 @@ void lucene_optimize_worker(dsm_segment *seg, shm_toc *toc)
 
         char *indexPath = shm_toc_lookup_key(toc, IDEX_KEY_OFFSET + position);
 
-        lucene_set_folder(&lucene, indexPath);
+        lucene_set_folder(&lucene, indexPath, 0);
         lucene_begin(&lucene);
 
         PG_TRY();
@@ -211,7 +211,7 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
 
 
     lucene_link_directory(oldIndexPath, indexPath);
-    lucene_set_folder(&lucene, indexPath);
+    lucene_set_folder(&lucene, indexPath, 0);
 
     if(unlikely(SPI_exec("delete from " INDEX_TABLE, 0) != SPI_OK_DELETE))
         elog(ERROR, "%s: SPI_exec() failed", __func__);
