@@ -116,6 +116,9 @@ typedef struct
 } GetErrorRoutineContext;
 
 
+static bool lucyInitialized = false;
+
+
 static void decref(void *obj)
 {
     DECREF(obj);
@@ -143,9 +146,15 @@ static void throwError(Err *error)
 
 static void base_init(InitRoutineContext *context)
 {
-    Lucy *lucy = context->lucy;
+    if(lucyInitialized == false)
+    {
+        lucy_bootstrap_parcel();
 
-    lucy_bootstrap_parcel();
+        lucyInitialized = true;
+    }
+
+
+    Lucy *lucy = context->lucy;
 
     lucy->idF = Str_new_wrap_trusted_utf8(ID_NAME, sizeof(ID_NAME) - 1);
     lucy->fpF = Str_new_wrap_trusted_utf8(FP_NAME, sizeof(FP_NAME) - 1);
