@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include "bitset.h"
 #include "common.h"
+#include "molindex.h"
 #include "sachem.h"
 #include "java/orchem.h"
 
@@ -418,19 +419,14 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
         indexNumber = DatumGetInt32(number) + 1;
     }
 
-    Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
-    size_t basePathLength = strlen(DataDir);
-    size_t databaseLength = strlen(database->data);
 
-    char *indexFilePath = (char *) palloc(basePathLength +  databaseLength + 64);
-    sprintf(indexFilePath, "%s/%s/orchem_substructure_index-%i.idx", DataDir, database->data, indexNumber);
-
+    char *indexFilePath = get_index_path(ORCHEM_INDEX_PREFIX, ORCHEM_INDEX_SUFFIX, indexNumber);
 
     if(unlikely(SPI_exec("delete from " INDEX_TABLE, 0) != SPI_OK_DELETE))
         elog(ERROR, "%s: SPI_exec() failed", __func__);
 
-    if(SPI_execute_with_args("insert into " INDEX_TABLE " (id, path) values ($1,$2)", 2, (Oid[]) { INT4OID, TEXTOID },
-            (Datum[]) {Int32GetDatum(indexNumber), CStringGetTextDatum(indexFilePath)}, NULL, false, 0) != SPI_OK_INSERT)
+    if(SPI_execute_with_args("insert into " INDEX_TABLE " (id) values ($1)", 1, (Oid[]) { INT4OID },
+            (Datum[]) {Int32GetDatum(indexNumber)}, NULL, false, 0) != SPI_OK_INSERT)
         elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
 
@@ -488,6 +484,10 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
         if(close(fd) != 0)
             elog(ERROR, "%s: close() failed", __func__);
+
+#if USE_MOLECULE_INDEX
+        sachem_generate_molecule_index(indexNumber, true);
+#endif
     }
     PG_CATCH();
     {

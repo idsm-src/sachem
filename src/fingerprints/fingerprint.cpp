@@ -23,13 +23,7 @@ static std::map<uint32_t, int> fporder;
 
 void fingerprint_init(void)
 {
-    Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
-    size_t basePathLength = strlen(DataDir);
-    size_t databaseLength = strlen(database->data);
-
-    char *fporderPath = (char *) palloc(basePathLength +  databaseLength + strlen(ORDER_FILE) + 3);
-    sprintf(fporderPath, "%s/%s/" ORDER_FILE, DataDir, database->data);
-
+    char *fporderPath = get_file_path(ORDER_FILE);
     std::ifstream stream(fporderPath, std::ios::in | std::ios::binary);
 
     if(stream.is_open())

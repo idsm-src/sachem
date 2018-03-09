@@ -32,7 +32,6 @@ CREATE TABLE sachem_compound_audit (
 
 CREATE TABLE sachem_index (
     id                    INT NOT NULL,
-    path                  TEXT NOT NULL,
     PRIMARY KEY (id)
 );
 

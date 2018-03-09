@@ -3,10 +3,15 @@
 #include <executor/spi.h>
 #include <funcapi.h>
 #include <utils/memutils.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include "bitset.h"
 #include "common.h"
 #include "isomorphism.h"
 #include "molecule.h"
+#include "molindex.h"
 #include "sachem.h"
 #include "subsearch.h"
 #include "lucy.h"
@@ -38,14 +43,20 @@ typedef struct
 
     LucyResultSet resultSet;
 
+#if USE_MOLECULE_INDEX == 0
     SPITupleTable *table;
+#endif
     int tableRowCount;
     int tableRowPosition;
 
     Molecule queryMolecule;
     VF2State vf2state;
 
+#if USE_MOLECULE_INDEX
+    int32_t *arrayBuffer;
+#else
     ArrayType *arrayBuffer;
+#endif
     MemoryContext isomorphismContext;
     MemoryContext targetContext;
 
@@ -67,6 +78,13 @@ static SPIPlanPtr mainQueryPlan;
 static SPIPlanPtr snapshotQueryPlan;
 static Lucy lucy;
 static int moleculeCount;
+
+#if USE_MOLECULE_INDEX
+static void *molIndexAddress = MAP_FAILED;
+static size_t molIndexSize;
+static uint8_t *moleculeData;
+static uint64_t *offsetData;
+#endif
 
 #if SHOW_STATS
 static int dbSize;
@@ -96,7 +114,7 @@ void lucy_subsearch_init(void)
     /* prepare snapshot query plan */
     if(unlikely(snapshotQueryPlan == NULL))
     {
-        SPIPlanPtr plan = SPI_prepare("select id, path from " INDEX_TABLE, 0, NULL);
+        SPIPlanPtr plan = SPI_prepare("select id from " INDEX_TABLE, 0, NULL);
 
         if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
             elog(ERROR, "%s: SPI_keepplan() failed", __func__);
@@ -121,56 +139,108 @@ void lucy_subsearch_init(void)
     if(unlikely(SPI_execute_plan(snapshotQueryPlan, NULL, NULL, true, 0) != SPI_OK_SELECT))
         elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
-    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
+    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
         elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
 
     char isNullFlag;
 
-    Datum id = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
+    int32_t dbIndexNumber = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
 
     if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
         elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
-    if(unlikely(DatumGetInt32(id) != indexId))
+
+    if(unlikely(dbIndexNumber != indexId))
     {
-        Datum path = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 2, &isNullFlag);
-
-        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-
-        if(unlikely(SPI_execute("select max(id) + 1 from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
-            elog(ERROR, "%s: SPI_execute() failed", __func__);
-
-        if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
-            elog(ERROR, "%s: SPI_execute() failed", __func__);
-
-        char isNullFlag;
-        moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
-
-        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-        SPI_freetuptable(SPI_tuptable);
-
-#if SHOW_STATS
-        if(unlikely(SPI_execute("select count(*) from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
-            elog(ERROR, "%s: SPI_execute() failed", __func__);
-
-        if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
-            elog(ERROR, "%s: SPI_execute() failed", __func__);
-
-        dbSize = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
-
-        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-        SPI_freetuptable(SPI_tuptable);
+#if USE_MOLECULE_INDEX
+        int indexFd = -1;
 #endif
 
-        lucy_set_folder(&lucy, TextDatumGetCString(path));
-        indexId = DatumGetInt32(id);
+        PG_TRY();
+        {
+#if USE_MOLECULE_INDEX
+            if(likely(molIndexAddress != MAP_FAILED))
+            {
+                if(unlikely(munmap(molIndexAddress, molIndexSize) < 0))
+                    elog(ERROR, "%s: munmap() failed", __func__);
+
+                molIndexAddress = MAP_FAILED;
+            }
+
+
+            char *indexFilePath = get_index_path(MOLECULE_INDEX_PREFIX, MOLECULE_INDEX_SUFFIX, dbIndexNumber);
+
+            if((indexFd = open(indexFilePath, O_RDONLY, 0)) == -1)
+                elog(ERROR, "%s: open() failed", __func__);
+
+            struct stat st;
+
+            if(fstat(indexFd, &st) < 0)
+                elog(ERROR, "%s: fstat() failed", __func__);
+
+            molIndexSize = st.st_size;
+
+            if(unlikely((molIndexAddress = mmap(NULL, molIndexSize, PROT_READ, MAP_SHARED, indexFd, 0)) == MAP_FAILED))
+                elog(ERROR, "%s: mmap() failed", __func__);
+
+            if(unlikely(close(indexFd) < 0))
+                elog(ERROR, "%s: close() failed", __func__);
+
+
+            moleculeCount = *((uint64_t *) molIndexAddress);
+            moleculeData = molIndexAddress + (moleculeCount + 1) * sizeof(uint64_t);
+            offsetData = molIndexAddress + sizeof(uint64_t);
+#endif
+
+            if(unlikely(SPI_execute("select max(id) + 1 from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
+                elog(ERROR, "%s: SPI_execute() failed", __func__);
+
+            if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
+                elog(ERROR, "%s: SPI_execute() failed", __func__);
+
+            char isNullFlag;
+            moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
+
+            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+            SPI_freetuptable(SPI_tuptable);
+
+#if SHOW_STATS
+            if(unlikely(SPI_execute("select count(*) from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
+                elog(ERROR, "%s: SPI_execute() failed", __func__);
+
+            if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
+                elog(ERROR, "%s: SPI_execute() failed", __func__);
+
+            dbSize = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
+
+            if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+            SPI_freetuptable(SPI_tuptable);
+#endif
+
+            char *path = get_index_path(LUCY_INDEX_PREFIX, LUCY_INDEX_SUFFIX, dbIndexNumber);
+            lucy_set_folder(&lucy, path);
+            indexId = dbIndexNumber;
+        }
+        PG_CATCH();
+        {
+#if USE_MOLECULE_INDEX
+            if(molIndexAddress != MAP_FAILED)
+                munmap(molIndexAddress, molIndexSize);
+
+            molIndexAddress = MAP_FAILED;
+
+            if(indexFd != -1)
+                close(indexFd);
+#endif
+
+            PG_RE_THROW();
+        }
+        PG_END_TRY();
     }
 
     SPI_finish();
@@ -224,10 +294,12 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 
         info->queryDataPosition = -1;
         info->resultSet = NULL_RESULT_SET;
-        info->table = NULL;
         info->tableRowCount = -1;
         info->tableRowPosition = -1;
         info->foundResults = 0;
+#if USE_MOLECULE_INDEX == 0
+        info->table = NULL;
+#endif
 
         bitset_init_empty(&info->resultMask, moleculeCount);
 
@@ -236,10 +308,14 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
         info->targetContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx,
                 "subsearch-lucy target context", ALLOCSET_DEFAULT_SIZES);
 
+#if USE_MOLECULE_INDEX
+        info->arrayBuffer = (int32_t *) palloc(FETCH_SIZE * sizeof(int32_t));
+#else
         info->arrayBuffer = (ArrayType *) palloc(FETCH_SIZE * sizeof(int32_t) + ARR_OVERHEAD_NONULLS(1));
         info->arrayBuffer->ndim = 1;
         info->arrayBuffer->dataoffset = 0;
         info->arrayBuffer->elemtype = INT4OID;
+#endif
 
 #if SHOW_STATS
         info->begin = begin;
@@ -269,12 +345,13 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
             {
                 if(unlikely(info->tableRowPosition == info->tableRowCount))
                 {
+#if USE_MOLECULE_INDEX == 0
                     if(info->table != NULL)
                     {
                         MemoryContextDelete(info->table->tuptabcxt);
                         info->table = NULL;
                     }
-
+#endif
 
                     if(!lucy_is_open(&info->resultSet))
                     {
@@ -319,8 +396,11 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
                         PG_MEMCONTEXT_END();
                     }
 
-
+#if USE_MOLECULE_INDEX
+                    int32_t *arrayData = info->arrayBuffer;
+#else
                     int32_t *arrayData = (int32_t *) ARR_DATA_PTR(info->arrayBuffer);
+#endif
 
 #if SHOW_STATS
                     struct timeval get_begin = time_get();
@@ -337,6 +417,8 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 #if SHOW_STATS
                     struct timeval load_begin = time_get();
 #endif
+
+#if USE_MOLECULE_INDEX == 0
                     *(ARR_DIMS(info->arrayBuffer)) = count;
                     SET_VARSIZE(info->arrayBuffer, count * sizeof(int32_t) + ARR_OVERHEAD_NONULLS(1));
 
@@ -356,10 +438,12 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
                         elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
                     info->table = SPI_tuptable;
-                    info->tableRowCount = SPI_processed;
+                    MemoryContextSetParent(SPI_tuptable->tuptabcxt, funcctx->multi_call_memory_ctx);
+#endif
+
+                    info->tableRowCount = count;
                     info->tableRowPosition = 0;
 
-                    MemoryContextSetParent(SPI_tuptable->tuptabcxt, funcctx->multi_call_memory_ctx);
 #if SHOW_STATS
                     struct timeval load_end = time_get();
                     info->matchTime += time_spent(load_begin, load_end);
@@ -370,47 +454,59 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
                 struct timeval match_begin = time_get();
 #endif
 
+#if USE_MOLECULE_INDEX
+                int32_t id = info->arrayBuffer[info->tableRowPosition];
+                uint8_t *molecule = moleculeData + offsetData[id];
+#else
                 TupleDesc tupdesc = info->table->tupdesc;
-                HeapTuple tuple = info->table->vals[info->tableRowPosition++];
+                HeapTuple tuple = info->table->vals[info->tableRowPosition];
                 char isNullFlag;
 
 
-                Datum id = SPI_getbinval(tuple, tupdesc, 1, &isNullFlag);
+                int32_t id = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 1, &isNullFlag));
 
                 if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                     elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
-                Datum molecule = SPI_getbinval(tuple, tupdesc, 2, &isNullFlag);
+                Datum moleculeDatum = SPI_getbinval(tuple, tupdesc, 2, &isNullFlag);
 
                 if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                     elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
-#if SHOW_STATS
-                info->candidateCount++;
+
+                bytea *moleculeData;
+
+                PG_MEMCONTEXT_BEGIN(info->targetContext);
+                moleculeData = DatumGetByteaP(moleculeDatum);
+                PG_MEMCONTEXT_END();
+
+                uint8_t *molecule = (uint8_t *) VARDATA(moleculeData);
 #endif
 
-                bytea *moleculeData = DatumGetByteaP(molecule);
                 bool match;
 
                 PG_MEMCONTEXT_BEGIN(info->targetContext);
                 Molecule target;
-                molecule_init(&target, (uint8_t *) VARDATA(moleculeData), NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
+                molecule_init(&target, molecule, NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
                         info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
-                match = vf2state_match(&info->vf2state, &target, DatumGetInt32(id), info->vf2_timeout);
+                match = vf2state_match(&info->vf2state, &target, id, info->vf2_timeout);
                 PG_MEMCONTEXT_END();
                 MemoryContextReset(info->targetContext);
 
+                info->tableRowPosition++;
+
 #if SHOW_STATS
+                info->candidateCount++;
                 struct timeval match_end = time_get();
                 info->matchTime += time_spent(match_begin, match_end);
 #endif
 
                 if(match)
                 {
-                    bitset_set(&info->resultMask, DatumGetInt32(id));
+                    bitset_set(&info->resultMask, id);
                     info->foundResults++;
-                    result = id;
+                    result = Int32GetDatum(id);
                     isNull = false;
                     break;
                 }

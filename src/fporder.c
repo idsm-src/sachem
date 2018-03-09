@@ -213,13 +213,7 @@ Datum sachem_generate_fporder(PG_FUNCTION_ARGS)
         ExitParallelMode();
 
 
-        Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
-        size_t basePathLength = strlen(DataDir);
-        size_t databaseLength = strlen(database->data);
-
-        char *fporderPath = (char *) palloc(basePathLength +  databaseLength + strlen(ORDER_FILE) + 3);
-        sprintf(fporderPath, "%s/%s/" ORDER_FILE, DataDir, database->data);
-
+        char *fporderPath = get_file_path(ORDER_FILE);
         stats_write(stats, fporderPath, limit);
     }
     PG_CATCH();

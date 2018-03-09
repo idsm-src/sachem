@@ -5,10 +5,15 @@
 #include <utils/memutils.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include "bitset.h"
 #include "common.h"
 #include "isomorphism.h"
 #include "molecule.h"
+#include "molindex.h"
 #include "sachem.h"
 #include "subsearch.h"
 #include "measurement.h"
@@ -39,14 +44,20 @@ typedef struct
     BitSet candidates;
     int candidatePosition;
 
+#if USE_MOLECULE_INDEX == 0
     SPITupleTable *table;
+#endif
     int tableRowCount;
     int tableRowPosition;
 
     Molecule queryMolecule;
     VF2State vf2state;
 
+#if USE_MOLECULE_INDEX
+    int32_t *arrayBuffer;
+#else
     ArrayType *arrayBuffer;
+#endif
     MemoryContext isomorphismContext;
     MemoryContext targetContext;
 
@@ -63,8 +74,8 @@ typedef struct
 
 static bool javaInitialized = false;
 static int indexId = -1;
-static uint64_t *base = MAP_FAILED;
-static size_t length;
+static uint64_t *indexAddress = MAP_FAILED;
+static size_t indexSize;
 static int moleculeCount;
 static BitSet bitmap[FP_SIZE];
 static SPIPlanPtr indexQueryPlan = NULL;
@@ -72,6 +83,13 @@ static SPIPlanPtr mainQueryPlan = NULL;
 
 #if USE_COUNT_FINGERPRINT
 static int16 (*counts)[COUNTS_SIZE];
+#endif
+
+#if USE_MOLECULE_INDEX
+static void *molIndexAddress = MAP_FAILED;
+static size_t molIndexSize;
+static uint8_t *moleculeData;
+static uint64_t *offsetData;
 #endif
 
 #if SHOW_STATS
@@ -95,7 +113,7 @@ static void orchem_subsearch_init(void)
     /* prepare index query plan */
     if(unlikely(indexQueryPlan == NULL))
     {
-        SPIPlanPtr plan = SPI_prepare("select id, path from " INDEX_TABLE, 0, NULL);
+        SPIPlanPtr plan = SPI_prepare("select id from " INDEX_TABLE, 0, NULL);
 
         if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
             elog(ERROR, "%s: SPI_keepplan() failed", __func__);
@@ -120,46 +138,82 @@ static void orchem_subsearch_init(void)
     if(unlikely(SPI_execute_plan(indexQueryPlan, NULL, NULL, true, 0) != SPI_OK_SELECT))
         elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
-    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
+    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
         elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
 
     char isNullFlag;
 
-    Datum id = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
+    int32_t dbIndexNumber = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
 
     if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
         elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
-    if(unlikely(DatumGetInt32(id) != indexId))
+    if(unlikely(dbIndexNumber != indexId))
     {
-        if(likely(base != MAP_FAILED))
-        {
-            if(unlikely(munmap(base, length) < 0))
-                elog(ERROR, "%s: munmap() failed", __func__);
-
-            base = MAP_FAILED;
-        }
-
-
-        Datum path = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 2, &isNullFlag);
-
-        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
         int fd = -1;
-        void *address = MAP_FAILED;
-        struct stat st;
+#if USE_MOLECULE_INDEX
+        int indexFd = -1;
+#endif
 
         PG_TRY();
         {
-            if(unlikely((fd = open(TextDatumGetCString(path), O_RDONLY, 0)) < 0))
+#if USE_MOLECULE_INDEX
+            if(likely(molIndexAddress != MAP_FAILED))
+            {
+                if(unlikely(munmap(molIndexAddress, molIndexSize) < 0))
+                    elog(ERROR, "%s: munmap() failed", __func__);
+
+                molIndexAddress = MAP_FAILED;
+            }
+
+
+            char *moleculeIndexFilePath = get_index_path(MOLECULE_INDEX_PREFIX, MOLECULE_INDEX_SUFFIX, dbIndexNumber);
+
+            if((indexFd = open(moleculeIndexFilePath, O_RDONLY, 0)) == -1)
                 elog(ERROR, "%s: open() failed", __func__);
+
+            struct stat indexSt;
+
+            if(fstat(indexFd, &indexSt) < 0)
+                elog(ERROR, "%s: fstat() failed", __func__);
+
+            molIndexSize = indexSt.st_size;
+
+            if(unlikely((molIndexAddress = mmap(NULL, molIndexSize, PROT_READ, MAP_SHARED, indexFd, 0)) == MAP_FAILED))
+                elog(ERROR, "%s: mmap() failed", __func__);
+
+            if(unlikely(close(indexFd) < 0))
+                elog(ERROR, "%s: close() failed", __func__);
+
+
+            moleculeCount = *((uint64_t *) molIndexAddress);
+            moleculeData = molIndexAddress + (moleculeCount + 1) * sizeof(uint64_t);
+            offsetData = molIndexAddress + sizeof(uint64_t);
+#endif
+
+            if(likely(indexAddress != MAP_FAILED))
+            {
+                if(unlikely(munmap(indexAddress, indexSize) < 0))
+                    elog(ERROR, "%s: munmap() failed", __func__);
+
+                indexAddress = MAP_FAILED;
+            }
+
+
+            char *indexFilePath = get_index_path(ORCHEM_INDEX_PREFIX, ORCHEM_INDEX_SUFFIX, dbIndexNumber);
+
+            if(unlikely((fd = open(indexFilePath, O_RDONLY, 0)) < 0))
+                elog(ERROR, "%s: open() failed", __func__);
+
+            struct stat st;
 
             if(fstat(fd, &st) < 0)
                 elog(ERROR, "%s: fstat() failed", __func__);
 
-            if(unlikely((address = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0)) == MAP_FAILED))
+            indexSize = st.st_size;
+
+            if(unlikely((indexAddress = mmap(NULL, indexSize, PROT_READ, MAP_SHARED, fd, 0)) == MAP_FAILED))
                 elog(ERROR, "%s: mmap() failed", __func__);
 
             if(unlikely(close(fd) < 0))
@@ -167,8 +221,18 @@ static void orchem_subsearch_init(void)
         }
         PG_CATCH();
         {
-            if(address != MAP_FAILED)
-                munmap(address, st.st_size);
+#if USE_MOLECULE_INDEX
+            if(molIndexAddress != MAP_FAILED)
+                munmap(molIndexAddress, molIndexSize);
+
+            molIndexAddress = MAP_FAILED;
+
+            if(indexFd != -1)
+                close(indexFd);
+#endif
+
+            if(indexAddress != MAP_FAILED)
+                munmap(indexAddress, indexSize);
 
             if(fd != -1)
                 close(fd);
@@ -177,18 +241,16 @@ static void orchem_subsearch_init(void)
         }
         PG_END_TRY();
 
-        base = address;
-        length = st.st_size;
-        moleculeCount = *(base + FP_SIZE);
+        moleculeCount = *(indexAddress + FP_SIZE);
 
         for(int i = 0; i < FP_SIZE; i++)
         {
-            uint64_t *address = base + base[i];
+            uint64_t *address = indexAddress + indexAddress[i];
             bitset_init(bitmap + i, address + 1, *address);
         }
 
 #if USE_COUNT_FINGERPRINT
-        counts = (int16 (*)[COUNTS_SIZE]) (base + FP_SIZE + 1);
+        counts = (int16 (*)[COUNTS_SIZE]) (indexAddress + FP_SIZE + 1);
 #endif
 
 #if SHOW_STATS
@@ -206,7 +268,7 @@ static void orchem_subsearch_init(void)
         SPI_freetuptable(SPI_tuptable);
 #endif
 
-        indexId = DatumGetInt32(id);
+        indexId = dbIndexNumber;
     }
 
     SPI_finish();
@@ -259,10 +321,12 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
         info->queryDataPosition = -1;
         info->candidatePosition = -1;
-        info->table = NULL;
         info->tableRowCount = -1;
         info->tableRowPosition = -1;
         info->foundResults = 0;
+#if USE_MOLECULE_INDEX == 0
+        info->table = NULL;
+#endif
 
         bitset_init_alloc(&info->candidates, moleculeCount);
         bitset_init_setted(&info->resultMask, moleculeCount);
@@ -272,10 +336,14 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
         info->targetContext = AllocSetContextCreate(funcctx->multi_call_memory_ctx,
                 "subsearch target context", ALLOCSET_DEFAULT_SIZES);
 
+#if USE_MOLECULE_INDEX
+        info->arrayBuffer = (int32_t *) palloc(FETCH_SIZE * sizeof(int32_t));
+#else
         info->arrayBuffer = (ArrayType *) palloc(FETCH_SIZE * sizeof(int32_t) + ARR_OVERHEAD_NONULLS(1));
         info->arrayBuffer->ndim = 1;
         info->arrayBuffer->dataoffset = 0;
         info->arrayBuffer->elemtype = INT4OID;
+#endif
 
 #if SHOW_STATS
         info->begin = begin;
@@ -303,11 +371,13 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
         {
             if(unlikely(info->tableRowPosition == info->tableRowCount))
             {
+#if USE_MOLECULE_INDEX == 0
                 if(info->table != NULL)
                 {
                     MemoryContextDelete(info->table->tuptabcxt);
                     info->table = NULL;
                 }
+#endif
 
                 if(info->candidatePosition < 0)
                 {
@@ -355,7 +425,12 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                 }
 
 
+#if USE_MOLECULE_INDEX
+                int32_t *arrayData = info->arrayBuffer;
+#else
                 int32_t *arrayData = (int32_t *) ARR_DATA_PTR(info->arrayBuffer);
+#endif
+
                 OrchemSubstructureQueryData *data = &(info->queryData[info->queryDataPosition]);
 
                 size_t count = 0;
@@ -394,6 +469,8 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 #if SHOW_STATS
                 struct timeval load_begin = time_get();
 #endif
+
+#if USE_MOLECULE_INDEX == 0
                 *(ARR_DIMS(info->arrayBuffer)) = count;
                 SET_VARSIZE(info->arrayBuffer, count * sizeof(int32_t) + ARR_OVERHEAD_NONULLS(1));
 
@@ -413,10 +490,12 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                     elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
                 info->table = SPI_tuptable;
-                info->tableRowCount = SPI_processed;
+                MemoryContextSetParent(SPI_tuptable->tuptabcxt, funcctx->multi_call_memory_ctx);
+#endif
+
+                info->tableRowCount = count;
                 info->tableRowPosition = 0;
 
-                MemoryContextSetParent(SPI_tuptable->tuptabcxt, funcctx->multi_call_memory_ctx);
 #if SHOW_STATS
                 struct timeval load_end = time_get();
                 info->matchTime += time_spent(load_begin, load_end);
@@ -427,53 +506,65 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
             struct timeval match_begin = time_get();
 #endif
 
+#if USE_MOLECULE_INDEX
+            int32_t seqid = info->arrayBuffer[info->tableRowPosition];
+            int32_t id =  *((int32_t *) (moleculeData + offsetData[seqid]));
+            uint8_t *molecule = moleculeData + offsetData[seqid] + sizeof(int32_t);
+#else
             TupleDesc tupdesc = info->table->tupdesc;
-            HeapTuple tuple = info->table->vals[info->tableRowPosition++];
+            HeapTuple tuple = info->table->vals[info->tableRowPosition];
             char isNullFlag;
 
 
-            Datum id = SPI_getbinval(tuple, tupdesc, 1, &isNullFlag);
+            int32_t id = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 1, &isNullFlag));
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                 elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
-            Datum seqid = SPI_getbinval(tuple, tupdesc, 2, &isNullFlag);
+            int32_t seqid = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 2, &isNullFlag));
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                 elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
 
-            Datum molecule = SPI_getbinval(tuple, tupdesc, 3, &isNullFlag);
+            Datum moleculeDatum = SPI_getbinval(tuple, tupdesc, 3, &isNullFlag);
 
             if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                 elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
-#if SHOW_STATS
-            info->candidateCount++;
+            bytea *moleculeData;
+
+            PG_MEMCONTEXT_BEGIN(info->targetContext);
+            moleculeData = DatumGetByteaP(moleculeDatum);
+            PG_MEMCONTEXT_END();
+
+            uint8_t *molecule = (uint8_t *) VARDATA(moleculeData);
 #endif
 
-            bytea *moleculeData = DatumGetByteaP(molecule);
             bool match;
 
             PG_MEMCONTEXT_BEGIN(info->targetContext);
             Molecule target;
-            molecule_init(&target, (uint8_t *) VARDATA(moleculeData), NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
+            molecule_init(&target, molecule, NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
                     info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
-            match = vf2state_match(&info->vf2state, &target, DatumGetInt32(id), info->vf2_timeout);
+            match = vf2state_match(&info->vf2state, &target, id, info->vf2_timeout);
             PG_MEMCONTEXT_END();
             MemoryContextReset(info->targetContext);
 
+            info->tableRowPosition++;
+
 #if SHOW_STATS
+            info->candidateCount++;
             struct timeval match_end = time_get();
             info->matchTime += time_spent(match_begin, match_end);
 #endif
 
             if(match)
             {
-                bitset_unset(&info->resultMask, DatumGetInt32(seqid));
+                bitset_unset(&info->resultMask, seqid);
                 info->foundResults++;
-                result = id;
+                result = Int32GetDatum(id);
                 isNull = false;
                 break;
             }

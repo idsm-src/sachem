@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include "common.h"
 #include "molecule.h"
+#include "molindex.h"
 #include "sachem.h"
 #include "lucy.h"
 #include "java/parse.h"
@@ -168,46 +169,31 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
     int indexNumber = 0;
     char *oldIndexPath = NULL;
 
-    if(unlikely(SPI_exec("select id, path from " INDEX_TABLE, 0) != SPI_OK_SELECT))
+    if(unlikely(SPI_exec("select id from " INDEX_TABLE, 0) != SPI_OK_SELECT))
         elog(ERROR, "%s: SPI_exec() failed", __func__);
 
     if(SPI_processed != 0)
     {
-        if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
+        if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
             elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
-        Datum number = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
+        int32_t number = DatumGetInt32(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
 
         if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE) || isNullFlag)
             elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
-        indexNumber = DatumGetInt32(number) + 1;
-
-
-        Datum path = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 2, &isNullFlag);
-
-        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE) || isNullFlag)
-            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-        oldIndexPath = TextDatumGetCString(path);
+        indexNumber = number + 1;
+        oldIndexPath = get_index_path(LUCY_INDEX_PREFIX, LUCY_INDEX_SUFFIX, number);
     }
 
-    Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
-    size_t basePathLength = strlen(DataDir);
-    size_t databaseLength = strlen(database->data);
 
     int countOfProcessors = sysconf(_SC_NPROCESSORS_ONLN);
 
-    char *indexPath = (char *) palloc(basePathLength +  databaseLength + 64);
-    sprintf(indexPath, "%s/%s/lucy-%i", DataDir, database->data, indexNumber);
-
+    char *indexPath = get_index_path(LUCY_INDEX_PREFIX, LUCY_INDEX_SUFFIX, indexNumber);
     char *subindexPath[countOfProcessors];
 
     for(int p = 0; p < countOfProcessors; p++)
-    {
-        subindexPath[p] = (char *) palloc(basePathLength +  databaseLength + 64);
-        sprintf(subindexPath[p], "%s/%s/lucy-%i.%i", DataDir, database->data, indexNumber, p);
-    }
+        subindexPath[p] = get_subindex_path(LUCY_INDEX_PREFIX, LUCY_INDEX_SUFFIX, indexNumber, p);
 
 
     lucy_link_directory(oldIndexPath, indexPath);
@@ -216,8 +202,8 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
     if(unlikely(SPI_exec("delete from " INDEX_TABLE, 0) != SPI_OK_DELETE))
         elog(ERROR, "%s: SPI_exec() failed", __func__);
 
-    if(SPI_execute_with_args("insert into " INDEX_TABLE " (id, path) values ($1,$2)", 2, (Oid[]) { INT4OID, TEXTOID },
-            (Datum[]) {Int32GetDatum(indexNumber), CStringGetTextDatum(indexPath)}, NULL, false, 0) != SPI_OK_INSERT)
+    if(SPI_execute_with_args("insert into " INDEX_TABLE " (id) values ($1)", 1, (Oid[]) { INT4OID },
+            (Datum[]) {Int32GetDatum(indexNumber)}, NULL, false, 0) != SPI_OK_INSERT)
         elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
 
@@ -494,6 +480,10 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
             lucy_optimize(&lucy);
 
         lucy_commit(&lucy);
+
+#if USE_MOLECULE_INDEX
+        sachem_generate_molecule_index(indexNumber, false);
+#endif
     }
     PG_CATCH();
     {

@@ -10,6 +10,7 @@ libsachem_la_LIBADD = -llucy -lclownfish
 libsachem_la_SOURCES = \
 		isomorphism.c \
 		fporder.c \
+        molindex.c \
         sachem.c \
         stats.cpp \
         fingerprints/fingerprint.cpp \
@@ -37,6 +38,7 @@ EXTRA_DIST = \
         isomorphism.h \
         measurement.h \
         molecule.h \
+        molindex.h \
         sachem.h \
         stats.h \
         subsearch.h \

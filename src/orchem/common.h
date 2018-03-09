@@ -2,10 +2,13 @@
 #define ORCHEM_COMMON_H_
 
 
+#define USE_MOLECULE_INDEX      1
 #define USE_COUNT_FINGERPRINT   1
 #define FP_SIZE                 788
 #define EXTFP_SIZE              907
 #define COUNTS_SIZE             13
+#define ORCHEM_INDEX_PREFIX     "orchem_substructure_index"
+#define ORCHEM_INDEX_SUFFIX     ".idx"
 #define COMPOUNDS_TABLE         "compounds"
 #define AUDIT_TABLE             "sachem_compound_audit"
 #define INDEX_TABLE             "sachem_index"
