@@ -6,16 +6,17 @@
 #include <limits.h>
 #include "sachem.h"
 
-#define Q_ATOM_NUMBER   (-'Q')
-#define M_ATOM_NUMBER   (-'M')
-#define X_ATOM_NUMBER   (-'X')
-#define H_ATOM_NUMBER        1
-#define C_ATOM_NUMBER        6
+#define Q_ATOM_NUMBER           ((int8_t) -'Q')
+#define M_ATOM_NUMBER           ((int8_t) -'M')
+#define X_ATOM_NUMBER           ((int8_t) -'X')
+#define H_ATOM_NUMBER           1
+#define C_ATOM_NUMBER           6
+#define MAX_ATOM_IDX            INT16_MAX
 
-#define BOND_LIST_BASE_SIZE 16
-#define BOND_BLOCK_SIZE      4
-#define HBOND_BLOCK_SIZE     2
-#define SPECIAL_BLOCK_SIZE   3
+#define BOND_LIST_BASE_SIZE     16
+#define BOND_BLOCK_SIZE         4
+#define HBOND_BLOCK_SIZE        2
+#define SPECIAL_BLOCK_SIZE      3
 
 
 enum BondType
@@ -62,24 +63,29 @@ enum BondStereoType
 };
 
 
+typedef int16_t AtomIdx;
+typedef int16_t BondIdx;
+typedef int16_t MolSize;
+
+
 typedef struct Molecule
 {
     int atomCount;
     int bondCount;
-    uint8_t *restrict atomNumbers;
+    int8_t *restrict atomNumbers;
     uint8_t *restrict atomHydrogens;
     int8_t *restrict atomCharges;
-    uint8_t *restrict atomMasses;
+    int8_t *restrict atomMasses;
     uint8_t *restrict atomStereo;
     uint8_t *restrict bondTypes;
     uint8_t *restrict bondStereo;
     bool *restrict restH;
 
-    int *restrict bondMatrix;
-    int *restrict bondLists;
-    int *restrict bondListSizes;
+    BondIdx *restrict bondMatrix;
+    AtomIdx *restrict bondLists;
+    MolSize *restrict bondListSizes;
 
-    int (*restrict contains)[2];
+    AtomIdx (*restrict contains)[2];
 } Molecule;
 
 
@@ -113,19 +119,19 @@ inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *r
 
         if(restH != NULL)
         {
-            bool *extendedRestH = (bool *) palloc0(atomCount * sizeof(bool));
-            memcpy(extendedRestH, restH, heavyAtomCount * sizeof(bool));
+            bool *extendedRestH = (bool *) palloc0((size_t) atomCount * sizeof(bool));
+            memcpy(extendedRestH, restH, (size_t) heavyAtomCount * sizeof(bool));
             restH = extendedRestH;
         }
     }
 
-    uint8_t *atomNumbers = (uint8_t *) palloc(atomCount);
-    uint8_t *atomHydrogens = (uint8_t *) palloc0(atomCount);
-    uint8_t *bondTypes = (uint8_t *) palloc(bondCount);
-    int8_t  *atomCharges = withCharges ? (int8_t *) palloc0(atomCount) : NULL;
-    uint8_t *atomMasses = withIsotopes ? (uint8_t *) palloc0(atomCount) : NULL;
-    uint8_t *atomStereo = withStereo ? (uint8_t *) palloc0(atomCount) : NULL;
-    uint8_t *bondStereo = withStereo ? (uint8_t *) palloc0(bondCount) : NULL;
+    int8_t *atomNumbers = (int8_t *) palloc((size_t) atomCount);
+    uint8_t *atomHydrogens = (uint8_t *) palloc0((size_t) atomCount);
+    uint8_t *bondTypes = (uint8_t *) palloc((size_t) bondCount);
+    int8_t  *atomCharges = withCharges ? (int8_t *) palloc0((size_t) atomCount) : NULL;
+    int8_t *atomMasses = withIsotopes ? (int8_t *) palloc0((size_t) atomCount) : NULL;
+    uint8_t *atomStereo = withStereo ? (uint8_t *) palloc0((size_t) atomCount) : NULL;
+    uint8_t *bondStereo = withStereo ? (uint8_t *) palloc0((size_t) bondCount) : NULL;
 
     molecule->atomCount = atomCount;
     molecule->bondCount = bondCount;
@@ -138,14 +144,14 @@ inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *r
     molecule->bondStereo = bondStereo;
     molecule->restH = restH;
 
-    molecule->bondLists = (int *) palloc(BOND_LIST_BASE_SIZE * atomCount * sizeof(int));
-    molecule->bondListSizes = (int *) palloc0(atomCount * sizeof(int));
-    molecule->contains = (int (*)[2]) palloc(bondCount * 2 * sizeof(int));
-    molecule->bondMatrix = (int *) palloc(atomCount * atomCount * sizeof(int));
+    molecule->bondLists = (AtomIdx *) palloc(BOND_LIST_BASE_SIZE * (size_t) atomCount * sizeof(AtomIdx));
+    molecule->bondListSizes = (MolSize *) palloc0((size_t) atomCount * sizeof(MolSize));
+    molecule->contains = (AtomIdx (*)[2]) palloc((size_t) bondCount * 2 * sizeof(AtomIdx));
+    molecule->bondMatrix = (BondIdx *) palloc((size_t) atomCount * (size_t) atomCount * sizeof(BondIdx));
 
 
     for(int i = 0; i < xAtomCount; i++)
-        atomNumbers[i] = data[i];
+        atomNumbers[i] = (int8_t) data[i];
 
     for(int i = xAtomCount; i < heavyAtomCount; i++)
         atomNumbers[i] = C_ATOM_NUMBER;
@@ -159,7 +165,7 @@ inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *r
     for(int i = 0; i < atomCount * atomCount; i++)
         molecule->bondMatrix[i] = -1;
 
-    int boundIdx = 0;
+    BondIdx boundIdx = 0;
 
     for(int i = 0; i < xBondCount; i++)
     {
@@ -171,8 +177,8 @@ inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *r
         int b1 = data[offset + 1];
         int b2 = data[offset + 2];
 
-        int x = b0 | (b1 << 4 & 0xF00);
-        int y = b2 | (b1 << 8 & 0xF00);
+        AtomIdx x = (AtomIdx) (b0 | (b1 << 4 & 0xF00));
+        AtomIdx y = (AtomIdx) (b2 | (b1 << 8 & 0xF00));
 
         if(x >= heavyAtomCount && y < atomCount)
             atomHydrogens[y]++;
@@ -218,7 +224,7 @@ inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *r
         }
 
 
-        int idx = value & 0xFFF;
+        AtomIdx idx = value & 0xFFF;
 
         if(idx < atomCount)
             atomHydrogens[idx]++;
@@ -226,12 +232,12 @@ inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *r
 
         if(extended)
         {
-            int idy = heavyAtomCount + i;
+            AtomIdx idy = (AtomIdx) (heavyAtomCount + i);
 
             if(idx >= heavyAtomCount)
                 atomHydrogens[idy]++;
 
-            bondTypes[boundIdx] = data[offset] >> 4;
+            bondTypes[boundIdx] = (uint8_t ) (data[offset] >> 4);
 
 
             molecule->bondLists[idx * BOND_LIST_BASE_SIZE + molecule->bondListSizes[idx]++] = idy;
@@ -268,7 +274,7 @@ inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *r
 
             case RECORD_ISOTOPE:
                 if(withIsotopes && idx < atomCount)
-                    atomMasses[idx] = data[offset + 2];
+                    atomMasses[idx] = (int8_t) data[offset + 2];
                 break;
 
             case RECORD_TETRAHEDRAL_STEREO:
@@ -329,16 +335,16 @@ inline void molecule_simple_init(Molecule *const molecule, const uint8_t *data)
     molecule->atomCount = atomCount;
     molecule->bondCount = bondCount;
 
-    molecule->atomNumbers = (uint8_t *) palloc(atomCount);
-    molecule->bondTypes = (uint8_t *) palloc(bondCount);
-    molecule->bondLists = (int *) palloc(BOND_LIST_BASE_SIZE * atomCount * sizeof(int));
-    molecule->bondListSizes = (int *) palloc0(atomCount * sizeof(int));
-    molecule->contains = (int (*)[2]) palloc(bondCount * 2 * sizeof(int));
-    molecule->bondMatrix = (int *) palloc(atomCount * atomCount * sizeof(int));
+    molecule->atomNumbers = (int8_t *) palloc((size_t) atomCount);
+    molecule->bondTypes = (uint8_t *) palloc((size_t) bondCount);
+    molecule->bondLists = (AtomIdx *) palloc(BOND_LIST_BASE_SIZE * (size_t) atomCount * sizeof(AtomIdx));
+    molecule->bondListSizes = (MolSize *) palloc0((size_t) atomCount * sizeof(MolSize));
+    molecule->contains = (AtomIdx (*)[2]) palloc((size_t) bondCount * 2 * sizeof(AtomIdx));
+    molecule->bondMatrix = (BondIdx *) palloc((size_t) atomCount * (size_t) atomCount * sizeof(BondIdx));
 
 
     for(int i = 0; i < xAtomCount; i++)
-        molecule->atomNumbers[i] = data[i];
+        molecule->atomNumbers[i] = (int8_t) data[i];
 
     for(int i = xAtomCount; i < atomCount; i++)
         molecule->atomNumbers[i] = C_ATOM_NUMBER;
@@ -349,7 +355,7 @@ inline void molecule_simple_init(Molecule *const molecule, const uint8_t *data)
     for(int i = 0; i < atomCount * atomCount; i++)
         molecule->bondMatrix[i] = -1;
 
-    int boundIdx = 0;
+    BondIdx boundIdx = 0;
 
     for(int i = 0; i < xBondCount; i++)
     {
@@ -361,8 +367,8 @@ inline void molecule_simple_init(Molecule *const molecule, const uint8_t *data)
         int b1 = data[offset + 1];
         int b2 = data[offset + 2];
 
-        int x = b0 | (b1 << 4 & 0xF00);
-        int y = b2 | (b1 << 8 & 0xF00);
+        AtomIdx x = (AtomIdx) (b0 | (b1 << 4 & 0xF00));
+        AtomIdx y = (AtomIdx) (b2 | (b1 << 8 & 0xF00));
 
         if(x >= atomCount || y >= atomCount)
         {
@@ -491,21 +497,21 @@ inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, 
 }
 
 
-inline bool molecule_is_pseudo_atom(const Molecule *const restrict molecule, int i)
+inline bool molecule_is_pseudo_atom(const Molecule *const restrict molecule, AtomIdx i)
 {
-    return ((int8_t) molecule->atomNumbers[i]) < 0;
+    return molecule->atomNumbers[i] < 0;
 }
 
 
-inline int8_t molecule_get_atom_number(const Molecule *const restrict molecule, int i)
+inline int8_t molecule_get_atom_number(const Molecule *const restrict molecule, AtomIdx i)
 {
     return molecule->atomNumbers[i];
 }
 
 
-inline bool molecule_is_metal(const Molecule *const restrict molecule, int i)
+inline bool molecule_is_metal(const Molecule *const restrict molecule, AtomIdx i)
 {
-    int number = molecule_get_atom_number(molecule, i);
+    int8_t number = molecule_get_atom_number(molecule, i);
 
     return  (number > 2 && number < 5) || (number > 10 && number < 14) ||
             (number > 18 && number < 32) || (number > 36 && number < 51) ||
@@ -513,39 +519,39 @@ inline bool molecule_is_metal(const Molecule *const restrict molecule, int i)
 }
 
 
-inline bool molecule_is_halogen(const Molecule *const restrict molecule, int i)
+inline bool molecule_is_halogen(const Molecule *const restrict molecule, AtomIdx i)
 {
-    int number = molecule_get_atom_number(molecule, i);
+    int8_t number = molecule_get_atom_number(molecule, i);
 
     return number == 9 || number == 17 || number == 35 || number == 53 || number == 85;
 }
 
 
-inline uint8_t molecule_get_hydrogen_count(const Molecule *const restrict molecule, int i)
+inline uint8_t molecule_get_hydrogen_count(const Molecule *const restrict molecule, AtomIdx i)
 {
     return molecule->atomHydrogens[i];
 }
 
 
-inline int8_t molecule_get_formal_charge(const Molecule *const restrict molecule, int i)
+inline int8_t molecule_get_formal_charge(const Molecule *const restrict molecule, AtomIdx i)
 {
     return molecule->atomCharges[i];
 }
 
 
-inline int8_t molecule_get_atom_mass(const Molecule *const restrict molecule, int i)
+inline int8_t molecule_get_atom_mass(const Molecule *const restrict molecule, AtomIdx i)
 {
     return molecule->atomMasses[i];
 }
 
 
-inline int *molecule_get_bond_list(const Molecule *const restrict molecule, int i)
+inline AtomIdx *molecule_get_bond_list(const Molecule *const restrict molecule, AtomIdx i)
 {
     return molecule->bondLists + i * BOND_LIST_BASE_SIZE;
 }
 
 
-inline int molecule_get_bond_list_size(const Molecule *const restrict molecule, int i)
+inline MolSize molecule_get_bond_list_size(const Molecule *const restrict molecule, AtomIdx i)
 {
     return molecule->bondListSizes[i];
 }
@@ -557,25 +563,25 @@ inline bool molecule_has_restH_flags(const Molecule *const restrict molecule)
 }
 
 
-inline bool molecule_get_atom_restH_flag(const Molecule *const restrict molecule, int i)
+inline bool molecule_get_atom_restH_flag(const Molecule *const restrict molecule, AtomIdx i)
 {
     return molecule->restH[i];
 }
 
 
-inline int *molecule_bond_atoms(const Molecule *const restrict molecule, int b)
+inline AtomIdx *molecule_bond_atoms(const Molecule *const restrict molecule, BondIdx b)
 {
     return molecule->contains[b];
 }
 
 
-inline bool molecule_bond_contains(const Molecule *const restrict molecule, int b, int i)
+inline bool molecule_bond_contains(const Molecule *const restrict molecule, BondIdx b, AtomIdx i)
 {
     return molecule->contains[b][0] == i || molecule->contains[b][1] == i;
 }
 
 
-inline int molecule_get_bond_connected_atom(const Molecule *const restrict molecule, int b, int i)
+inline AtomIdx molecule_get_bond_connected_atom(const Molecule *const restrict molecule, BondIdx b, AtomIdx i)
 {
     if(molecule->contains[b][0] == i)
         return molecule->contains[b][1];
@@ -585,12 +591,12 @@ inline int molecule_get_bond_connected_atom(const Molecule *const restrict molec
 }
 
 
-inline int molecule_get_atom_connected_bond(const Molecule *const restrict molecule, int i, int b)
+inline AtomIdx molecule_get_atom_connected_bond(const Molecule *const restrict molecule, AtomIdx i, AtomIdx b)
 {
     if(molecule_get_bond_list_size(molecule, i) != 2)
         return -1;
 
-    int *bonds = molecule_get_bond_list(molecule, i);
+    AtomIdx *bonds = molecule_get_bond_list(molecule, i);
 
     if(bonds[0] == b)
         return bonds[1];
@@ -601,74 +607,69 @@ inline int molecule_get_atom_connected_bond(const Molecule *const restrict molec
 }
 
 
-inline int molecule_get_bond(const Molecule *const restrict molecule, int i, int j)
+inline BondIdx molecule_get_bond(const Molecule *const restrict molecule, AtomIdx i, AtomIdx j)
 {
     return molecule->bondMatrix[i * molecule->atomCount + j];
 }
 
 
-inline uint8_t molecule_get_bond_type(const Molecule *const restrict molecule, int b)
+inline uint8_t molecule_get_bond_type(const Molecule *const restrict molecule, BondIdx b)
 {
     return molecule->bondTypes[b];
 }
 
 
-inline uint8_t molecule_get_atom_stereo(const Molecule *const restrict molecule, int i)
+inline uint8_t molecule_get_atom_stereo(const Molecule *const restrict molecule, AtomIdx i)
 {
     return molecule->atomStereo[i];
 }
 
 
-inline uint8_t molecule_get_bond_stereo(const Molecule *const restrict molecule, int i)
+inline uint8_t molecule_get_bond_stereo(const Molecule *const restrict molecule, BondIdx i)
 {
     return molecule->bondStereo[i];
 }
 
 
-inline int molecule_get_last_stereo_bond_ligand(const Molecule *const restrict molecule, int atom, int bond, int ligand)
+inline AtomIdx molecule_get_last_stereo_bond_ligand(const Molecule *const restrict molecule, AtomIdx atom, BondIdx bond, AtomIdx ligand)
 {
-    int listSize = molecule_get_bond_list_size(molecule, atom);
+    MolSize listSize = molecule_get_bond_list_size(molecule, atom);
 
     if(listSize == 2)
     {
-        return INT_MAX;
+        return MAX_ATOM_IDX;
     }
     else if(listSize == 3)
     {
+        AtomIdx other = molecule_get_bond_connected_atom(molecule, bond, atom);
+
         for(int i = 0; i < 3; i++)
         {
-            int b = molecule_get_bond_list(molecule, atom)[i];
+            AtomIdx a = molecule_get_bond_list(molecule, atom)[i];
 
-            if(b == bond)
-                continue;
-
-            int a = molecule_get_bond_connected_atom(molecule, b, atom);
-
-            if(a == ligand)
-                continue;
-
-            return a;
+            if(a != other && a != ligand)
+                return a;
         }
     }
 
     elog(NOTICE, "unexpected branch: %s: %i", __FILE__, __LINE__);
-    return INT_MAX;
+    return MAX_ATOM_IDX;
 }
 
 
-inline int molecule_get_last_chiral_ligand(const Molecule *const restrict molecule, int centre, int *ligands)
+inline AtomIdx molecule_get_last_chiral_ligand(const Molecule *const restrict molecule, AtomIdx centre, AtomIdx *ligands)
 {
-    int listSize = molecule_get_bond_list_size(molecule, centre);
+    MolSize listSize = molecule_get_bond_list_size(molecule, centre);
 
     if(listSize == 3)
     {
-        return INT_MAX;
+        return MAX_ATOM_IDX;
     }
     else if(listSize == 4)
     {
         for(int i = 0; i < 4; i++)
         {
-            int ligand = molecule_get_bond_list(molecule, centre)[i];
+            AtomIdx ligand = molecule_get_bond_list(molecule, centre)[i];
             bool contains = false;
 
             for(int j = 0; j < 3; j++)
@@ -683,65 +684,65 @@ inline int molecule_get_last_chiral_ligand(const Molecule *const restrict molecu
     {
         for(int i = 0; i < 2; i++)
         {
-            int atom = centre;
-            int bond = molecule_get_bond_list(molecule, centre)[i];
+            AtomIdx atom = centre;
+            AtomIdx bonded = molecule_get_bond_list(molecule, centre)[i];
 
             while(true)
             {
-                atom = molecule_get_bond_connected_atom(molecule, bond, atom);
-                int newListSize = molecule_get_bond_list_size(molecule, atom);
+                MolSize newListSize = molecule_get_bond_list_size(molecule, bonded);
 
                 if(newListSize == 3)
                 {
                     for(int j = 0; j < 3; j++)
                     {
-                        int b = molecule_get_bond_list(molecule, atom)[j];
+                        AtomIdx o = molecule_get_bond_list(molecule, bonded)[j];
 
-                        if(b == bond)
+                        if(o == atom)
                             continue;
 
-                        int a = molecule_get_bond_connected_atom(molecule, b, atom);
-
-                        if(a != ligands[0] && a != ligands[1] && a != ligands[2])
-                            return a;
+                        if(o != ligands[0] && o != ligands[1] && o != ligands[2])
+                            return o;
                     }
 
                     break;
                 }
                 else if(newListSize == 2)
                 {
-                    bond = molecule_get_atom_connected_bond(molecule, atom, bond);
+                    AtomIdx next = molecule_get_atom_connected_bond(molecule, bonded, atom);
 
-                    if(molecule_get_bond_type(molecule, bond) != BOND_DOUBLE)
-                        return INT_MAX;
+                    if(molecule_get_bond_type(molecule, molecule_get_bond(molecule, bonded, next)) != BOND_DOUBLE)
+                        return MAX_ATOM_IDX;
+
+                    atom = bonded;
+                    bonded = next;
                 }
                 else
                 {
                     elog(NOTICE, "unexpected branch: %s: %i", __FILE__, __LINE__);
-                    return INT_MAX;
+                    return MAX_ATOM_IDX;
                 }
             }
         }
     }
 
     elog(NOTICE, "unexpected branch: %s: %i", __FILE__, __LINE__);
-    return INT_MAX;
+    return MAX_ATOM_IDX;
 }
 
 
-inline uint8_t normalize_atom_stereo(int indexes[4], uint8_t stereo)
+inline uint8_t normalize_atom_stereo(AtomIdx indexes[4], uint8_t stereo)
 {
     uint16_t order = 0;
 
     for(int i = 0; i < 4; i++)
     {
-        int value = 0;
+        uint16_t value = 0;
 
         for(int j = 0; j < 4; j++)
             if(indexes[j] <= indexes[i])
                 value++;
 
-        order = (order << 4) + value;
+        order = (uint16_t) ((order << 4) + value);
     }
 
     bool reverse = true;
@@ -753,13 +754,13 @@ inline uint8_t normalize_atom_stereo(int indexes[4], uint8_t stereo)
             reverse = false;
 
     if(reverse)
-        return ~stereo;
+        return (uint8_t) ~stereo;
 
     return stereo;
 }
 
 
-inline uint8_t normalize_bond_stereo(int indexes[4], uint8_t conformation)
+inline uint8_t normalize_bond_stereo(AtomIdx indexes[4], uint8_t conformation)
 {
     bool reverse = false;
 
@@ -770,7 +771,7 @@ inline uint8_t normalize_bond_stereo(int indexes[4], uint8_t conformation)
         reverse = !reverse;
 
     if(reverse)
-        return ~conformation;
+        return (uint8_t) ~conformation;
 
     return conformation;
 }

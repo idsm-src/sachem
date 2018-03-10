@@ -75,8 +75,8 @@ typedef enum
 
 typedef struct
 {
-    int target_selector;
-    int target_idx;
+    AtomIdx target_selector;
+    AtomIdx target_idx;
 } VF2Undo;
 
 
@@ -87,7 +87,7 @@ typedef struct
     IsotopeMode isotopeMode;
     StereoMode stereoMode;
 
-    int targetId;
+    int32_t targetId;
 
     const Molecule *restrict query;
     const Molecule *restrict target;
@@ -95,16 +95,16 @@ typedef struct
     int queryAtomCount;
     int targetAtomCount;
 
-    int *restrict core_query;
-    int *restrict core_target;
+    AtomIdx *restrict core_query;
+    AtomIdx *restrict core_target;
     int core_len;
 
-    int *restrict query_order;
-    int *restrict query_parents;
-    int query_idx;
+    AtomIdx *restrict query_order;
+    AtomIdx *restrict query_parents;
+    AtomIdx query_idx;
 
-    int target_selector;
-    int target_idx;
+    AtomIdx target_selector;
+    AtomIdx target_idx;
 
     VF2Undo *undos;
 } VF2State;
@@ -118,30 +118,30 @@ void vf2_timeout_handler(void);
 #endif
 
 
-inline void swap_int(int *a, int *b)
+inline void swap_idx(AtomIdx *a, AtomIdx *b)
 {
-    int t = *a;
+    AtomIdx t = *a;
     *a = *b;
     *b = t;
 }
 
 
-inline void sort_stereo_atoms(int array[4])
+inline void sort_stereo_atoms(AtomIdx array[4])
 {
     for(int n = 4; n > 0; n--)
         for(int i = 1; i < n; i++)
             if(array[i-1] > array[i])
-                swap_int(array + i, array + i - 1);
+                swap_idx(array + i, array + i - 1);
 }
 
 
-inline void sort_bond_atoms(int array[4])
+inline void sort_bond_atoms(AtomIdx array[4])
 {
     if(array[0] > array[1])
-        swap_int(array + 0, array + 1);
+        swap_idx(array + 0, array + 1);
 
     if(array[2] > array[3])
-        swap_int(array + 2, array + 3);
+        swap_idx(array + 2, array + 3);
 }
 
 
@@ -162,10 +162,10 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
     vf2state->query = query;
     vf2state->queryAtomCount = queryAtomCount;
     vf2state->core_len = 0;
-    vf2state->core_query = (int *) palloc(queryAtomCount * sizeof(int));
-    vf2state->query_order = (int *) palloc(queryAtomCount * sizeof(int));
-    vf2state->query_parents = (int *) palloc(queryAtomCount * sizeof(int));
-    vf2state->undos = (VF2Undo *) palloc(queryAtomCount * sizeof(VF2Undo));
+    vf2state->core_query = (AtomIdx *) palloc((size_t) queryAtomCount * sizeof(AtomIdx));
+    vf2state->query_order = (AtomIdx *) palloc((size_t) queryAtomCount * sizeof(AtomIdx));
+    vf2state->query_parents = (AtomIdx *) palloc((size_t) queryAtomCount * sizeof(AtomIdx));
+    vf2state->undos = (VF2Undo *) palloc((size_t) queryAtomCount * sizeof(VF2Undo));
 
 
     for(int i = 0; i < queryAtomCount; i++)
@@ -178,10 +178,10 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
 
     for(int idx = 0; idx < queryAtomCount; idx++)
     {
-        int selected = -1;
-        int fallback = -1;
+        AtomIdx selected = -1;
+        AtomIdx fallback = -1;
 
-        for(int i = 0; i < queryAtomCount; i++)
+        for(AtomIdx i = 0; i < queryAtomCount; i++)
         {
             if(selected == -1 && query_flags[i] == 1)
             {
@@ -197,14 +197,14 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
             selected = fallback;
 
 
-        int *restrict queryBondList = molecule_get_bond_list(query, selected);
-        int queryBondListSize = molecule_get_bond_list_size(query, selected);
+        AtomIdx *restrict queryBondList = molecule_get_bond_list(query, selected);
+        MolSize queryBondListSize = molecule_get_bond_list_size(query, selected);
 
         query_flags[selected] = 2;
 
         for(int i = 0; i < queryBondListSize; i++)
         {
-            int idx = queryBondList[i];
+            AtomIdx idx = queryBondList[i];
 
             if(query_flags[idx] == 0)
             {
@@ -218,7 +218,7 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
 
 
     if(unlikely(graphMode == GRAPH_EXACT))
-        vf2state->core_target = (int *) palloc(queryAtomCount * sizeof(int));
+        vf2state->core_target = (AtomIdx *) palloc((size_t) queryAtomCount * sizeof(AtomIdx));
 }
 
 
@@ -237,17 +237,17 @@ inline bool vf2state_next_query(VF2State *const restrict vf2state)
 
 inline bool vf2state_next_target(VF2State *const restrict vf2state)
 {
-    int query_parent = vf2state->query_parents[vf2state->query_idx];
+    AtomIdx query_parent = vf2state->query_parents[vf2state->query_idx];
 
     if(likely(query_parent >= 0))
     {
-        int target_parent = vf2state->core_query[query_parent];
-        int *restrict targetBondList = molecule_get_bond_list(vf2state->target, target_parent);
-        int targetBondListSize = molecule_get_bond_list_size(vf2state->target, target_parent);
+        AtomIdx target_parent = vf2state->core_query[query_parent];
+        AtomIdx *restrict targetBondList = molecule_get_bond_list(vf2state->target, target_parent);
+        MolSize targetBondListSize = molecule_get_bond_list_size(vf2state->target, target_parent);
 
         for(vf2state->target_selector++; vf2state->target_selector < targetBondListSize; vf2state->target_selector++)
         {
-            int target_id = targetBondList[vf2state->target_selector];
+            AtomIdx target_id = targetBondList[vf2state->target_selector];
 
             if(!is_core_defined(vf2state->core_target[target_id]))
             {
@@ -269,10 +269,10 @@ inline bool vf2state_next_target(VF2State *const restrict vf2state)
 }
 
 
-inline bool vf2state_atom_matches(const VF2State *const restrict vf2state, int queryAtom, int targetAtom)
+inline bool vf2state_atom_matches(const VF2State *const restrict vf2state, AtomIdx queryAtom, AtomIdx targetAtom)
 {
-    int queryAtomNumber = molecule_get_atom_number(vf2state->query, queryAtom);
-    int targetAtomNumber = molecule_get_atom_number(vf2state->target, targetAtom);
+    int8_t queryAtomNumber = molecule_get_atom_number(vf2state->query, queryAtom);
+    int8_t targetAtomNumber = molecule_get_atom_number(vf2state->target, targetAtom);
 
     if(unlikely(queryAtomNumber == targetAtomNumber))
         return true;
@@ -321,16 +321,16 @@ inline bool vf2state_atom_matches(const VF2State *const restrict vf2state, int q
 }
 
 
-inline bool vf2state_bond_matches(const VF2State *const restrict vf2state, int qIdx1, int qIdx2, int tIdx1, int tIdx2)
+inline bool vf2state_bond_matches(const VF2State *const restrict vf2state, AtomIdx qIdx1, AtomIdx qIdx2, AtomIdx tIdx1, AtomIdx tIdx2)
 {
-    int queryBond = molecule_get_bond(vf2state->query, qIdx1, qIdx2);
-    int targetbond = molecule_get_bond(vf2state->target, tIdx1, tIdx2);
+    BondIdx queryBond = molecule_get_bond(vf2state->query, qIdx1, qIdx2);
+    BondIdx targetbond = molecule_get_bond(vf2state->target, tIdx1, tIdx2);
 
     if(likely(targetbond < 0))
         return false;
 
-    int queryBondType = molecule_get_bond_type(vf2state->query, queryBond);
-    int targetbondType = molecule_get_bond_type(vf2state->target, targetbond);
+    uint8_t queryBondType = molecule_get_bond_type(vf2state->query, queryBond);
+    uint8_t targetbondType = molecule_get_bond_type(vf2state->target, targetbond);
 
     if(likely(queryBondType <= BOND_AROMATIC && targetbondType <= BOND_AROMATIC))
         return queryBondType == targetbondType;
@@ -368,8 +368,8 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
 
     if(vf2state->chargeMode != CHARGE_IGNORE)
     {
-        int queryCharge = molecule_get_formal_charge(vf2state->query, vf2state->query_idx);
-        int targetCharge = molecule_get_formal_charge(vf2state->target, vf2state->target_idx);
+        int8_t queryCharge = molecule_get_formal_charge(vf2state->query, vf2state->query_idx);
+        int8_t targetCharge = molecule_get_formal_charge(vf2state->target, vf2state->target_idx);
 
         if(queryCharge != targetCharge && (queryCharge != 0 || vf2state->chargeMode == CHARGE_DEFAULT_AS_UNCHARGED))
             return false;
@@ -378,8 +378,8 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
 
     if(vf2state->isotopeMode != ISOTOPE_IGNORE)
     {
-        int queryMass = molecule_get_atom_mass(vf2state->query, vf2state->query_idx);
-        int targetMass = molecule_get_atom_mass(vf2state->target, vf2state->target_idx);
+        int8_t queryMass = molecule_get_atom_mass(vf2state->query, vf2state->query_idx);
+        int8_t targetMass = molecule_get_atom_mass(vf2state->target, vf2state->target_idx);
 
         if(queryMass != targetMass && (queryMass != 0 || vf2state->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD))
             return false;
@@ -407,16 +407,16 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
     int newQuery = 0;
     int newTarget = 0;
 
-    int *restrict queryBondList = molecule_get_bond_list(vf2state->query, vf2state->query_idx);
-    int queryBondListSize = molecule_get_bond_list_size(vf2state->query, vf2state->query_idx);
+    AtomIdx *restrict queryBondList = molecule_get_bond_list(vf2state->query, vf2state->query_idx);
+    MolSize queryBondListSize = molecule_get_bond_list_size(vf2state->query, vf2state->query_idx);
 
     for(int i = 0; i < queryBondListSize; i++)
     {
-        int other1 = queryBondList[i];
+        AtomIdx other1 = queryBondList[i];
 
         if(is_core_defined(vf2state->core_query[other1]))
         {
-            int other2 = vf2state->core_query[other1];
+            AtomIdx other2 = vf2state->core_query[other1];
 
             if(!vf2state_bond_matches(vf2state, vf2state->query_idx, other1, vf2state->target_idx, other2))
                 return false;
@@ -428,18 +428,18 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
     }
 
 
-    int *restrict targetBondList = molecule_get_bond_list(vf2state->target, vf2state->target_idx);
-    int targetBondListSize = molecule_get_bond_list_size(vf2state->target, vf2state->target_idx);
+    AtomIdx *restrict targetBondList = molecule_get_bond_list(vf2state->target, vf2state->target_idx);
+    MolSize targetBondListSize = molecule_get_bond_list_size(vf2state->target, vf2state->target_idx);
 
     for(int i = 0; i < targetBondListSize; i++)
     {
-        int other2 = targetBondList[i];
+        AtomIdx other2 = targetBondList[i];
 
         if(is_core_defined(vf2state->core_target[other2]))
         {
             if(unlikely(vf2state->graphMode == GRAPH_EXACT))
             {
-                int other1 = vf2state->core_target[other2];
+                AtomIdx other1 = vf2state->core_target[other2];
 
                 if(!vf2state_bond_matches(vf2state, vf2state->query_idx, other1, vf2state->target_idx, other2))
                     return false;
@@ -494,12 +494,12 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
     int queryBondCount = query->bondCount;
 
 
-    for(int queryAtomIdx = 0; queryAtomIdx < queryAtomCount; queryAtomIdx++)
+    for(AtomIdx queryAtomIdx = 0; queryAtomIdx < queryAtomCount; queryAtomIdx++)
     {
-        int queryStereo = molecule_get_atom_stereo(query, queryAtomIdx);
+        uint8_t queryStereo = molecule_get_atom_stereo(query, queryAtomIdx);
 
-        int targetAtomIdx = vf2state->core_query[queryAtomIdx];
-        int targetStereo = molecule_get_atom_stereo(target, targetAtomIdx);
+        AtomIdx targetAtomIdx = vf2state->core_query[queryAtomIdx];
+        uint8_t targetStereo = molecule_get_atom_stereo(target, targetAtomIdx);
 
         if(queryStereo != TETRAHEDRAL_STEREO_NONE && queryStereo != TETRAHEDRAL_STEREO_UNDEFINED)
         {
@@ -510,19 +510,19 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
                 return false;
 
 
-            int queryAtoms[4];
-            int listSize = molecule_get_bond_list_size(query, queryAtomIdx);
+            AtomIdx queryAtoms[4];
+            MolSize listSize = molecule_get_bond_list_size(query, queryAtomIdx);
 
             for(int i = 0; i < listSize; i++)
                 queryAtoms[i] = molecule_get_bond_list(query, queryAtomIdx)[i];
 
             if(listSize == 3)
-                queryAtoms[3] = INT_MAX;
+                queryAtoms[3] = MAX_ATOM_IDX;
 
             sort_stereo_atoms(queryAtoms);
 
 
-            int targetAtoms[4] = { -1, -1, -1, -1 };
+            AtomIdx targetAtoms[4] = { -1, -1, -1, -1 };
 
             for(int i = 0; i < listSize; i++)
                 targetAtoms[i] = vf2state->core_query[queryAtoms[i]];
@@ -541,15 +541,15 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
     }
 
 
-    for(int queryBondIdx = 0; queryBondIdx < queryBondCount; queryBondIdx++)
+    for(BondIdx queryBondIdx = 0; queryBondIdx < queryBondCount; queryBondIdx++)
     {
-        int queryStereo = molecule_get_bond_stereo(query, queryBondIdx);
+        uint8_t queryStereo = molecule_get_bond_stereo(query, queryBondIdx);
 
-        int *queryBondAtoms = molecule_bond_atoms(query, queryBondIdx);
-        int targetBondAtom0 = vf2state->core_query[queryBondAtoms[0]];
-        int targetBondAtom1 = vf2state->core_query[queryBondAtoms[1]];
-        int targetBondIdx = molecule_get_bond(target, targetBondAtom0, targetBondAtom1);
-        int targetStereo = molecule_get_bond_stereo(target, targetBondIdx);
+        AtomIdx *queryBondAtoms = molecule_bond_atoms(query, queryBondIdx);
+        AtomIdx targetBondAtom0 = vf2state->core_query[queryBondAtoms[0]];
+        AtomIdx targetBondAtom1 = vf2state->core_query[queryBondAtoms[1]];
+        BondIdx targetBondIdx = molecule_get_bond(target, targetBondAtom0, targetBondAtom1);
+        uint8_t targetStereo = molecule_get_bond_stereo(target, targetBondIdx);
 
         if(queryStereo != BOND_STEREO_NONE && queryStereo != BOND_STEREO_UNDEFINED)
         {
@@ -560,10 +560,10 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
                 return false;
 
 
-            int queryAtoms[4];
+            AtomIdx queryAtoms[4];
 
-            int *bondList0 = molecule_get_bond_list(query, queryBondAtoms[0]);
-            int listSize0 = molecule_get_bond_list_size(query, queryBondAtoms[0]);
+            AtomIdx *bondList0 = molecule_get_bond_list(query, queryBondAtoms[0]);
+            MolSize listSize0 = molecule_get_bond_list_size(query, queryBondAtoms[0]);
 
             int idx = 0;
 
@@ -572,31 +572,31 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
                     queryAtoms[idx++] = bondList0[i];
 
             if(listSize0 == 2)
-                queryAtoms[idx++] = INT_MAX;
+                queryAtoms[idx++] = MAX_ATOM_IDX;
 
-            int *bondList1 = molecule_get_bond_list(query, queryBondAtoms[1]);
-            int listSize1 = molecule_get_bond_list_size(query, queryBondAtoms[1]);
+            AtomIdx *bondList1 = molecule_get_bond_list(query, queryBondAtoms[1]);
+            MolSize listSize1 = molecule_get_bond_list_size(query, queryBondAtoms[1]);
 
             for(int i = 0; i < listSize1; i++)
                 if(bondList1[i] != queryBondAtoms[0])
                     queryAtoms[idx++] = bondList1[i];
 
             if(listSize1 == 2)
-                queryAtoms[idx] =  INT_MAX;
+                queryAtoms[idx] = MAX_ATOM_IDX;
 
             sort_bond_atoms(queryAtoms);
 
 
-            int targetAtoms[4] = { -1, -1, -1, -1 };
+            AtomIdx targetAtoms[4] = { -1, -1, -1, -1 };
 
             for(int i = 0; i < 4; i++)
-                if(queryAtoms[i] != INT_MAX)
+                if(queryAtoms[i] != MAX_ATOM_IDX)
                     targetAtoms[i] = vf2state->core_query[queryAtoms[i]];
 
-            if(queryAtoms[1] == INT_MAX)
+            if(queryAtoms[1] == MAX_ATOM_IDX)
                 targetAtoms[1] = molecule_get_last_stereo_bond_ligand(target, targetBondAtom0, targetBondIdx, targetAtoms[0]);
 
-            if(queryAtoms[3] == INT_MAX)
+            if(queryAtoms[3] == MAX_ATOM_IDX)
                 targetAtoms[3] = molecule_get_last_stereo_bond_ligand(target, targetBondAtom1, targetBondIdx, targetAtoms[2]);
 
             if(normalize_bond_stereo(targetAtoms, targetStereo) != queryStereo)
@@ -641,21 +641,21 @@ inline bool vf2state_is_match_valid(const VF2State *const restrict vf2state)
 
     if(molecule_has_restH_flags(query))
     {
-        for(int i = 0; i < queryAtomCount; i++)
+        for(AtomIdx i = 0; i < queryAtomCount; i++)
         {
             if(molecule_get_atom_restH_flag(query, i) == true)
             {
-                int targetAtomIdx = vf2state->core_query[i];
+                AtomIdx targetAtomIdx = vf2state->core_query[i];
 
                 int queryConnectivityCount = 0;
                 int targetConnectivityCount = 0;
 
-                for(int b = 0; b < queryBondCount; b++)
+                for(BondIdx b = 0; b < queryBondCount; b++)
                     if(molecule_bond_contains(query, b, i) &&
                             !(molecule_get_atom_number(query, molecule_get_bond_connected_atom(query, b, i)) == H_ATOM_NUMBER))
                         queryConnectivityCount++;
 
-                for(int b = 0; b < targetBondCount; b++)
+                for(BondIdx b = 0; b < targetBondCount; b++)
                     if(molecule_bond_contains(target, b, targetAtomIdx) &&
                             !(molecule_get_atom_number(target, molecule_get_bond_connected_atom(target, b, targetAtomIdx)) == H_ATOM_NUMBER))
                         targetConnectivityCount++;
@@ -726,7 +726,7 @@ inline bool vf2state_match_core(VF2State *const restrict vf2state)
 }
 
 
-inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *const restrict target, int targetId, int timeout)
+inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *const restrict target, int32_t targetId, int timeout)
 {
     vf2state->targetId = targetId;
 
@@ -748,7 +748,7 @@ inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *co
     vf2state->core_len = 0;
 
     if(likely(vf2state->graphMode != GRAPH_EXACT))
-        vf2state->core_target = (int *) palloc(targetAtomCount * sizeof(int));
+        vf2state->core_target = (AtomIdx *) palloc((size_t) targetAtomCount * sizeof(AtomIdx));
 
     for(int i = 0; i < targetAtomCount; i++)
         vf2state->core_target[i] = UNDEFINED_CORE;

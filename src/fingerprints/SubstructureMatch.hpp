@@ -116,8 +116,8 @@ class SubstructureMatch
                     selected = fallback;
 
 
-                int *queryBondList = molecule_get_bond_list(query, selected);
-                int queryBondListSize = molecule_get_bond_list_size(query, selected);
+                AtomIdx *queryBondList = molecule_get_bond_list(query, selected);
+                MolSize queryBondListSize = molecule_get_bond_list_size(query, selected);
 
                 query_flags[selected] = 2;
 
@@ -158,8 +158,8 @@ class SubstructureMatch
             if(likely(query_parent >= 0))
             {
                 int target_parent = core_query[query_parent];
-                int *targetBondList = molecule_get_bond_list(target, target_parent);
-                int targetBondListSize = molecule_get_bond_list_size(target, target_parent);
+                AtomIdx *targetBondList = molecule_get_bond_list(target, target_parent);
+                MolSize targetBondListSize = molecule_get_bond_list_size(target, target_parent);
 
                 for(target_selector++; target_selector < targetBondListSize; target_selector++)
                 {
@@ -187,8 +187,8 @@ class SubstructureMatch
 
         bool atom_matches(int queryAtom, int targetAtom)
         {
-            int queryAtomNumber = molecule_get_atom_number(query, queryAtom);
-            int targetAtomNumber = molecule_get_atom_number(target, targetAtom);
+            int8_t queryAtomNumber = molecule_get_atom_number(query, queryAtom);
+            int8_t targetAtomNumber = molecule_get_atom_number(target, targetAtom);
 
             return queryAtomNumber == targetAtomNumber;
         }
@@ -196,14 +196,14 @@ class SubstructureMatch
 
         bool bond_matches(int qIdx1, int qIdx2, int tIdx1, int tIdx2)
         {
-            int queryBond = molecule_get_bond(query, qIdx1, qIdx2);
-            int targetbond = molecule_get_bond(target, tIdx1, tIdx2);
+            BondIdx queryBond = molecule_get_bond(query, qIdx1, qIdx2);
+            BondIdx targetbond = molecule_get_bond(target, tIdx1, tIdx2);
 
             if(likely(targetbond < 0))
                 return false;
 
-            int queryBondType = molecule_get_bond_type(query, queryBond);
-            int targetbondType = molecule_get_bond_type(target, targetbond);
+            uint8_t queryBondType = molecule_get_bond_type(query, queryBond);
+            uint8_t targetbondType = molecule_get_bond_type(target, targetbond);
 
             return queryBondType == targetbondType;
         }
@@ -218,8 +218,8 @@ class SubstructureMatch
             int newQuery = 0;
             int newTarget = 0;
 
-            int *queryBondList = molecule_get_bond_list(query, query_idx);
-            int queryBondListSize = molecule_get_bond_list_size(query, query_idx);
+            AtomIdx *queryBondList = molecule_get_bond_list(query, query_idx);
+            MolSize queryBondListSize = molecule_get_bond_list_size(query, query_idx);
 
             for(int i = 0; i < queryBondListSize; i++)
             {
@@ -239,8 +239,8 @@ class SubstructureMatch
             }
 
 
-            int *targetBondList = molecule_get_bond_list(target, target_idx);
-            int targetBondListSize = molecule_get_bond_list_size(target, target_idx);
+            AtomIdx *targetBondList = molecule_get_bond_list(target, target_idx);
+            MolSize targetBondListSize = molecule_get_bond_list_size(target, target_idx);
 
             for(int i = 0; i < targetBondListSize; i++)
             {

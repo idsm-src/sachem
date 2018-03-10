@@ -48,13 +48,13 @@ static inline uint32_t list_hash(uint32_t a, uint32_t b, const C &l)
 }
 
 
-static inline uint32_t bond_hash(const Molecule *molecule, int b)
+static inline uint32_t bond_hash(const Molecule *molecule, BondIdx b)
 {
     return molecule_get_bond_type(molecule, b);
 }
 
 
-static inline uint32_t atom_hash(const Molecule *molecule, int a)
+static inline uint32_t atom_hash(const Molecule *molecule, AtomIdx a)
 {
     return molecule_get_atom_number(molecule, a);
 }
@@ -79,10 +79,10 @@ static bool submol_hash(const std::vector<int> &bondIds, const Molecule *molecul
 
     for(auto &a : preatoms)
     {
-        int aid = a.first;
+        AtomIdx aid = a.first;
 
         // pre-hash the bonds
-        for(int bid : a.second)
+        for(BondIdx bid : a.second)
             bonds[aid][molecule_get_bond_connected_atom(molecule, bid, aid)] = bond_hash(molecule, bid);
 
         atoms[a.second.size()][aid] = AtomDesc(atom_hash(molecule, aid), std::list<uint32_t>());
@@ -227,20 +227,20 @@ static std::vector<std::vector<int>> get_neighbor_list(const Molecule *molecule)
     int nAtoms = molecule->atomCount;
 
     // create a list of neighbors for each bond
-    for(int i = 0; i < nAtoms; i++)
+    for(AtomIdx i = 0; i < nAtoms; i++)
     {
         if(molecule_get_atom_number(molecule, i) <= H_ATOM_NUMBER)
             continue;
 
-        int size = molecule_get_bond_list_size(molecule, i);
-        int *bondedAtoms = molecule_get_bond_list(molecule, i);
+        MolSize size = molecule_get_bond_list_size(molecule, i);
+        AtomIdx *bondedAtoms = molecule_get_bond_list(molecule, i);
 
         for(int l = 0; l < size; l++)
         {
             if(molecule_get_atom_number(molecule, bondedAtoms[l]) <= H_ATOM_NUMBER)
                 continue;
 
-            int bid1 = molecule_get_bond(molecule, i, bondedAtoms[l]);
+            BondIdx bid1 = molecule_get_bond(molecule, i, bondedAtoms[l]);
 
             if(molecule_get_bond_type(molecule, bid1) > BOND_AROMATIC)
                 continue;
@@ -250,7 +250,7 @@ static std::vector<std::vector<int>> get_neighbor_list(const Molecule *molecule)
                 if(molecule_get_atom_number(molecule, bondedAtoms[k]) <= H_ATOM_NUMBER)
                     continue;
 
-                int bid2 = molecule_get_bond(molecule, i, bondedAtoms[k]);
+                BondIdx bid2 = molecule_get_bond(molecule, i, bondedAtoms[k]);
 
                 if(molecule_get_bond_type(molecule, bid2) > BOND_AROMATIC)
                     continue;
@@ -326,7 +326,7 @@ static PathList find_subgraphs(const Molecule *molecule, uint lowerLen, uint upp
     PathList res;
 
     // start paths at each bond:
-    for(int i = 0; i < molecule->bondCount; i++)
+    for(BondIdx i = 0; i < molecule->bondCount; i++)
     {
         if(molecule_get_bond_type(molecule, i) > BOND_AROMATIC)
             continue;
@@ -388,19 +388,19 @@ static void add_molecule_fp(const Molecule *molecule, std::map<uint32_t, int> &f
 }
 
 
-static inline void fragment_walk(const Molecule *molecule, int atom, std::vector<int> &visitedAtoms,
+static inline void fragment_walk(const Molecule *molecule, AtomIdx atom, std::vector<int> &visitedAtoms,
         std::vector<int> &visitedBonds, int &visited)
 {
     visitedAtoms[atom] = 1;
 
-    int size = molecule_get_bond_list_size(molecule, atom);
-    int *neighbors = molecule_get_bond_list(molecule, atom);
+    MolSize size = molecule_get_bond_list_size(molecule, atom);
+    AtomIdx *neighbors = molecule_get_bond_list(molecule, atom);
 
     for(int i = 0; i < size; i++)
     {
-        int other = neighbors[i];
+        AtomIdx other = neighbors[i];
 
-        int bond = molecule_get_bond(molecule, atom, other);
+        BondIdx bond = molecule_get_bond(molecule, atom, other);
 
         if(!visitedBonds[bond])
         {
@@ -423,7 +423,7 @@ std::map<uint32_t, int> sg_fingerprint_get(const Molecule *molecule, int minLen,
         std::vector<int> visitedAtoms(molecule->atomCount);
         std::vector<int> visitedBonds(molecule->bondCount);
 
-        for(int a = 0; a < molecule->atomCount; a++)
+        for(AtomIdx a = 0; a < molecule->atomCount; a++)
         {
             if(!visitedAtoms[a])
             {
