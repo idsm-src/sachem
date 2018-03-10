@@ -148,7 +148,7 @@ Datum lucy_sync_data(PG_FUNCTION_ARGS)
     bool verbose = PG_GETARG_BOOL(0);
     bool optimize = PG_GETARG_BOOL(1);
 
-    createBasePath();
+    create_base_directory();
 
 
     /* prepare lucy */

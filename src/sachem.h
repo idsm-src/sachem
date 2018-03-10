@@ -47,14 +47,14 @@
         elog(ERROR, "%s: unexpected exception", __func__);
 
 
-inline void createBasePath(void)
+inline void create_base_directory(void)
 {
     Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
 
     size_t basePathLength = strlen(DataDir);
     size_t databaseLength = strlen(database->data);
 
-    char *path = (char *) palloc(basePathLength +  databaseLength + 2);
+    char *path = (char *) palloc(basePathLength + databaseLength + 2);
     char *data = path;
 
     memcpy(data, DataDir, basePathLength);
@@ -80,7 +80,7 @@ inline char *get_index_path(const char *prefix, const char *suffix, int indexNum
     size_t prefixLength = strlen(prefix);
     size_t suffixLength = strlen(suffix);
 
-    char *indexPath = (char *) palloc(basePathLength +  databaseLength + prefixLength + suffixLength + 24);
+    char *indexPath = (char *) palloc(basePathLength + databaseLength + prefixLength + suffixLength + 24);
     sprintf(indexPath, "%s/%s/%s-%i%s", DataDir, database->data, prefix, indexNumber, suffix);
 
     return indexPath;
@@ -95,7 +95,7 @@ inline char *get_subindex_path(const char *prefix, const char *suffix, int index
     size_t prefixLength = strlen(prefix);
     size_t suffixLength = strlen(suffix);
 
-    char *indexPath = (char *) palloc(basePathLength +  databaseLength + prefixLength + suffixLength + 64);
+    char *indexPath = (char *) palloc(basePathLength + databaseLength + prefixLength + suffixLength + 64);
     sprintf(indexPath, "%s/%s/%s-%i.%i%s", DataDir, database->data, prefix, indexNumber, subNumber, suffix);
 
     return indexPath;
@@ -109,7 +109,7 @@ inline char *get_file_path(const char *name)
     size_t databaseLength = strlen(database->data);
     size_t nameLength = strlen(name);
 
-    char *filePath = (char *) palloc(basePathLength +  databaseLength + nameLength + 3);
+    char *filePath = (char *) palloc(basePathLength + databaseLength + nameLength + 3);
     sprintf(filePath, "%s/%s/%s", DataDir, database->data, name);
 
     return filePath;

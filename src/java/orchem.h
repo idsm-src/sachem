@@ -33,4 +33,4 @@ int java_orchem_parse_substructure_query(OrchemSubstructureQueryData **data, cha
 int java_orchem_parse_similarity_query(uint64_t **data, char* query, size_t queryLength, int32_t type);
 void java_orchem_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *data);
 
-#endif /*JAVA_ORCHEM_H_*/
+#endif /* JAVA_ORCHEM_H_ */

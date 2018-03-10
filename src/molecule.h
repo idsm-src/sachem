@@ -128,7 +128,7 @@ inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *r
     int8_t *atomNumbers = (int8_t *) palloc((size_t) atomCount);
     uint8_t *atomHydrogens = (uint8_t *) palloc0((size_t) atomCount);
     uint8_t *bondTypes = (uint8_t *) palloc((size_t) bondCount);
-    int8_t  *atomCharges = withCharges ? (int8_t *) palloc0((size_t) atomCount) : NULL;
+    int8_t *atomCharges = withCharges ? (int8_t *) palloc0((size_t) atomCount) : NULL;
     int8_t *atomMasses = withIsotopes ? (int8_t *) palloc0((size_t) atomCount) : NULL;
     uint8_t *atomStereo = withStereo ? (uint8_t *) palloc0((size_t) atomCount) : NULL;
     uint8_t *bondStereo = withStereo ? (uint8_t *) palloc0((size_t) bondCount) : NULL;

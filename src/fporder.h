@@ -4,4 +4,4 @@
 
 #define ORDER_FILE              "fporder.bin"
 
-#endif /*FPORDER_H_*/
+#endif /* FPORDER_H_ */

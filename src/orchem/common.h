@@ -17,4 +17,4 @@
 #define FINGERPRINT_TABLE       "sachem_fingerprint"
 #define MOLECULE_COUNTS_TABLE   "sachem_molecule_counts"
 
-#endif /*ORCHEM_COMMON_H_*/
+#endif /* ORCHEM_COMMON_H_ */

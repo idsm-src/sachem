@@ -10,4 +10,4 @@
 
 void sachem_generate_molecule_index(int indexNumber, bool useSeqId);
 
-#endif /*MOLINDEX_H_*/
+#endif /* MOLINDEX_H_ */

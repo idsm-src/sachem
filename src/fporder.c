@@ -128,7 +128,7 @@ void fporder_worker(dsm_segment *seg, shm_toc *toc)
 
             shm_mq_result result = shm_mq_send(out, size * sizeof(StatItem), items + i, false);
 
-            if (result != SHM_MQ_SUCCESS)
+            if(result != SHM_MQ_SUCCESS)
                 elog(ERROR, "%s: shm_mq_send() failed", __func__);
         }
     }

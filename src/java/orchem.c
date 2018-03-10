@@ -104,7 +104,7 @@ int java_orchem_parse_substructure_query(OrchemSubstructureQueryData **data, cha
     jshortArray countsArray = NULL;
     jshortArray fpArray = NULL;
     jbyteArray moleculeArray = NULL;
-    jbooleanArray  restHArray = NULL;
+    jbooleanArray restHArray = NULL;
     jshort *counts = NULL;
     jshort *fp = NULL;
     jbyte *molecule = NULL;
@@ -135,8 +135,8 @@ int java_orchem_parse_substructure_query(OrchemSubstructureQueryData **data, cha
 
             countsArray = (jshortArray) (*env)->GetObjectField(env, element, countsField);
             fpArray = (jshortArray) (*env)->GetObjectField(env, element, fpField);
-            moleculeArray = (jbyteArray)  (*env)->GetObjectField(env, element, moleculeField);
-            restHArray = (jbooleanArray)   (*env)->GetObjectField(env, element, restHField);
+            moleculeArray = (jbyteArray) (*env)->GetObjectField(env, element, moleculeField);
+            restHArray = (jbooleanArray) (*env)->GetObjectField(env, element, restHField);
 
             jsize countsSize = (*env)->GetArrayLength(env, countsArray);
             jsize fpSize = (*env)->GetArrayLength(env, fpArray);
@@ -318,7 +318,7 @@ void java_orchem_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *
             {
                 countsArray = (jshortArray) (*env)->GetObjectField(env, resultElement, orchemLoaderCountsField);
                 fpArray = (jlongArray) (*env)->GetObjectField(env, resultElement, orchemLoaderFpField);
-                moleculeArray = (jbyteArray)  (*env)->GetObjectField(env, resultElement, orchemLoaderMoleculeField);
+                moleculeArray = (jbyteArray) (*env)->GetObjectField(env, resultElement, orchemLoaderMoleculeField);
 
                 jsize countsSize = (*env)->GetArrayLength(env, countsArray);
                 jsize fpSize = (*env)->GetArrayLength(env, fpArray);

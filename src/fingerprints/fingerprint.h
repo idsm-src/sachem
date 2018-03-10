@@ -47,4 +47,4 @@ inline void integer_fingerprint_free(IntegerFingerprint fingerprint)
         pfree(fingerprint.data);
 }
 
-#endif
+#endif /* FINGERPRINT_H__ */

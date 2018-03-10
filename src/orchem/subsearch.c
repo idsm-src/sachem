@@ -508,7 +508,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
 #if USE_MOLECULE_INDEX
             int32_t seqid = info->arrayBuffer[info->tableRowPosition];
-            int32_t id =  *((int32_t *) (moleculeData + offsetData[seqid]));
+            int32_t id = *((int32_t *) (moleculeData + offsetData[seqid]));
             uint8_t *molecule = moleculeData + offsetData[seqid] + sizeof(int32_t);
 #else
             TupleDesc tupdesc = info->table->tupdesc;

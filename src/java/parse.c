@@ -75,7 +75,7 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
     jobjectArray result = NULL;
     jobject element = NULL;
     jbyteArray moleculeArray = NULL;
-    jbooleanArray  restHArray = NULL;
+    jbooleanArray restHArray = NULL;
     jbyte *molecule = NULL;
     jboolean *restH = NULL;
     jsize length = -1;
@@ -102,8 +102,8 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
         {
             element = (*env)->GetObjectArrayElement(env, result, i);
 
-            moleculeArray = (jbyteArray)  (*env)->GetObjectField(env, element, moleculeField);
-            restHArray = (jbooleanArray)   (*env)->GetObjectField(env, element, restHField);
+            moleculeArray = (jbyteArray) (*env)->GetObjectField(env, element, moleculeField);
+            restHArray = (jbooleanArray) (*env)->GetObjectField(env, element, restHField);
 
             jsize moleculeSize = (*env)->GetArrayLength(env, moleculeArray);
             jsize restHSize = restHArray ? (*env)->GetArrayLength(env, restHArray) : -1;
@@ -207,7 +207,7 @@ void java_parse_data(size_t count, VarChar **molfiles, LoaderData *data)
             }
             else
             {
-                moleculeArray = (jbyteArray)  (*env)->GetObjectField(env, resultElement, lucyLoaderMoleculeField);
+                moleculeArray = (jbyteArray) (*env)->GetObjectField(env, resultElement, lucyLoaderMoleculeField);
 
                 jsize moleculeSize = (*env)->GetArrayLength(env, moleculeArray);
 

@@ -24,4 +24,4 @@ inline double time_to_ms(int64_t time)
     return time / 1000.0;
 }
 
-#endif /*MEASUREMENT_H_*/
+#endif /* MEASUREMENT_H_ */

@@ -1,3 +1,6 @@
+#ifndef HEAP_H_
+#define HEAP_H_
+
 #include "sachem.h"
 
 
@@ -126,3 +129,5 @@ static inline void heap_remove(Heap *const heap)
         child = HEAP_CHILD_IDX(idx);
     }
 }
+
+#endif /* HEAP_H_ */

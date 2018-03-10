@@ -396,10 +396,10 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 
 
     /*
-     *  create index
+     * create index
      */
 
-    createBasePath();
+    create_base_directory();
 
     if(unlikely(SPI_exec("select id from " INDEX_TABLE, 0) != SPI_OK_SELECT))
         elog(ERROR, "%s: SPI_exec() failed", __func__);

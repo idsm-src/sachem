@@ -25,4 +25,4 @@ void java_parse_init(void);
 int java_parse_substructure_query(SubstructureQueryData **data, char* query, size_t queryLength, int32_t type, bool implicitHydrogens, bool tautomers);
 void java_parse_data(size_t count, VarChar **molfiles, LoaderData *data);
 
-#endif /*JAVA_PARSE_H_*/
+#endif /* JAVA_PARSE_H_ */

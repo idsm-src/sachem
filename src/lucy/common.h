@@ -11,4 +11,4 @@
 #define AUDIT_TABLE             "sachem_compound_audit"
 #define INDEX_TABLE             "sachem_index"
 
-#endif /*LUCY_COMMON_H_*/
+#endif /* LUCY_COMMON_H_ */
