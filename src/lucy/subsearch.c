@@ -390,7 +390,7 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 #if SHOW_STATS
                         struct timeval search_begin = time_get();
 #endif
-                        info->resultSet = lucy_search(&lucy, fp, INT32_MAX);
+                        info->resultSet = lucy_search(&lucy, fp);
 #if SHOW_STATS
                         struct timeval search_end = time_get();
                         info->indexTime += time_spent(search_begin, search_end);

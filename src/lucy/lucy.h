@@ -50,7 +50,7 @@ void lucy_delete(Lucy *lucy, int32_t id);
 void lucy_optimize(Lucy *lucy);
 void lucy_commit(Lucy *lucy);
 void lucy_rollback(Lucy *lucy);
-LucyResultSet lucy_search(Lucy *lucy, StringFingerprint fp, int max_results);
+LucyResultSet lucy_search(Lucy *lucy, StringFingerprint fp);
 size_t lucy_get(Lucy *lucy, LucyResultSet *resultSet, int32_t *buffer, size_t size);
 void lucy_fail(Lucy *lucy, LucyResultSet *resultSet);
 void lucy_link_directory(const char *oldPath, const char *newPath);

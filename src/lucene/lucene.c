@@ -55,7 +55,7 @@ void lucene_init(Lucene *lucene)
         rollbackMethod = (*env)->GetMethodID(env, luceneClass, "rollback", "()V");
         java_check_exception(__func__);
 
-        searchMethod = (*env)->GetMethodID(env, luceneClass, "search", "([II)[J");
+        searchMethod = (*env)->GetMethodID(env, luceneClass, "search", "([I)[J");
         java_check_exception(__func__);
 
         jmethodID constructor = (*env)->GetMethodID(env, luceneClass, "<init>", "()V");
@@ -182,7 +182,7 @@ void lucene_rollback(Lucene *lucene)
 }
 
 
-LuceneResultSet lucene_search(Lucene *lucene, IntegerFingerprint fp, int maxResultCount)
+LuceneResultSet lucene_search(Lucene *lucene, IntegerFingerprint fp)
 {
     jintArray fpArray = NULL;
 
@@ -194,7 +194,7 @@ LuceneResultSet lucene_search(Lucene *lucene, IntegerFingerprint fp, int maxResu
         (*env)->SetIntArrayRegion(env, fpArray, 0, fp.size, (jint*) fp.data);
         java_check_exception(__func__);
 
-        lucene->bitsetArray = (jlongArray) (*env)->CallObjectMethod(env, lucene->instance, searchMethod, fpArray, (jint) maxResultCount);
+        lucene->bitsetArray = (jlongArray) (*env)->CallObjectMethod(env, lucene->instance, searchMethod, fpArray);
         java_check_exception(__func__);
 
         jsize size = (*env)->GetArrayLength(env, lucene->bitsetArray);

@@ -85,7 +85,6 @@ typedef struct
 {
     Lucy *lucy;
     StringFingerprint fp;
-    int max_results;
     String *queryStr;
     Query *query;
 #if USE_ID_TABLE
@@ -483,12 +482,11 @@ static void base_search(SearchRoutineContext *context)
 }
 
 
-LucyResultSet lucy_search(Lucy *lucy, StringFingerprint fp, int max_results)
+LucyResultSet lucy_search(Lucy *lucy, StringFingerprint fp)
 {
     SearchRoutineContext context;
     context.lucy = lucy;
     context.fp = fp;
-    context.max_results = max_results;
     context.queryStr = NULL;
     context.query = NULL;
 #if USE_ID_TABLE

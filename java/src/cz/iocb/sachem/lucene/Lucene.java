@@ -159,7 +159,7 @@ public class Lucene
     }
 
 
-    long[] search(int fp[], int maxResults) throws IOException
+    long[] search(int fp[]) throws IOException
     {
         if(searcher == null)
         {
