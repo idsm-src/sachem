@@ -83,7 +83,7 @@ static bool submol_hash(const std::vector<int> &bondIds, const Molecule *molecul
 
         // pre-hash the bonds
         for(BondIdx bid : a.second)
-            bonds[aid][molecule_get_bond_connected_atom(molecule, bid, aid)] = bond_hash(molecule, bid);
+            bonds[aid][molecule_get_other_bond_atom(molecule, bid, aid)] = bond_hash(molecule, bid);
 
         atoms[a.second.size()][aid] = AtomDesc(atom_hash(molecule, aid), std::list<uint32_t>());
     }
@@ -232,8 +232,8 @@ static std::vector<std::vector<int>> get_neighbor_list(const Molecule *molecule)
         if(molecule_get_atom_number(molecule, i) <= H_ATOM_NUMBER)
             continue;
 
-        MolSize size = molecule_get_bond_list_size(molecule, i);
-        AtomIdx *bondedAtoms = molecule_get_bond_list(molecule, i);
+        MolSize size = molecule_get_bonded_atom_list_size(molecule, i);
+        AtomIdx *bondedAtoms = molecule_get_bonded_atom_list(molecule, i);
 
         for(int l = 0; l < size; l++)
         {
@@ -393,8 +393,8 @@ static inline void fragment_walk(const Molecule *molecule, AtomIdx atom, std::ve
 {
     visitedAtoms[atom] = 1;
 
-    MolSize size = molecule_get_bond_list_size(molecule, atom);
-    AtomIdx *neighbors = molecule_get_bond_list(molecule, atom);
+    MolSize size = molecule_get_bonded_atom_list_size(molecule, atom);
+    AtomIdx *neighbors = molecule_get_bonded_atom_list(molecule, atom);
 
     for(int i = 0; i < size; i++)
     {
