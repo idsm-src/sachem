@@ -4,6 +4,7 @@ EXTRA_DIST = clownfish lucy
 		cp -r $(srcdir)/clownfish ../build/clownfish
 		chmod -R u+w ../build/clownfish
 		cd ../build/clownfish/runtime/c; ./configure
+		find ../build/clownfish -name Makefile -exec sed -i 's|-O2|-O2 -march=native|' '{}' ';'
 		
 ../build/lucy:
 		cp -r $(srcdir)/lucy ../build/lucy
@@ -11,6 +12,7 @@ EXTRA_DIST = clownfish lucy
 		cd ../build/lucy/c; ./configure
 		sed -i 's|cfc|../../clownfish/compiler/c/cfc --include=../../clownfish/runtime/c/autogen/share/clownfish/include|' ../build/lucy/c/Makefile
 		sed -i 's|-l clownfish|-L ../../clownfish/runtime/c -l clownfish|' ../build/lucy/c/Makefile
+		find ../build/lucy -name Makefile -exec sed -i 's|-O2|-O2 -march=native|' '{}' ';'
 
 all-local: ../build/clownfish ../build/lucy
 		$(MAKE) -C ../build/clownfish/runtime/c

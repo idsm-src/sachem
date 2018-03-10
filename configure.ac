@@ -4,6 +4,8 @@ AC_PREREQ(2.59)
 AC_INIT(sachem, 0.1)
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([build])
+: ${CFLAGS=""}
+: ${CXXFLAGS=""}
 AC_PROG_CC
 AC_PROG_CXX
 
@@ -49,6 +51,7 @@ fi
 
 cd build/clownfish/runtime/c
 ./configure || exit $?
+find ../.. -name Makefile -exec sed -i 's|-O2|-O2 -march=native|' '{}' ';'
 CLOWNFISH_CPPFLAGS="-DCFISH_USE_SHORT_NAMES"
 CLOWNFISH_LDFLAGS="-L$(pwd)"
 cd -
@@ -68,6 +71,7 @@ cd build/lucy/c
 ./configure || exit $?
 sed -i 's|cfc|../../clownfish/compiler/c/cfc --include=../../clownfish/runtime/c/autogen/share/clownfish/include|' Makefile
 sed -i 's|-l clownfish|-L ../../clownfish/runtime/c -l clownfish|' Makefile
+find .. -name Makefile -exec sed -i 's|-O2|-O2 -march=native|' '{}' ';'
 LUCY_CPPFLAGS="-DLUCY_USE_SHORT_NAMES -I$(pwd)/autogen/include"
 LUCY_LDFLAGS="-L$(pwd)"
 cd -

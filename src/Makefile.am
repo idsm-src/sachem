@@ -1,8 +1,8 @@
 pglibdir = $(POSTGRESQL_LIBDIR)
 pglib_LTLIBRARIES = libsachem.la
 
-libsachem_la_CFLAGS = -std=gnu99 -Ofast -march=native -Wall
-libsachem_la_CXXFLAGS = -std=c++11 -Ofast -march=native -Wall
+libsachem_la_CFLAGS = -std=gnu99 -O3 -march=native -flto -minline-stringops-dynamically -Wall -g
+libsachem_la_CXXFLAGS = -std=c++11 -O3 -march=native -flto -minline-stringops-dynamically -Wall -g
 libsachem_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(JDK8_CPPFLAGS) $(CLOWNFISH_CPPFLAGS) $(LUCY_CPPFLAGS) -DBINDIR=\"$(bindir)\" -DJARDIR=\"$(datadir)/$(PACKAGE)/jar\"
 libsachem_la_LDFLAGS = $(JDK8_LDFLAGS) $(CLOWNFISH_LDFLAGS) $(LUCY_LDFLAGS)
 libsachem_la_LIBADD = -llucy -lclownfish
