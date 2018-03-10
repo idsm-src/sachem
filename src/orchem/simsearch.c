@@ -46,6 +46,7 @@ typedef struct
 } SimilaritySearchData;
 
 
+static bool initialized = false;
 static bool javaInitialized = false;
 static SPIPlanPtr mainQueryPlan = NULL;
 static TupleDesc tupdesc = NULL;
@@ -53,51 +54,58 @@ static TupleDesc tupdesc = NULL;
 
 static void orchem_simsearch_init(void)
 {
-    if(unlikely(javaInitialized == false))
+    if(unlikely(initialized == false))
     {
-        java_orchem_init();
-        javaInitialized = true;
-    }
-
-
-    /* prepare query plan */
-    if(unlikely(mainQueryPlan == NULL))
-    {
-        if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-            elog(ERROR, "%s: SPI_connect() failed", __func__);
-
-        SPIPlanPtr plan = SPI_prepare("select id, fp from " FINGERPRINT_TABLE " where bit_count = $1", 1, (Oid[]) { INT4OID });
-
-        if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
-            elog(ERROR, "%s: SPI_keepplan() failed", __func__);
-
-        mainQueryPlan = plan;
-        SPI_finish();
-    }
-
-    /* create tuple description */
-    if(unlikely(tupdesc == NULL))
-    {
-        TupleDesc desc = NULL;
-
-        PG_MEMCONTEXT_BEGIN(TopMemoryContext);
-        PG_TRY();
+        if(unlikely(javaInitialized == false))
         {
-            desc = CreateTemplateTupleDesc(2, false);
-            TupleDescInitEntry(desc, (AttrNumber) 1, "compound", INT4OID, -1, 0);
-            TupleDescInitEntry(desc, (AttrNumber) 2, "score", FLOAT4OID, -1, 0);
-            desc = BlessTupleDesc(desc);
-            tupdesc = desc;
+            java_orchem_init();
+            javaInitialized = true;
         }
-        PG_CATCH();
-        {
-            if(desc != NULL)
-                FreeTupleDesc(desc);
 
-            PG_RE_THROW();
+
+        /* prepare query plan */
+        if(unlikely(mainQueryPlan == NULL))
+        {
+            if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+                elog(ERROR, "%s: SPI_connect() failed", __func__);
+
+            SPIPlanPtr plan = SPI_prepare("select id, fp from " FINGERPRINT_TABLE " where bit_count = $1", 1, (Oid[]) { INT4OID });
+
+            if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
+                elog(ERROR, "%s: SPI_keepplan() failed", __func__);
+
+            mainQueryPlan = plan;
+            SPI_finish();
         }
-        PG_END_TRY();
-        PG_MEMCONTEXT_END();
+
+
+        /* create tuple description */
+        if(unlikely(tupdesc == NULL))
+        {
+            TupleDesc desc = NULL;
+
+            PG_MEMCONTEXT_BEGIN(TopMemoryContext);
+            PG_TRY();
+            {
+                desc = CreateTemplateTupleDesc(2, false);
+                TupleDescInitEntry(desc, (AttrNumber) 1, "compound", INT4OID, -1, 0);
+                TupleDescInitEntry(desc, (AttrNumber) 2, "score", FLOAT4OID, -1, 0);
+                desc = BlessTupleDesc(desc);
+                tupdesc = desc;
+            }
+            PG_CATCH();
+            {
+                if(desc != NULL)
+                    FreeTupleDesc(desc);
+
+                PG_RE_THROW();
+            }
+            PG_END_TRY();
+            PG_MEMCONTEXT_END();
+        }
+
+
+        initialized = true;
     }
 }
 

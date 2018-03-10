@@ -71,6 +71,7 @@ typedef struct
 } SubstructureSearchData;
 
 
+static bool initialized = false;
 static bool javaInitialized = false;
 static bool luceneInitialised = false;
 static int indexId = -1;
@@ -93,45 +94,52 @@ static int dbSize;
 
 void lucene_subsearch_init(void)
 {
-    if(unlikely(javaInitialized == false))
-    {
-        java_parse_init();
-        javaInitialized = true;
-    }
-
-
-    /* prepare lucene */
-    if(unlikely(luceneInitialised == false))
-    {
-        lucene_init(&lucene);
-        luceneInitialised = true;
-    }
-
-
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
         elog(ERROR, "%s: SPI_connect() failed", __func__);
 
-    /* prepare snapshot query plan */
-    if(unlikely(snapshotQueryPlan == NULL))
+
+    if(unlikely(initialized == false))
     {
-        SPIPlanPtr plan = SPI_prepare("select id from " INDEX_TABLE, 0, NULL);
-
-        if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
-            elog(ERROR, "%s: SPI_keepplan() failed", __func__);
-
-        snapshotQueryPlan = plan;
-    }
+        if(unlikely(javaInitialized == false))
+        {
+            java_parse_init();
+            javaInitialized = true;
+        }
 
 
-    /* prepare query plan */
-    if(unlikely(mainQueryPlan == NULL))
-    {
-        SPIPlanPtr plan = SPI_prepare("select id, molecule from " MOLECULES_TABLE " where id = any($1)", 1, (Oid[]) { INT4ARRAYOID });
+        /* prepare lucene */
+        if(unlikely(luceneInitialised == false))
+        {
+            lucene_init(&lucene);
+            luceneInitialised = true;
+        }
 
-        if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
-            elog(ERROR, "%s: SPI_keepplan() failed", __func__);
 
-        mainQueryPlan = plan;
+        /* prepare snapshot query plan */
+        if(unlikely(snapshotQueryPlan == NULL))
+        {
+            SPIPlanPtr plan = SPI_prepare("select id from " INDEX_TABLE, 0, NULL);
+
+            if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
+                elog(ERROR, "%s: SPI_keepplan() failed", __func__);
+
+            snapshotQueryPlan = plan;
+        }
+
+
+        /* prepare query plan */
+        if(unlikely(mainQueryPlan == NULL))
+        {
+            SPIPlanPtr plan = SPI_prepare("select id, molecule from " MOLECULES_TABLE " where id = any($1)", 1, (Oid[]) { INT4ARRAYOID });
+
+            if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
+                elog(ERROR, "%s: SPI_keepplan() failed", __func__);
+
+            mainQueryPlan = plan;
+        }
+
+
+        initialized = true;
     }
 
 
@@ -142,13 +150,12 @@ void lucene_subsearch_init(void)
     if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
         elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
-
     char isNullFlag;
-
     int32_t dbIndexNumber = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
 
     if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
         elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
 
     if(unlikely(dbIndexNumber != indexId))
     {
