@@ -5,6 +5,7 @@
 #include <tcop/tcopprot.h>
 #include <stdint.h>
 #include "java.h"
+#include "orchem/common.h"
 
 
 typedef struct
@@ -22,7 +23,9 @@ typedef struct
 {
     int bitCount;
     ArrayType *fp;
+#if USE_COUNT_FINGERPRINT
     ArrayType *counts;
+#endif
     bytea *molecule;
     text *error;
 } OrchemLoaderData;

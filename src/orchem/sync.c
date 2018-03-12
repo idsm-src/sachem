@@ -259,11 +259,13 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
     SPIPlanPtr moleculesPlan = SPI_prepare("insert into " MOLECULES_TABLE " (seqid, id, molecule) values ($1,$2,$3)",
             3, (Oid[]) { INT4OID, INT4OID, BYTEAOID });
 
-    SPIPlanPtr countsPlan = SPI_prepare("insert into " MOLECULE_COUNTS_TABLE " (id, counts) values ($1,$2)",
-            2, (Oid[]) { INT4OID, INT2ARRAYOID });
-
     SPIPlanPtr fingerprintPlan = SPI_prepare("insert into " FINGERPRINT_TABLE " (id, bit_count, fp) values ($1,$2,$3)",
             3, (Oid[]) { INT4OID, INT2OID, int8arrayOid });
+
+#if USE_COUNT_FINGERPRINT
+    SPIPlanPtr countsPlan = SPI_prepare("insert into " MOLECULE_COUNTS_TABLE " (id, counts) values ($1,$2)",
+            2, (Oid[]) { INT4OID, INT2ARRAYOID });
+#endif
 
 
     Portal compoundCursor = SPI_cursor_open_with_args(NULL, "select cmp.id, cmp.molfile from " COMPOUNDS_TABLE " cmp, "
@@ -335,7 +337,11 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
                 pfree(data[i].error);
             }
 
+#if USE_COUNT_FINGERPRINT
             if(data[i].molecule == NULL || data[i].counts == NULL || data[i].fp == NULL)
+#else
+            if(data[i].molecule == NULL || data[i].fp == NULL)
+#endif
             {
                 notIndexed++;
                 continue;
@@ -375,9 +381,11 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
                 bitset_set(bitmap + j - 1, currentSeqid);
 
 
-            pfree(data[i].counts);
             pfree(data[i].fp);
             pfree(data[i].molecule);
+#if USE_COUNT_FINGERPRINT
+            pfree(data[i].counts);
+#endif
         }
 
         SPI_freetuptable(tuptable);

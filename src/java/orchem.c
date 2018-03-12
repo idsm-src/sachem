@@ -264,12 +264,14 @@ void java_orchem_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *
     jbyteArray molfileArg = NULL;
     jobject resultElement = NULL;
     jstring exception = NULL;
-    jshortArray countsArray = NULL;
     jlongArray fpArray = NULL;
     jbyteArray moleculeArray = NULL;
-    jshort *counts = NULL;
     jlong *fp = NULL;
     jbyte *molecule = NULL;
+#if USE_COUNT_FINGERPRINT
+    jshortArray countsArray = NULL;
+    jshort *counts = NULL;
+#endif
 
 
     PG_TRY();
@@ -311,21 +313,18 @@ void java_orchem_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *
 
                 data[i].bitCount = -1;
                 data[i].fp = NULL;
-                data[i].counts = NULL;
                 data[i].molecule = NULL;
+#if USE_COUNT_FINGERPRINT
+                data[i].counts = NULL;
+#endif
             }
             else
             {
-                countsArray = (jshortArray) (*env)->GetObjectField(env, resultElement, orchemLoaderCountsField);
                 fpArray = (jlongArray) (*env)->GetObjectField(env, resultElement, orchemLoaderFpField);
                 moleculeArray = (jbyteArray) (*env)->GetObjectField(env, resultElement, orchemLoaderMoleculeField);
 
-                jsize countsSize = (*env)->GetArrayLength(env, countsArray);
                 jsize fpSize = (*env)->GetArrayLength(env, fpArray);
                 jsize moleculeSize = (*env)->GetArrayLength(env, moleculeArray);
-
-                counts = (*env)->GetShortArrayElements(env, countsArray, NULL);
-                java_check_exception(__func__);
 
                 fp = (*env)->GetLongArrayElements(env, fpArray, NULL);
                 java_check_exception(__func__);
@@ -333,6 +332,12 @@ void java_orchem_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *
                 molecule = (*env)->GetByteArrayElements(env, moleculeArray, NULL);
                 java_check_exception(__func__);
 
+#if USE_COUNT_FINGERPRINT
+                countsArray = (jshortArray) (*env)->GetObjectField(env, resultElement, orchemLoaderCountsField);
+                jsize countsSize = (*env)->GetArrayLength(env, countsArray);
+                counts = (*env)->GetShortArrayElements(env, countsArray, NULL);
+                java_check_exception(__func__);
+#endif
 
                 data[i].fp = (ArrayType *) palloc(fpSize * sizeof(uint64_t) + ARR_OVERHEAD_NONULLS(1));
                 data[i].fp->ndim = 1;
@@ -347,6 +352,7 @@ void java_orchem_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *
                 bitset_init(&bitset, (uint64_t *) fp, fpSize);
                 data[i].bitCount = bitset_cardinality(&bitset);
 
+#if USE_COUNT_FINGERPRINT
                 data[i].counts = (ArrayType *) palloc(countsSize * sizeof(int16) + ARR_OVERHEAD_NONULLS(1));
                 data[i].counts->ndim = 1;
                 data[i].counts->dataoffset = 0;
@@ -355,6 +361,7 @@ void java_orchem_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *
                 *(ARR_DIMS(data[i].counts)) = countsSize;
                 *(ARR_LBOUND(data[i].counts)) = 1;
                 SET_VARSIZE(data[i].counts, countsSize * sizeof(int16) + ARR_OVERHEAD_NONULLS(1));
+#endif
 
                 data[i].molecule = (bytea *) palloc(VARHDRSZ + moleculeSize);
                 SET_VARSIZE(data[i].molecule, VARHDRSZ + moleculeSize);
@@ -363,9 +370,11 @@ void java_orchem_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *
                 data[i].error = NULL;
 
 
-                JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
                 JavaDeleteLongArray(fpArray, fp, JNI_ABORT);
                 JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
+#if USE_COUNT_FINGERPRINT
+                JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
+#endif
             }
 
             JavaDeleteRef(resultElement);
@@ -380,9 +389,11 @@ void java_orchem_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *
         JavaDeleteRef(molfileArg);
         JavaDeleteRef(resultElement);
         JavaDeleteRef(exception);
-        JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
         JavaDeleteLongArray(fpArray, fp, JNI_ABORT);
         JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
+#if USE_COUNT_FINGERPRINT
+        JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
+#endif
 
         PG_RE_THROW();
     }
