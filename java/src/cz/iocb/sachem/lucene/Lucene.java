@@ -20,6 +20,7 @@ import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.BooleanQuery.Builder;
 import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.SimpleCollector;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.store.Directory;
@@ -54,11 +55,17 @@ public class Lucene
         @Override
         public void collect(int docId) throws IOException
         {
-            Document doc = searcher.doc(docBase + docId);
-            IndexableField id = doc.getField(idFieldName);
-            int moleculeID = id.numericValue().intValue();
-
-            bitset.set(moleculeID);
+            if(useIdTable)
+            {
+                bitset.set(idTable[docBase + docId]);
+            }
+            else
+            {
+                Document doc = searcher.doc(docBase + docId);
+                IndexableField id = doc.getField(idFieldName);
+                int moleculeId = id.numericValue().intValue();
+                bitset.set(moleculeId);
+            }
         }
 
         @Override
@@ -75,6 +82,7 @@ public class Lucene
 
 
     private static final IndexType indexType = IndexType.POINTS;
+    private static final boolean useIdTable = true;
     private static final String idFieldName = "id";
     private static final String fpFieldName = "fp";
 
@@ -82,6 +90,7 @@ public class Lucene
     private Directory folder;
     private IndexSearcher searcher;
     private IndexWriter indexer;
+    private int[] idTable;
     private final FingerprintTokenizer tokenizer = new FingerprintTokenizer();
 
 
@@ -90,6 +99,9 @@ public class Lucene
         maxMoleculeId = maxId;
         folder = FSDirectory.open(Paths.get(path));
         searcher = null;
+
+        if(useIdTable)
+            idTable = null;
     }
 
 
@@ -165,6 +177,37 @@ public class Lucene
         {
             IndexReader reader = DirectoryReader.open(folder);
             searcher = new IndexSearcher(reader);
+
+            if(useIdTable)
+            {
+                idTable = new int[reader.maxDoc()];
+
+                searcher.search(new MatchAllDocsQuery(), new SimpleCollector()
+                {
+                    private int docBase;
+
+                    @Override
+                    protected void doSetNextReader(LeafReaderContext context) throws IOException
+                    {
+                        docBase = context.docBase;
+                    }
+
+                    @Override
+                    public void collect(int docId) throws IOException
+                    {
+                        Document doc = searcher.doc(docBase + docId);
+                        IndexableField id = doc.getField(idFieldName);
+                        int moleculeId = id.numericValue().intValue();
+                        idTable[docBase + docId] = moleculeId;
+                    }
+
+                    @Override
+                    public boolean needsScores()
+                    {
+                        return false;
+                    }
+                });
+            }
         }
 
 
