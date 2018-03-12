@@ -108,7 +108,7 @@ static void orchem_subsearch_init(void)
     {
         if(unlikely(javaInitialized == false))
         {
-            java_orchem_init();
+            orchem_java_init();
             javaInitialized = true;
         }
 
@@ -317,7 +317,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 #if SHOW_STATS
         struct timeval java_begin = time_get();
 #endif
-        info->queryDataCount = java_orchem_parse_substructure_query(&info->queryData, VARDATA(query), VARSIZE(query) - VARHDRSZ,
+        info->queryDataCount = orchem_java_parse_substructure_query(&info->queryData, VARDATA(query), VARSIZE(query) - VARHDRSZ,
                 type, graphMode == GRAPH_EXACT, tautomerMode == TAUTOMER_INCHI);
 #if SHOW_STATS
         struct timeval java_end = time_get();

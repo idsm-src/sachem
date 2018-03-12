@@ -58,7 +58,7 @@ static void orchem_simsearch_init(void)
     {
         if(unlikely(javaInitialized == false))
         {
-            java_orchem_init();
+            orchem_java_init();
             javaInitialized = true;
         }
 
@@ -136,7 +136,7 @@ Datum orchem_similarity_search(PG_FUNCTION_ARGS)
         info->topN = topN;
 
         uint64_t *words;
-        int length = java_orchem_parse_similarity_query(&words, VARDATA(query), VARSIZE(query) - VARHDRSZ, type);
+        int length = orchem_java_parse_similarity_query(&words, VARDATA(query), VARSIZE(query) - VARHDRSZ, type);
 
         PG_FREE_IF_COPY(query, 0);
 

@@ -29,7 +29,7 @@ static jfieldID orchemLoaderMoleculeField = NULL;
 static jmethodID orchemLoaderDataMethod = NULL;
 
 
-void java_orchem_init(void)
+void orchem_java_init(void)
 {
     if(likely(initialised))
         return;
@@ -96,7 +96,7 @@ void java_orchem_init(void)
 }
 
 
-int java_orchem_parse_substructure_query(OrchemSubstructureQueryData **data, char* query, size_t queryLength, int32_t type, bool implicitHydrogens, bool tautomers)
+int orchem_java_parse_substructure_query(OrchemSubstructureQueryData **data, char* query, size_t queryLength, int32_t type, bool implicitHydrogens, bool tautomers)
 {
     jbyteArray queryArg = NULL;
     jobjectArray result = NULL;
@@ -208,7 +208,7 @@ int java_orchem_parse_substructure_query(OrchemSubstructureQueryData **data, cha
 }
 
 
-int java_orchem_parse_similarity_query(uint64_t **data, char* query, size_t queryLength, int32_t type)
+int orchem_java_parse_similarity_query(uint64_t **data, char* query, size_t queryLength, int32_t type)
 {
     jbyteArray queryArg = NULL;
     jlongArray result = NULL;
@@ -257,7 +257,7 @@ int java_orchem_parse_similarity_query(uint64_t **data, char* query, size_t quer
 }
 
 
-void java_orchem_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *data)
+void orchem_java_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *data)
 {
     jbyteArray molfileArrayArg = NULL;
     jobjectArray resultArray = NULL;

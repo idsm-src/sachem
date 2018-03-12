@@ -21,7 +21,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
 {
     if(unlikely(javaInitialized == false))
     {
-        java_orchem_init();
+        orchem_java_init();
         javaInitialized = true;
     }
 
@@ -305,7 +305,7 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
         }
 
 
-        java_orchem_parse_data(processed, molfiles, data);
+        orchem_java_parse_data(processed, molfiles, data);
 
 
         for(int i = 0; i < processed; i++)
