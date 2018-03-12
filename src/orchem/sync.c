@@ -7,7 +7,7 @@
 #include "common.h"
 #include "molindex.h"
 #include "sachem.h"
-#include "java/orchem.h"
+#include "orchem.h"
 
 
 #define SYNC_FETCH_SIZE         100000

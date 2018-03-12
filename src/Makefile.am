@@ -19,7 +19,6 @@ libsachem_la_SOURCES = \
 	    fingerprints/CRNGFingerprint.cpp \
 	    fingerprints/SGFingerprint.cpp \
         java/java.c \
-        java/orchem.c \
         java/parse.c \
         lucene/lucene.c \
         lucene/subsearch.c \
@@ -27,6 +26,7 @@ libsachem_la_SOURCES = \
         lucy/lucy.c \
         lucy/subsearch.c \
         lucy/sync.c \
+        orchem/orchem.c \
         orchem/simsearch.c \
         orchem/subsearch.c \
         orchem/sync.c
@@ -49,10 +49,10 @@ EXTRA_DIST = \
 	    fingerprints/SGFingerprint.hpp \
 	    fingerprints/SubstructureMatch.hpp \
         java/java.h \
-        java/orchem.h \
         java/parse.h \
         lucene/common.h \
         lucene/lucene.h \
         lucy/common.h \
         lucy/lucy.h \
-        orchem/common.h
+        orchem/common.h \
+        orchem/orchem.h

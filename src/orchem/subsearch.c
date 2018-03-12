@@ -17,7 +17,7 @@
 #include "sachem.h"
 #include "subsearch.h"
 #include "measurement.h"
-#include "java/orchem.h"
+#include "orchem.h"
 
 
 #define SHOW_STATS              0

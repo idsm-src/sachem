@@ -4,8 +4,8 @@
 #include <postgres.h>
 #include <tcop/tcopprot.h>
 #include <stdint.h>
-#include "java.h"
-#include "orchem/common.h"
+#include "common.h"
+#include "java/java.h"
 
 
 typedef struct
