@@ -4,8 +4,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.BitSet;
 import org.openscience.cdk.exception.CDKException;
-import org.openscience.cdk.fingerprint.ExtendedFingerprinter;
 import org.openscience.cdk.interfaces.IAtomContainer;
+import cz.iocb.sachem.fingerprint.ExtendedFingerprinter;
 import cz.iocb.sachem.shared.MoleculeCreator;
 
 

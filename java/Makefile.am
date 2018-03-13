@@ -23,6 +23,7 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/fingerprint/bitpos/BitPositions.java \
     src/cz/iocb/sachem/fingerprint/bitpos/ExtendedBitPositions.java \
     src/cz/iocb/sachem/fingerprint/bitpos/Neighbour.java \
+    src/cz/iocb/sachem/fingerprint/ExtendedFingerprinter.java \
     src/cz/iocb/sachem/fingerprint/OrchemExtendedFingerprinter.java \
     src/cz/iocb/sachem/fingerprint/OrchemFingerprinter.java \
     src/cz/iocb/sachem/isomorphism/IsomorphismSort.java \

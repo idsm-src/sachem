@@ -21,9 +21,9 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.openscience.cdk.CDKConstants;
 import org.openscience.cdk.exception.CDKException;
-import org.openscience.cdk.fingerprint.ExtendedFingerprinter;
 import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
+import cz.iocb.sachem.fingerprint.ExtendedFingerprinter;
 import cz.iocb.sachem.isomorphism.IsomorphismSort;
 import cz.iocb.sachem.tautomers.CombinationCountException;
 
