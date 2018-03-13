@@ -1,6 +1,7 @@
 #include <postgres.h>
 #include <catalog/pg_type.h>
 #include <stdbool.h>
+#include "common.h"
 #include "bitset.h"
 #include "orchem.h"
 #include "sachem.h"
@@ -11,11 +12,13 @@ static jclass byteArrayClass = NULL;
 
 static jclass orchemSubstructureSearchClass = NULL;
 static jclass orchemSubstructureQueryDataClass = NULL;
-static jfieldID countsField = NULL;
 static jfieldID fpField = NULL;
 static jfieldID moleculeField = NULL;
 static jfieldID restHField = NULL;
 static jmethodID orchemSubstructureQueryDataMethod = NULL;
+#if USE_COUNT_FINGERPRINT
+static jfieldID countsField = NULL;
+#endif
 
 static jclass orchemSimilaritySearchClass = NULL;
 static jmethodID orchemSimilarityQueryDataMethod = NULL;
@@ -23,10 +26,12 @@ static jmethodID orchemSimilarityQueryDataMethod = NULL;
 static jclass orchemLoaderClass = NULL;
 static jclass orchemLoaderDataClass = NULL;
 static jfieldID orchemLoaderExceptionField = NULL;
-static jfieldID orchemLoaderCountsField = NULL;
 static jfieldID orchemLoaderFpField = NULL;
 static jfieldID orchemLoaderMoleculeField = NULL;
 static jmethodID orchemLoaderDataMethod = NULL;
+#if USE_COUNT_FINGERPRINT
+static jfieldID orchemLoaderCountsField = NULL;
+#endif
 
 
 void orchem_java_init(void)
@@ -47,8 +52,10 @@ void orchem_java_init(void)
     orchemSubstructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/sachem/search/OrchemSubstructureSearch$OrchemQueryData");
     java_check_exception(__func__);
 
+#if USE_COUNT_FINGERPRINT
     countsField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "counts", "[S");
     java_check_exception(__func__);
+#endif
 
     fpField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "fp", "[S");
     java_check_exception(__func__);
@@ -79,8 +86,10 @@ void orchem_java_init(void)
     orchemLoaderExceptionField = (*env)->GetFieldID(env, orchemLoaderDataClass, "exception", "Ljava/lang/String;");
     java_check_exception(__func__);
 
+#if USE_COUNT_FINGERPRINT
     orchemLoaderCountsField = (*env)->GetFieldID(env, orchemLoaderDataClass, "counts", "[S");
     java_check_exception(__func__);
+#endif
 
     orchemLoaderFpField = (*env)->GetFieldID(env, orchemLoaderDataClass, "fp", "[J");
     java_check_exception(__func__);
@@ -101,15 +110,17 @@ int orchem_java_parse_substructure_query(OrchemSubstructureQueryData **data, cha
     jbyteArray queryArg = NULL;
     jobjectArray result = NULL;
     jobject element = NULL;
-    jshortArray countsArray = NULL;
     jshortArray fpArray = NULL;
     jbyteArray moleculeArray = NULL;
     jbooleanArray restHArray = NULL;
-    jshort *counts = NULL;
     jshort *fp = NULL;
     jbyte *molecule = NULL;
     jboolean *restH = NULL;
     jsize length = -1;
+#if USE_COUNT_FINGERPRINT
+    jshortArray countsArray = NULL;
+    jshort *counts = NULL;
+#endif
 
 
     PG_TRY();
@@ -133,18 +144,20 @@ int orchem_java_parse_substructure_query(OrchemSubstructureQueryData **data, cha
         {
             element = (*env)->GetObjectArrayElement(env, result, i);
 
-            countsArray = (jshortArray) (*env)->GetObjectField(env, element, countsField);
             fpArray = (jshortArray) (*env)->GetObjectField(env, element, fpField);
             moleculeArray = (jbyteArray) (*env)->GetObjectField(env, element, moleculeField);
             restHArray = (jbooleanArray) (*env)->GetObjectField(env, element, restHField);
 
-            jsize countsSize = (*env)->GetArrayLength(env, countsArray);
             jsize fpSize = (*env)->GetArrayLength(env, fpArray);
             jsize moleculeSize = (*env)->GetArrayLength(env, moleculeArray);
             jsize restHSize = restHArray ? (*env)->GetArrayLength(env, restHArray) : -1;
 
+#if USE_COUNT_FINGERPRINT
+            countsArray = (jshortArray) (*env)->GetObjectField(env, element, countsField);
+            jsize countsSize = (*env)->GetArrayLength(env, countsArray);
             counts = (*env)->GetShortArrayElements(env, countsArray, NULL);
             java_check_exception(__func__);
+#endif
 
             fp = (*env)->GetShortArrayElements(env, fpArray, NULL);
             java_check_exception(__func__);
@@ -156,8 +169,10 @@ int orchem_java_parse_substructure_query(OrchemSubstructureQueryData **data, cha
             java_check_exception(__func__);
 
 
+#if USE_COUNT_FINGERPRINT
             results[i].counts = (jshort *) palloc(countsSize * sizeof(jshort));
             memcpy(results[i].counts, counts, countsSize * sizeof(jshort));
+#endif
 
             results[i].fp = (jshort *) palloc(fpSize * sizeof(jshort));
             memcpy(results[i].fp, fp, fpSize * sizeof(jshort));
@@ -178,10 +193,12 @@ int orchem_java_parse_substructure_query(OrchemSubstructureQueryData **data, cha
 
             results[i].fpLength = fpSize;
 
-            JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
             JavaDeleteShortArray(fpArray, fp, JNI_ABORT);
             JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
             JavaDeleteBooleanArray(restHArray, restH, JNI_ABORT);
+#if USE_COUNT_FINGERPRINT
+            JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
+#endif
 
             JavaDeleteRef(element);
         }
@@ -195,10 +212,12 @@ int orchem_java_parse_substructure_query(OrchemSubstructureQueryData **data, cha
         JavaDeleteRef(queryArg);
         JavaDeleteRef(result);
         JavaDeleteRef(element);
-        JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
         JavaDeleteShortArray(fpArray, fp, JNI_ABORT);
         JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
         JavaDeleteBooleanArray(restHArray, restH, JNI_ABORT);
+#if USE_COUNT_FINGERPRINT
+        JavaDeleteShortArray(countsArray, counts, JNI_ABORT);
+#endif
 
         PG_RE_THROW();
     }

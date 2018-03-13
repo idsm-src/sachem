@@ -1,5 +1,5 @@
-#ifndef JAVA_ORCHEM_H_
-#define JAVA_ORCHEM_H_
+#ifndef ORCHEM_H_
+#define ORCHEM_H_
 
 #include <postgres.h>
 #include <tcop/tcopprot.h>
@@ -36,4 +36,4 @@ int orchem_java_parse_substructure_query(OrchemSubstructureQueryData **data, cha
 int orchem_java_parse_similarity_query(uint64_t **data, char* query, size_t queryLength, int32_t type);
 void orchem_java_parse_data(size_t count, VarChar **molfiles, OrchemLoaderData *data);
 
-#endif /* JAVA_ORCHEM_H_ */
+#endif /* ORCHEM_H_ */

@@ -437,8 +437,9 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                 int32_t *arrayData = (int32_t *) ARR_DATA_PTR(info->arrayBuffer);
 #endif
 
+#if USE_COUNT_FINGERPRINT
                 OrchemSubstructureQueryData *data = &(info->queryData[info->queryDataPosition]);
-
+#endif
                 size_t count = 0;
 
 #if SHOW_STATS

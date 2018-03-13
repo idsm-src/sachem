@@ -43,13 +43,15 @@ Datum orchem_sync_data(PG_FUNCTION_ARGS)
             AUDIT_TABLE " aud where tbl.id = aud.id", 0) != SPI_OK_DELETE))
         elog(ERROR, "%s: SPI_exec() failed", __func__);
 
-    if(unlikely(SPI_exec("delete from " MOLECULE_COUNTS_TABLE " tbl using "
-            AUDIT_TABLE " aud where tbl.id = aud.id", 0) != SPI_OK_DELETE))
-        elog(ERROR, "%s: SPI_exec() failed", __func__);
-
     if(unlikely(SPI_exec("delete from " FINGERPRINT_TABLE " tbl using "
             AUDIT_TABLE " aud where tbl.id = aud.id", 0) != SPI_OK_DELETE))
         elog(ERROR, "%s: SPI_exec() failed", __func__);
+
+#if USE_COUNT_FINGERPRINT
+    if(unlikely(SPI_exec("delete from " MOLECULE_COUNTS_TABLE " tbl using "
+            AUDIT_TABLE " aud where tbl.id = aud.id", 0) != SPI_OK_DELETE))
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
+#endif
 
 
     /*
