@@ -20,6 +20,10 @@ libsachem_la_SOURCES = \
 	    fingerprints/SGFingerprint.cpp \
         java/java.c \
         java/parse.c \
+        ecdk/ecdk.c \
+        ecdk/simsearch.c \
+        ecdk/subsearch.c \
+        ecdk/sync.c \
         lucene/lucene.c \
         lucene/subsearch.c \
         lucene/sync.c \
@@ -50,6 +54,8 @@ EXTRA_DIST = \
 	    fingerprints/SubstructureMatch.hpp \
         java/java.h \
         java/parse.h \
+        ecdk/common.h \
+        ecdk/ecdk.h \
         lucene/common.h \
         lucene/lucene.h \
         lucy/common.h \

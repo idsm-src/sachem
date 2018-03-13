@@ -38,6 +38,9 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/lucene/FingerprintTokenizer.java \
     src/cz/iocb/sachem/lucene/Lucene.java \
     src/cz/iocb/sachem/search/LucyLoader.java \
+    src/cz/iocb/sachem/search/EcdkLoader.java \
+    src/cz/iocb/sachem/search/EcdkSimilaritySearch.java \
+    src/cz/iocb/sachem/search/EcdkSubstructureSearch.java \
     src/cz/iocb/sachem/search/OrchemLoader.java \
     src/cz/iocb/sachem/search/OrchemSimilaritySearch.java \
     src/cz/iocb/sachem/search/OrchemSubstructureSearch.java \
