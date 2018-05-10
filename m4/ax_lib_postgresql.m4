@@ -112,9 +112,9 @@ AC_DEFUN([AX_LIB_POSTGRESQL],
 
         dnl Decompose version string of installed PostgreSQL
         dnl and calculate its number representation
-        postgresql_version_major=`expr $POSTGRESQL_VERSION : '\([[0-9]]*\)'`
-        postgresql_version_minor=`expr $POSTGRESQL_VERSION : '[[0-9]]*\.\([[0-9]]*\)'`
-        postgresql_version_micro=`expr $POSTGRESQL_VERSION : '[[0-9]]*\.[[0-9]]*\.\([[0-9]]*\)'`
+        postgresql_version_major=`expr "$POSTGRESQL_VERSION" : '\([[0-9]]*\)'`
+        postgresql_version_minor=`expr "$POSTGRESQL_VERSION" : '[[0-9]]*\.\([[0-9]]*\)'`
+        postgresql_version_micro=`expr "$POSTGRESQL_VERSION" : '[[0-9]]*\.[[0-9]]*\.\([[0-9]]*\)'`
 
         if test "x$postgresql_version_minor" = "x"; then
             postgresql_version_minor="0"
