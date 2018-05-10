@@ -47,7 +47,7 @@
         elog(ERROR, "%s: unexpected exception", __func__);
 
 
-inline void create_base_directory(void)
+static inline void create_base_directory(void)
 {
     Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
 
@@ -72,7 +72,7 @@ inline void create_base_directory(void)
 }
 
 
-inline char *get_index_path(const char *prefix, const char *suffix, int indexNumber)
+static inline char *get_index_path(const char *prefix, const char *suffix, int indexNumber)
 {
     Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
     size_t basePathLength = strlen(DataDir);
@@ -87,7 +87,7 @@ inline char *get_index_path(const char *prefix, const char *suffix, int indexNum
 }
 
 
-inline char *get_subindex_path(const char *prefix, const char *suffix, int indexNumber, int subNumber)
+static inline char *get_subindex_path(const char *prefix, const char *suffix, int indexNumber, int subNumber)
 {
     Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
     size_t basePathLength = strlen(DataDir);
@@ -102,7 +102,7 @@ inline char *get_subindex_path(const char *prefix, const char *suffix, int index
 }
 
 
-inline char *get_file_path(const char *name)
+static inline char *get_file_path(const char *name)
 {
     Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
     size_t basePathLength = strlen(DataDir);

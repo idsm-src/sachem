@@ -26,7 +26,7 @@ typedef struct
 } LuceneResultSet;
 
 
-inline bool lucene_is_open(LuceneResultSet *resultSet)
+static inline bool lucene_is_open(LuceneResultSet *resultSet)
 {
     return resultSet->possition != -1;
 }

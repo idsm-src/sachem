@@ -34,14 +34,14 @@ IntegerFingerprint integer_fingerprint_get(const Molecule *molecule);
 IntegerFingerprint integer_fingerprint_get_query(const Molecule *molecule);
 
 
-inline void string_fingerprint_free(StringFingerprint fingerprint)
+static inline void string_fingerprint_free(StringFingerprint fingerprint)
 {
     if(fingerprint.data)
         pfree(fingerprint.data);
 }
 
 
-inline void integer_fingerprint_free(IntegerFingerprint fingerprint)
+static inline void integer_fingerprint_free(IntegerFingerprint fingerprint)
 {
     if(fingerprint.data)
         pfree(fingerprint.data);

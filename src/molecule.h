@@ -89,7 +89,7 @@ typedef struct Molecule
 } Molecule;
 
 
-inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *restH, bool extended,
+static inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *restH, bool extended,
         bool withCharges, bool withIsotopes, bool withStereo)
 {
     int xAtomCount = *data << 8 | *(data + 1);
@@ -291,7 +291,7 @@ inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *r
 }
 
 
-inline void molecule_simple_free(Molecule *const molecule)
+static inline void molecule_simple_free(Molecule *const molecule)
 {
     if(molecule->atomNumbers)
         pfree(molecule->atomNumbers);
@@ -313,7 +313,7 @@ inline void molecule_simple_free(Molecule *const molecule)
 }
 
 
-inline void molecule_simple_init(Molecule *const molecule, const uint8_t *data)
+static inline void molecule_simple_init(Molecule *const molecule, const uint8_t *data)
 {
     memset(molecule, 0, sizeof(Molecule));
 
@@ -393,7 +393,7 @@ inline void molecule_simple_init(Molecule *const molecule, const uint8_t *data)
 }
 
 
-inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, bool withIsotopes)
+static inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, bool withIsotopes)
 {
     int xAtomCount = *data << 8 | *(data + 1);
     data += 2;
@@ -497,19 +497,19 @@ inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, 
 }
 
 
-inline bool molecule_is_pseudo_atom(const Molecule *const restrict molecule, AtomIdx atom)
+static inline bool molecule_is_pseudo_atom(const Molecule *const restrict molecule, AtomIdx atom)
 {
     return molecule->atomNumbers[atom] < 0;
 }
 
 
-inline int8_t molecule_get_atom_number(const Molecule *const restrict molecule, AtomIdx atom)
+static inline int8_t molecule_get_atom_number(const Molecule *const restrict molecule, AtomIdx atom)
 {
     return molecule->atomNumbers[atom];
 }
 
 
-inline bool molecule_is_metal(const Molecule *const restrict molecule, AtomIdx atom)
+static inline bool molecule_is_metal(const Molecule *const restrict molecule, AtomIdx atom)
 {
     int8_t number = molecule_get_atom_number(molecule, atom);
 
@@ -519,7 +519,7 @@ inline bool molecule_is_metal(const Molecule *const restrict molecule, AtomIdx a
 }
 
 
-inline bool molecule_is_halogen(const Molecule *const restrict molecule, AtomIdx atom)
+static inline bool molecule_is_halogen(const Molecule *const restrict molecule, AtomIdx atom)
 {
     int8_t number = molecule_get_atom_number(molecule, atom);
 
@@ -527,61 +527,61 @@ inline bool molecule_is_halogen(const Molecule *const restrict molecule, AtomIdx
 }
 
 
-inline uint8_t molecule_get_hydrogen_count(const Molecule *const restrict molecule, AtomIdx atom)
+static inline uint8_t molecule_get_hydrogen_count(const Molecule *const restrict molecule, AtomIdx atom)
 {
     return molecule->atomHydrogens[atom];
 }
 
 
-inline int8_t molecule_get_formal_charge(const Molecule *const restrict molecule, AtomIdx atom)
+static inline int8_t molecule_get_formal_charge(const Molecule *const restrict molecule, AtomIdx atom)
 {
     return molecule->atomCharges[atom];
 }
 
 
-inline int8_t molecule_get_atom_mass(const Molecule *const restrict molecule, AtomIdx atom)
+static inline int8_t molecule_get_atom_mass(const Molecule *const restrict molecule, AtomIdx atom)
 {
     return molecule->atomMasses[atom];
 }
 
 
-inline AtomIdx *molecule_get_bonded_atom_list(const Molecule *const restrict molecule, AtomIdx atom)
+static inline AtomIdx *molecule_get_bonded_atom_list(const Molecule *const restrict molecule, AtomIdx atom)
 {
     return molecule->bondLists + atom * BOND_LIST_BASE_SIZE;
 }
 
 
-inline MolSize molecule_get_bonded_atom_list_size(const Molecule *const restrict molecule, AtomIdx atom)
+static inline MolSize molecule_get_bonded_atom_list_size(const Molecule *const restrict molecule, AtomIdx atom)
 {
     return molecule->bondListSizes[atom];
 }
 
 
-inline bool molecule_has_restH_flags(const Molecule *const restrict molecule)
+static inline bool molecule_has_restH_flags(const Molecule *const restrict molecule)
 {
     return molecule->restH != NULL;
 }
 
 
-inline bool molecule_get_atom_restH_flag(const Molecule *const restrict molecule, AtomIdx atom)
+static inline bool molecule_get_atom_restH_flag(const Molecule *const restrict molecule, AtomIdx atom)
 {
     return molecule->restH[atom];
 }
 
 
-inline AtomIdx *molecule_bond_atoms(const Molecule *const restrict molecule, BondIdx bond)
+static inline AtomIdx *molecule_bond_atoms(const Molecule *const restrict molecule, BondIdx bond)
 {
     return molecule->contains[bond];
 }
 
 
-inline bool molecule_bond_contains(const Molecule *const restrict molecule, BondIdx bond, AtomIdx atom)
+static inline bool molecule_bond_contains(const Molecule *const restrict molecule, BondIdx bond, AtomIdx atom)
 {
     return molecule->contains[bond][0] == atom || molecule->contains[bond][1] == atom;
 }
 
 
-inline AtomIdx molecule_get_other_bond_atom(const Molecule *const restrict molecule, BondIdx bond, AtomIdx atom)
+static inline AtomIdx molecule_get_other_bond_atom(const Molecule *const restrict molecule, BondIdx bond, AtomIdx atom)
 {
     if(molecule->contains[bond][0] == atom)
         return molecule->contains[bond][1];
@@ -591,7 +591,7 @@ inline AtomIdx molecule_get_other_bond_atom(const Molecule *const restrict molec
 }
 
 
-inline AtomIdx molecule_get_opposite_atom(const Molecule *const restrict molecule, AtomIdx centre, AtomIdx atom)
+static inline AtomIdx molecule_get_opposite_atom(const Molecule *const restrict molecule, AtomIdx centre, AtomIdx atom)
 {
     if(molecule_get_bonded_atom_list_size(molecule, centre) != 2)
         return -1;
@@ -607,31 +607,31 @@ inline AtomIdx molecule_get_opposite_atom(const Molecule *const restrict molecul
 }
 
 
-inline BondIdx molecule_get_bond(const Molecule *const restrict molecule, AtomIdx i, AtomIdx j)
+static inline BondIdx molecule_get_bond(const Molecule *const restrict molecule, AtomIdx i, AtomIdx j)
 {
     return molecule->bondMatrix[i * molecule->atomCount + j];
 }
 
 
-inline uint8_t molecule_get_bond_type(const Molecule *const restrict molecule, BondIdx bond)
+static inline uint8_t molecule_get_bond_type(const Molecule *const restrict molecule, BondIdx bond)
 {
     return molecule->bondTypes[bond];
 }
 
 
-inline uint8_t molecule_get_atom_stereo(const Molecule *const restrict molecule, AtomIdx atom)
+static inline uint8_t molecule_get_atom_stereo(const Molecule *const restrict molecule, AtomIdx atom)
 {
     return molecule->atomStereo[atom];
 }
 
 
-inline uint8_t molecule_get_bond_stereo(const Molecule *const restrict molecule, BondIdx bond)
+static inline uint8_t molecule_get_bond_stereo(const Molecule *const restrict molecule, BondIdx bond)
 {
     return molecule->bondStereo[bond];
 }
 
 
-inline AtomIdx molecule_get_last_stereo_bond_ligand(const Molecule *const restrict molecule, AtomIdx atom, BondIdx bond, AtomIdx ligand)
+static inline AtomIdx molecule_get_last_stereo_bond_ligand(const Molecule *const restrict molecule, AtomIdx atom, BondIdx bond, AtomIdx ligand)
 {
     MolSize listSize = molecule_get_bonded_atom_list_size(molecule, atom);
 
@@ -657,7 +657,7 @@ inline AtomIdx molecule_get_last_stereo_bond_ligand(const Molecule *const restri
 }
 
 
-inline AtomIdx molecule_get_last_chiral_ligand(const Molecule *const restrict molecule, AtomIdx centre, AtomIdx *ligands)
+static inline AtomIdx molecule_get_last_chiral_ligand(const Molecule *const restrict molecule, AtomIdx centre, AtomIdx *ligands)
 {
     MolSize listSize = molecule_get_bonded_atom_list_size(molecule, centre);
 
@@ -730,7 +730,7 @@ inline AtomIdx molecule_get_last_chiral_ligand(const Molecule *const restrict mo
 }
 
 
-inline uint8_t normalize_atom_stereo(AtomIdx indexes[4], uint8_t stereo)
+static inline uint8_t normalize_atom_stereo(AtomIdx indexes[4], uint8_t stereo)
 {
     uint16_t order = 0;
 
@@ -760,7 +760,7 @@ inline uint8_t normalize_atom_stereo(AtomIdx indexes[4], uint8_t stereo)
 }
 
 
-inline uint8_t normalize_bond_stereo(AtomIdx indexes[4], uint8_t conformation)
+static inline uint8_t normalize_bond_stereo(AtomIdx indexes[4], uint8_t conformation)
 {
     bool reverse = false;
 

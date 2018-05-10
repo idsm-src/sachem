@@ -118,7 +118,7 @@ void vf2_timeout_handler(void);
 #endif
 
 
-inline void swap_idx(AtomIdx *a, AtomIdx *b)
+static inline void swap_idx(AtomIdx *a, AtomIdx *b)
 {
     AtomIdx t = *a;
     *a = *b;
@@ -126,7 +126,7 @@ inline void swap_idx(AtomIdx *a, AtomIdx *b)
 }
 
 
-inline void sort_stereo_atoms(AtomIdx array[4])
+static inline void sort_stereo_atoms(AtomIdx array[4])
 {
     for(int n = 4; n > 0; n--)
         for(int i = 1; i < n; i++)
@@ -135,7 +135,7 @@ inline void sort_stereo_atoms(AtomIdx array[4])
 }
 
 
-inline void sort_bond_atoms(AtomIdx array[4])
+static inline void sort_bond_atoms(AtomIdx array[4])
 {
     if(array[0] > array[1])
         swap_idx(array + 0, array + 1);
@@ -145,7 +145,7 @@ inline void sort_bond_atoms(AtomIdx array[4])
 }
 
 
-inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *const restrict query,
+static inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *const restrict query,
         GraphMode graphMode, ChargeMode chargeMode, IsotopeMode isotopeMode, StereoMode stereoMode)
 {
 #if USE_VF2_TIMEOUT
@@ -222,7 +222,7 @@ inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *con
 }
 
 
-inline bool vf2state_next_query(VF2State *const restrict vf2state)
+static inline bool vf2state_next_query(VF2State *const restrict vf2state)
 {
     if(unlikely(vf2state->coreLength >= vf2state->queryAtomCount))
         return false;
@@ -235,7 +235,7 @@ inline bool vf2state_next_query(VF2State *const restrict vf2state)
 }
 
 
-inline bool vf2state_next_target(VF2State *const restrict vf2state)
+static inline bool vf2state_next_target(VF2State *const restrict vf2state)
 {
     AtomIdx query_parent = vf2state->queryParents[vf2state->queryIdx];
 
@@ -269,7 +269,7 @@ inline bool vf2state_next_target(VF2State *const restrict vf2state)
 }
 
 
-inline bool vf2state_atom_matches(const VF2State *const restrict vf2state, AtomIdx queryAtom, AtomIdx targetAtom)
+static inline bool vf2state_atom_matches(const VF2State *const restrict vf2state, AtomIdx queryAtom, AtomIdx targetAtom)
 {
     int8_t queryAtomNumber = molecule_get_atom_number(vf2state->query, queryAtom);
     int8_t targetAtomNumber = molecule_get_atom_number(vf2state->target, targetAtom);
@@ -321,7 +321,7 @@ inline bool vf2state_atom_matches(const VF2State *const restrict vf2state, AtomI
 }
 
 
-inline bool vf2state_bond_matches(const VF2State *const restrict vf2state, AtomIdx qIdx1, AtomIdx qIdx2, AtomIdx tIdx1, AtomIdx tIdx2)
+static inline bool vf2state_bond_matches(const VF2State *const restrict vf2state, AtomIdx qIdx1, AtomIdx qIdx2, AtomIdx tIdx1, AtomIdx tIdx2)
 {
     BondIdx queryBond = molecule_get_bond(vf2state->query, qIdx1, qIdx2);
     BondIdx targetbond = molecule_get_bond(vf2state->target, tIdx1, tIdx2);
@@ -360,7 +360,7 @@ inline bool vf2state_bond_matches(const VF2State *const restrict vf2state, AtomI
 }
 
 
-inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
+static inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
 {
     if(likely(!vf2state_atom_matches(vf2state, vf2state->queryIdx, vf2state->targetIdx)))
         return false;
@@ -458,7 +458,7 @@ inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2state)
 }
 
 
-inline void vf2state_undo_add_pair(VF2State *const restrict vf2state)
+static inline void vf2state_undo_add_pair(VF2State *const restrict vf2state)
 {
     VF2Undo *restrict undo = &vf2state->undos[--vf2state->coreLength];
 
@@ -472,7 +472,7 @@ inline void vf2state_undo_add_pair(VF2State *const restrict vf2state)
 }
 
 
-inline void vf2state_add_pair(VF2State *const restrict vf2state)
+static inline void vf2state_add_pair(VF2State *const restrict vf2state)
 {
     VF2Undo *restrict undo = &vf2state->undos[vf2state->coreLength];
 
@@ -485,7 +485,7 @@ inline void vf2state_add_pair(VF2State *const restrict vf2state)
 }
 
 
-inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
+static inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
 {
     const Molecule *const restrict query = vf2state->query;
     const Molecule *const restrict target = vf2state->target;
@@ -614,7 +614,7 @@ inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2state)
 }
 
 
-inline bool vf2state_is_match_valid(const VF2State *const restrict vf2state)
+static inline bool vf2state_is_match_valid(const VF2State *const restrict vf2state)
 {
     const Molecule *const restrict query = vf2state->query;
     const Molecule *const restrict target = vf2state->target;
@@ -675,7 +675,7 @@ inline bool vf2state_is_match_valid(const VF2State *const restrict vf2state)
 }
 
 
-inline bool vf2state_match_core(VF2State *const restrict vf2state)
+static inline bool vf2state_match_core(VF2State *const restrict vf2state)
 {
     while(true)
     {
@@ -726,7 +726,7 @@ inline bool vf2state_match_core(VF2State *const restrict vf2state)
 }
 
 
-inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *const restrict target, int32_t targetId, int timeout)
+static inline bool vf2state_match(VF2State *const restrict vf2state, const Molecule *const restrict target, int32_t targetId, int timeout)
 {
     vf2state->targetId = targetId;
 

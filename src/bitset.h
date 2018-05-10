@@ -24,7 +24,7 @@ typedef struct
 } BitSet;
 
 
-inline void bitset_init(BitSet *restrict const bitset, uint64_t *words, int length)
+static inline void bitset_init(BitSet *restrict const bitset, uint64_t *words, int length)
 {
     bitset->words = words;
     bitset->length = length;
@@ -32,7 +32,7 @@ inline void bitset_init(BitSet *restrict const bitset, uint64_t *words, int leng
 }
 
 
-inline void bitset_init_alloc(BitSet *restrict const bitset, int size)
+static inline void bitset_init_alloc(BitSet *restrict const bitset, int size)
 {
     int length = (size + BITS_PER_WORD - 1) >> ADDRESS_BITS_PER_WORD;
     uint64_t *words = (uint64_t *) palloc(length * sizeof(uint64_t));
@@ -43,7 +43,7 @@ inline void bitset_init_alloc(BitSet *restrict const bitset, int size)
 }
 
 
-inline void bitset_init_empty(BitSet *restrict const bitset, int size)
+static inline void bitset_init_empty(BitSet *restrict const bitset, int size)
 {
     int length = (size + BITS_PER_WORD - 1) >> ADDRESS_BITS_PER_WORD;
     uint64_t *words = (uint64_t *) palloc0(length * sizeof(uint64_t));
@@ -54,7 +54,7 @@ inline void bitset_init_empty(BitSet *restrict const bitset, int size)
 }
 
 
-inline void bitset_init_setted(BitSet *restrict const bitset, int size)
+static inline void bitset_init_setted(BitSet *restrict const bitset, int size)
 {
     int length = (size + BITS_PER_WORD - 1) >> ADDRESS_BITS_PER_WORD;
     uint64_t *words = (uint64_t *) palloc(length * sizeof(uint64_t));
@@ -71,7 +71,7 @@ inline void bitset_init_setted(BitSet *restrict const bitset, int size)
 }
 
 
-inline void bitset_init_from_array(BitSet *restrict const bitset, uint8_t *data, int length)
+static inline void bitset_init_from_array(BitSet *restrict const bitset, uint8_t *data, int length)
 {
     int idx = length;
 
@@ -105,7 +105,7 @@ inline void bitset_init_from_array(BitSet *restrict const bitset, uint8_t *data,
 }
 
 
-inline void bitset_copy(BitSet *restrict const bitset, const BitSet *restrict const source)
+static inline void bitset_copy(BitSet *restrict const bitset, const BitSet *restrict const source)
 {
 #if BITSET_ASSERT
     if(bitset->length != source->length)
@@ -117,7 +117,7 @@ inline void bitset_copy(BitSet *restrict const bitset, const BitSet *restrict co
 }
 
 
-inline bool bitset_get(BitSet *restrict const bitset, int bitIndex)
+static inline bool bitset_get(BitSet *restrict const bitset, int bitIndex)
 {
     int wordIndex = bitIndex >> ADDRESS_BITS_PER_WORD;
 
@@ -130,7 +130,7 @@ inline bool bitset_get(BitSet *restrict const bitset, int bitIndex)
 }
 
 
-inline void bitset_set(BitSet *restrict const bitset, int bitIndex)
+static inline void bitset_set(BitSet *restrict const bitset, int bitIndex)
 {
     int wordIndex = bitIndex >> ADDRESS_BITS_PER_WORD;
 
@@ -146,7 +146,7 @@ inline void bitset_set(BitSet *restrict const bitset, int bitIndex)
 }
 
 
-inline void bitset_unset(BitSet *restrict const bitset, int bitIndex)
+static inline void bitset_unset(BitSet *restrict const bitset, int bitIndex)
 {
     int wordIndex = bitIndex >> ADDRESS_BITS_PER_WORD;
 
@@ -162,7 +162,7 @@ inline void bitset_unset(BitSet *restrict const bitset, int bitIndex)
 }
 
 
-inline void bitset_merge(BitSet *restrict const bitset, const BitSet *restrict const other)
+static inline void bitset_merge(BitSet *restrict const bitset, const BitSet *restrict const other)
 {
     if(bitset == other)
         return;
@@ -178,7 +178,7 @@ inline void bitset_merge(BitSet *restrict const bitset, const BitSet *restrict c
 }
 
 
-inline int bitset_number_of_trailing_zeros(uint64_t i)
+static inline int bitset_number_of_trailing_zeros(uint64_t i)
 {
     if(i == 0)
         return 64;
@@ -235,7 +235,7 @@ inline int bitset_number_of_trailing_zeros(uint64_t i)
 }
 
 
-inline int bitset_next_set_bit(const BitSet *restrict const bitset, int fromIndex)
+static inline int bitset_next_set_bit(const BitSet *restrict const bitset, int fromIndex)
 {
     int wordIndex = fromIndex >> ADDRESS_BITS_PER_WORD;
 
@@ -257,7 +257,7 @@ inline int bitset_next_set_bit(const BitSet *restrict const bitset, int fromInde
 }
 
 
-inline int bitset_word_cardinality(uint64_t i)
+static inline int bitset_word_cardinality(uint64_t i)
 {
     /* based on the Long.java code */
 
@@ -272,7 +272,7 @@ inline int bitset_word_cardinality(uint64_t i)
 }
 
 
-inline int bitset_cardinality(BitSet *restrict const bitset)
+static inline int bitset_cardinality(BitSet *restrict const bitset)
 {
     int cardinality = 0;
 
@@ -283,7 +283,7 @@ inline int bitset_cardinality(BitSet *restrict const bitset)
 }
 
 
-inline int bitset_and_cardinality(BitSet *restrict const bitset, const BitSet *restrict const other)
+static inline int bitset_and_cardinality(BitSet *restrict const bitset, const BitSet *restrict const other)
 {
     int wordsInUse = bitset->wordsInUse;
 

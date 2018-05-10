@@ -5,7 +5,7 @@
 #include <sys/time.h>
 
 
-inline struct timeval time_get()
+static inline struct timeval time_get()
 {
     struct timeval value;
     gettimeofday(&value, NULL);
@@ -13,13 +13,13 @@ inline struct timeval time_get()
 }
 
 
-inline int64_t time_spent(struct timeval begin, struct timeval end)
+static inline int64_t time_spent(struct timeval begin, struct timeval end)
 {
     return ((int64_t) end.tv_sec - (int64_t) begin.tv_sec) * 1000000 + ((int64_t) end.tv_usec - (int64_t) begin.tv_usec);
 }
 
 
-inline double time_to_ms(int64_t time)
+static inline double time_to_ms(int64_t time)
 {
     return time / 1000.0;
 }

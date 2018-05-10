@@ -35,7 +35,7 @@ typedef struct
 } LucyResultSet;
 
 
-inline bool lucy_is_open(LucyResultSet *resultSet)
+static inline bool lucy_is_open(LucyResultSet *resultSet)
 {
     return resultSet->possition != -1;
 }
