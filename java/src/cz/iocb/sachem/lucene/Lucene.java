@@ -2,7 +2,6 @@ package cz.iocb.sachem.lucene;
 
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.BitSet;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.IntPoint;
 import org.apache.lucene.document.StoredField;
@@ -36,57 +35,12 @@ public class Lucene
     };
 
 
-    private class BitSetCollector extends SimpleCollector
-    {
-        private final BitSet bitset;
-        int docBase;
-
-        BitSetCollector()
-        {
-            this.bitset = new BitSet(maxMoleculeId);
-        }
-
-        @Override
-        protected void doSetNextReader(LeafReaderContext context) throws IOException
-        {
-            docBase = context.docBase;
-        }
-
-        @Override
-        public void collect(int docId) throws IOException
-        {
-            if(useIdTable)
-            {
-                bitset.set(idTable[docBase + docId]);
-            }
-            else
-            {
-                Document doc = searcher.doc(docBase + docId);
-                IndexableField id = doc.getField(idFieldName);
-                int moleculeId = id.numericValue().intValue();
-                bitset.set(moleculeId);
-            }
-        }
-
-        @Override
-        public boolean needsScores()
-        {
-            return false;
-        }
-
-        public BitSet getBitSet()
-        {
-            return bitset;
-        }
-    }
-
-
     private static final IndexType indexType = IndexType.POINTS;
     private static final boolean useIdTable = true;
     private static final String idFieldName = "id";
     private static final String fpFieldName = "fp";
 
-    private int maxMoleculeId;
+    protected int maxMoleculeId;
     private Directory folder;
     private IndexSearcher searcher;
     private IndexWriter indexer;
@@ -94,7 +48,7 @@ public class Lucene
     private final FingerprintTokenizer tokenizer = new FingerprintTokenizer();
 
 
-    void setFolder(String path, int maxId) throws IOException
+    public void setFolder(String path, int maxId) throws IOException
     {
         maxMoleculeId = maxId;
         folder = FSDirectory.open(Paths.get(path));
@@ -105,7 +59,7 @@ public class Lucene
     }
 
 
-    void begin() throws IOException
+    public void begin() throws IOException
     {
         TieredMergePolicy policy = new TieredMergePolicy();
         policy.setMaxMergeAtOnceExplicit(Integer.MAX_VALUE);
@@ -118,7 +72,7 @@ public class Lucene
     }
 
 
-    void add(int id, int[] fp) throws IOException
+    public void add(int id, int[] fp) throws IOException
     {
         Document document = new Document();
         document.add(new IntPoint(idFieldName, id));
@@ -138,77 +92,43 @@ public class Lucene
     }
 
 
-    void addIndex(String path) throws IOException
+    public void addIndex(String path) throws IOException
     {
         Directory subFolder = FSDirectory.open(Paths.get(path));
         indexer.addIndexes(subFolder);
     }
 
 
-    void delete(int id) throws IOException
+    public void delete(int id) throws IOException
     {
         indexer.deleteDocuments(IntPoint.newExactQuery(idFieldName, id));
     }
 
 
-    void optimize() throws IOException
+    public void optimize() throws IOException
     {
         indexer.forceMerge(1);
     }
 
 
-    void commit() throws IOException
+    public void commit() throws IOException
     {
         indexer.commit();
         indexer.close();
     }
 
 
-    void rollback() throws IOException
+    public void rollback() throws IOException
     {
         indexer.rollback();
         indexer.close();
     }
 
 
-    long[] search(int fp[]) throws IOException
+    public long[] search(int fp[]) throws IOException
     {
         if(searcher == null)
-        {
-            IndexReader reader = DirectoryReader.open(folder);
-            searcher = new IndexSearcher(reader);
-
-            if(useIdTable)
-            {
-                idTable = new int[reader.maxDoc()];
-
-                searcher.search(new MatchAllDocsQuery(), new SimpleCollector()
-                {
-                    private int docBase;
-
-                    @Override
-                    protected void doSetNextReader(LeafReaderContext context) throws IOException
-                    {
-                        docBase = context.docBase;
-                    }
-
-                    @Override
-                    public void collect(int docId) throws IOException
-                    {
-                        Document doc = searcher.doc(docBase + docId);
-                        IndexableField id = doc.getField(idFieldName);
-                        int moleculeId = id.numericValue().intValue();
-                        idTable[docBase + docId] = moleculeId;
-                    }
-
-                    @Override
-                    public boolean needsScores()
-                    {
-                        return false;
-                    }
-                });
-            }
-        }
+            initSearcher();
 
 
         Builder builder = new BooleanQuery.Builder();
@@ -224,9 +144,64 @@ public class Lucene
                 builder.add(IntPoint.newExactQuery(fpFieldName, bit), BooleanClause.Occur.MUST);
         }
 
-        BitSetCollector collector = new BitSetCollector();
+        BitSetCollector collector = new BitSetCollector(this);
         searcher.search(new ConstantScoreQuery(builder.build()), collector);
 
         return collector.getBitSet().toLongArray();
+    }
+
+
+    protected void initSearcher() throws IOException
+    {
+        IndexReader reader = DirectoryReader.open(folder);
+        searcher = new IndexSearcher(reader);
+
+        if(useIdTable)
+        {
+            idTable = new int[reader.maxDoc()];
+
+            searcher.search(new MatchAllDocsQuery(), new SimpleCollector()
+            {
+                private int docBase;
+
+                @Override
+                protected void doSetNextReader(LeafReaderContext context) throws IOException
+                {
+                    docBase = context.docBase;
+                }
+
+                @Override
+                public void collect(int docId) throws IOException
+                {
+                    Document doc = searcher.doc(docBase + docId);
+                    IndexableField id = doc.getField(idFieldName);
+                    int moleculeId = id.numericValue().intValue();
+                    idTable[docBase + docId] = moleculeId;
+                }
+
+                @Override
+                public boolean needsScores()
+                {
+                    return false;
+                }
+            });
+        }
+    }
+
+
+    protected final int getMoleculeId(int id) throws IOException
+    {
+        if(useIdTable)
+        {
+            return idTable[id];
+        }
+        else
+        {
+            Document doc = searcher.doc(id);
+            IndexableField field = doc.getField(idFieldName);
+            int moleculeId = field.numericValue().intValue();
+
+            return moleculeId;
+        }
     }
 }

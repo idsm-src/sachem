@@ -1,0 +1,49 @@
+package cz.iocb.sachem.lucene;
+
+import java.io.IOException;
+import java.util.BitSet;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.search.SimpleCollector;
+
+
+
+public class BitSetCollector extends SimpleCollector
+{
+    private final Lucene lucene;
+    private final BitSet bitset;
+    private int docBase;
+
+
+    BitSetCollector(Lucene lucene)
+    {
+        this.lucene = lucene;
+        this.bitset = new BitSet(lucene.maxMoleculeId);
+    }
+
+
+    @Override
+    protected void doSetNextReader(LeafReaderContext context) throws IOException
+    {
+        docBase = context.docBase;
+    }
+
+
+    @Override
+    public void collect(int docId) throws IOException
+    {
+        bitset.set(lucene.getMoleculeId(docBase + docId));
+    }
+
+
+    @Override
+    public boolean needsScores()
+    {
+        return false;
+    }
+
+
+    public BitSet getBitSet()
+    {
+        return bitset;
+    }
+}
