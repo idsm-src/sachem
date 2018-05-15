@@ -1,6 +1,6 @@
 bin_SCRIPTS = inchi/inchi-1
 
-jar_DATA = lib/cdk-2.1.1.jar sachem.jar lib/commons-net-3.6.jar lib/jdbc-postgresql.jar lib/lucene-core-7.2.1.jar
+jar_DATA = lib/cdk-2.1.1.jar sachem.jar lib/commons-net-3.6.jar lib/jdbc-postgresql.jar lib/lucene-core-7.2.1.jar lib/lucene-queries-7.2.1.jar
 jardir = $(datadir)/$(PACKAGE)/jar
 
 sachem.jar: force-build
@@ -18,6 +18,7 @@ EXTRA_DIST = \
     lib/commons-net-3.6.jar \
     lib/jdbc-postgresql.jar \
     lib/lucene-core-7.2.1.jar \
+    lib/lucene-queries-7.2.1.jar \
     src/cz/iocb/sachem/convert/ConvertMolecule.java \
     src/cz/iocb/sachem/fingerprint/bitpos/BitPosApi.java \
     src/cz/iocb/sachem/fingerprint/bitpos/BitPositions.java \
@@ -34,10 +35,15 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/load/GeneralCompoundLoader.java \
     src/cz/iocb/sachem/load/DrugbankCompoundUpdater.java \
     src/cz/iocb/sachem/load/PubChemCompoundUpdater.java \
+    src/cz/iocb/sachem/lucene/BitSetCollector.java \
     src/cz/iocb/sachem/lucene/FingerprintAnalyzer.java \
     src/cz/iocb/sachem/lucene/FingerprintReader.java \
     src/cz/iocb/sachem/lucene/FingerprintTokenizer.java \
     src/cz/iocb/sachem/lucene/Lucene.java \
+    src/cz/iocb/sachem/lucene/ScoreHit.java \
+    src/cz/iocb/sachem/lucene/SimilarDocCollector.java \
+    src/cz/iocb/sachem/lucene/TanimotoScoreProvider.java \
+    src/cz/iocb/sachem/lucene/TanimotoScoreQuery.java \
     src/cz/iocb/sachem/search/LucyLoader.java \
     src/cz/iocb/sachem/search/EcdkLoader.java \
     src/cz/iocb/sachem/search/EcdkSimilaritySearch.java \
@@ -46,6 +52,7 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/search/OrchemSimilaritySearch.java \
     src/cz/iocb/sachem/search/OrchemSubstructureSearch.java \
     src/cz/iocb/sachem/search/SachemMoleculeBuilder.java \
+    src/cz/iocb/sachem/search/SimilaritySearch.java \
     src/cz/iocb/sachem/search/SubstructureSearch.java \
     src/cz/iocb/sachem/search/QueryFormat.java \
     src/cz/iocb/sachem/shared/MoleculeCounts.java \

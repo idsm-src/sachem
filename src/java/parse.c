@@ -14,6 +14,9 @@ static jfieldID moleculeField = NULL;
 static jfieldID restHField = NULL;
 static jmethodID substructureQueryDataMethod = NULL;
 
+static jclass similaritySearchClass = NULL;
+static jmethodID similarityQueryDataMethod = NULL;
+
 static jclass lucyLoaderClass = NULL;
 static jclass lucyLoaderDataClass = NULL;
 static jfieldID lucyLoaderExceptionField = NULL;
@@ -46,6 +49,13 @@ void java_parse_init(void)
     java_check_exception(__func__);
 
     substructureQueryDataMethod = (*env)->GetStaticMethodID(env, substructureSearchClass, "getQueryData", "([BIZZ)[Lcz/iocb/sachem/search/SubstructureSearch$QueryData;");
+    java_check_exception(__func__);
+
+
+    similaritySearchClass = (*env)->FindClass(env, "cz/iocb/sachem/search/SimilaritySearch");
+    java_check_exception(__func__);
+
+    similarityQueryDataMethod = (*env)->GetStaticMethodID(env, similaritySearchClass, "getQueryData", "([BI)[B");
     java_check_exception(__func__);
 
 
@@ -152,6 +162,48 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
     PG_END_TRY();
 
     return length;
+}
+
+
+void java_parse_similarity_query(SimilarityQueryData *data, char* query, size_t queryLength, int32_t type)
+{
+    jbyteArray queryArg = NULL;
+    jbyteArray moleculeArray = NULL;
+    jbyte *molecule = NULL;
+
+
+    PG_TRY();
+    {
+        queryArg = (*env)->NewByteArray(env, queryLength);
+        java_check_exception(__func__);
+
+        (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte *) query);
+
+
+        moleculeArray = (jbyteArray) (*env)->CallStaticObjectMethod(env, similaritySearchClass, similarityQueryDataMethod, queryArg, (jint) type);
+        java_check_exception(__func__);
+
+        JavaDeleteRef(queryArg);
+
+
+        jsize moleculeSize = (*env)->GetArrayLength(env, moleculeArray);
+        molecule = (*env)->GetByteArrayElements(env, moleculeArray, NULL);
+        java_check_exception(__func__);
+
+
+        data->molecule = (uint8_t *) palloc(moleculeSize);
+        memcpy(data->molecule, molecule, moleculeSize);
+
+        JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
+    }
+    PG_CATCH();
+    {
+        JavaDeleteRef(queryArg);
+        JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
 }
 
 

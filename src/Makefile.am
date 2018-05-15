@@ -25,6 +25,7 @@ libsachem_la_SOURCES = \
         ecdk/subsearch.c \
         ecdk/sync.c \
         lucene/lucene.c \
+        lucene/simsearch.c \
         lucene/subsearch.c \
         lucene/sync.c \
         lucy/lucy.c \

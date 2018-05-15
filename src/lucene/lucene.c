@@ -12,6 +12,7 @@
 
 static bool luceneInitialized = false;
 static jclass luceneClass;
+static jmethodID constructor;
 static jmethodID setFolderMethod;
 static jmethodID beginMethod;
 static jmethodID addMethod;
@@ -21,6 +22,10 @@ static jmethodID optimizeMethod;
 static jmethodID commitMethod;
 static jmethodID rollbackMethod;
 static jmethodID searchMethod;
+static jmethodID simsearchMethod;
+static jclass scoreHitClass;
+static jfieldID idField;
+static jfieldID scoreField;
 
 
 void lucene_init(Lucene *lucene)
@@ -30,6 +35,10 @@ void lucene_init(Lucene *lucene)
         java_init();
 
         luceneClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/Lucene");
+        java_check_exception(__func__);
+
+        constructor = (*env)->GetMethodID(env, luceneClass, "<init>", "()V");
+        java_check_exception(__func__);
 
         setFolderMethod = (*env)->GetMethodID(env, luceneClass, "setFolder", "(Ljava/lang/String;I)V");
         java_check_exception(__func__);
@@ -58,14 +67,23 @@ void lucene_init(Lucene *lucene)
         searchMethod = (*env)->GetMethodID(env, luceneClass, "search", "([I)[J");
         java_check_exception(__func__);
 
-        jmethodID constructor = (*env)->GetMethodID(env, luceneClass, "<init>", "()V");
+        simsearchMethod = (*env)->GetMethodID(env, luceneClass, "simsearch", "([IIF)[Lcz/iocb/sachem/lucene/ScoreHit;");
         java_check_exception(__func__);
 
-        lucene->instance = (*env)->NewObject(env, luceneClass, constructor);
+        scoreHitClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/ScoreHit");
+        java_check_exception(__func__);
+
+        idField = (*env)->GetFieldID(env, scoreHitClass, "id", "I");
+        java_check_exception(__func__);
+
+        scoreField = (*env)->GetFieldID(env, scoreHitClass, "score", "F");
         java_check_exception(__func__);
 
         luceneInitialized = true;
     }
+
+    lucene->instance = (*env)->NewObject(env, luceneClass, constructor);
+    java_check_exception(__func__);
 
     lucene->bitsetArray = NULL;
     lucene->bitsetWords = NULL;
@@ -246,6 +264,80 @@ size_t lucene_get(Lucene *lucene, LuceneResultSet *resultSet, int32_t *buffer, s
 void lucene_fail(Lucene *lucene, LuceneResultSet *resultSet)
 {
     JavaDeleteLongArray(lucene->bitsetArray, lucene->bitsetWords, JNI_ABORT);
+}
+
+
+LuceneSimsearchResult lucene_simsearch_submit(Lucene *lucene, IntegerFingerprint fp, int32_t topN, float cutoff)
+{
+    jintArray fpArray = NULL;
+    jobjectArray result = NULL;
+    jsize count;
+
+    PG_TRY();
+    {
+        fpArray = (jintArray) (*env)->NewIntArray(env, fp.size);
+        java_check_exception(__func__);
+
+        (*env)->SetIntArrayRegion(env, fpArray, 0, fp.size, (jint*) fp.data);
+        java_check_exception(__func__);
+
+        result = (jobjectArray) (*env)->CallObjectMethod(env, lucene->instance, simsearchMethod, fpArray, topN, cutoff);
+        java_check_exception(__func__);
+
+        count = (*env)->GetArrayLength(env, result);
+
+        JavaDeleteRef(fpArray);
+    }
+    PG_CATCH();
+    {
+        JavaDeleteRef(fpArray);
+        JavaDeleteRef(result);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
+
+    return (LuceneSimsearchResult) { .count = count, .possition = 0, .result = result };
+}
+
+
+bool lucene_simsearch_get(Lucene *lucene, LuceneSimsearchResult *result, int32_t *id, float *score)
+{
+    if(result->possition == result->count)
+    {
+        JavaDeleteRef(result->result);
+        return false;
+    }
+
+
+    jobject element = NULL;
+
+    PG_TRY();
+    {
+        element = (*env)->GetObjectArrayElement(env, result->result, result->possition);
+        *id = (*env)->GetIntField(env, element, idField);
+        *score = (*env)->GetFloatField(env, element, scoreField);
+
+        java_check_exception(__func__);
+
+        JavaDeleteRef(element);
+    }
+    PG_CATCH();
+    {
+        JavaDeleteRef(element);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
+
+    result->possition++;
+    return true;
+}
+
+
+void lucene_simsearch_fail(Lucene *lucene, LuceneSimsearchResult *result)
+{
+    JavaDeleteRef(result->result);
 }
 
 

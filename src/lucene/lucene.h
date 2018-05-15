@@ -26,6 +26,14 @@ typedef struct
 } LuceneResultSet;
 
 
+typedef struct
+{
+    jobjectArray result;
+    size_t count;
+    size_t possition;
+} LuceneSimsearchResult;
+
+
 static inline bool lucene_is_open(LuceneResultSet *resultSet)
 {
     return resultSet->possition != -1;
@@ -44,6 +52,9 @@ void lucene_rollback(Lucene *lucene);
 LuceneResultSet lucene_search(Lucene *lucene, IntegerFingerprint fp);
 size_t lucene_get(Lucene *lucene, LuceneResultSet *resultSet, int32_t *buffer, size_t size);
 void lucene_fail(Lucene *lucene, LuceneResultSet *resultSet);
+LuceneSimsearchResult lucene_simsearch_submit(Lucene *lucene, IntegerFingerprint fp, int32_t topN, float cutoff);
+bool lucene_simsearch_get(Lucene *lucene, LuceneSimsearchResult *result, int32_t *id, float *score);
+void lucene_simsearch_fail(Lucene *lucene, LuceneSimsearchResult *result);
 void lucene_link_directory(const char *oldPath, const char *newPath);
 void lucene_delete_directory(const char *path);
 

@@ -22,6 +22,7 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.SimpleCollector;
 import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.similarities.BooleanSimilarity;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 
@@ -37,14 +38,18 @@ public class Lucene
 
     private static final IndexType indexType = IndexType.POINTS;
     private static final boolean useIdTable = true;
+    private static final boolean useSizeTable = true;
+
     private static final String idFieldName = "id";
     private static final String fpFieldName = "fp";
+    private static final String sizeFieldName = "sz";
 
     protected int maxMoleculeId;
     private Directory folder;
     private IndexSearcher searcher;
     private IndexWriter indexer;
     private int[] idTable;
+    private int[] sizeTable;
     private final FingerprintTokenizer tokenizer = new FingerprintTokenizer();
 
 
@@ -56,6 +61,9 @@ public class Lucene
 
         if(useIdTable)
             idTable = null;
+
+        if(useSizeTable)
+            sizeTable = null;
     }
 
 
@@ -68,6 +76,7 @@ public class Lucene
         FingerprintAnalyzer analyzer = new FingerprintAnalyzer();
         IndexWriterConfig config = new IndexWriterConfig(analyzer);
         config.setMergePolicy(policy);
+        config.setSimilarity(new BooleanSimilarity());
         indexer = new IndexWriter(folder, config);
     }
 
@@ -77,6 +86,7 @@ public class Lucene
         Document document = new Document();
         document.add(new IntPoint(idFieldName, id));
         document.add(new StoredField(idFieldName, id));
+        document.add(new StoredField(sizeFieldName, fp.length));
 
         if(indexType == IndexType.TEXT)
         {
@@ -151,14 +161,50 @@ public class Lucene
     }
 
 
+    ScoreHit[] simsearch(int fp[], int top, float cutoff) throws IOException
+    {
+        if(searcher == null)
+            initSearcher();
+
+
+        Builder builder = new BooleanQuery.Builder();
+
+        if(indexType == IndexType.TEXT)
+        {
+            for(int bit : fp)
+                builder.add(new TermQuery(new Term(fpFieldName, tokenizer.bitAsString(bit))),
+                        BooleanClause.Occur.SHOULD);
+        }
+        else
+        {
+            for(int bit : fp)
+                builder.add(IntPoint.newExactQuery(fpFieldName, bit), BooleanClause.Occur.SHOULD);
+        }
+
+
+        SimilarDocCollector collector = new SimilarDocCollector(this, top, cutoff);
+        searcher.search(new TanimotoScoreQuery(this, builder.build()), collector);
+
+        return collector.getDocs();
+    }
+
+
     protected void initSearcher() throws IOException
     {
         IndexReader reader = DirectoryReader.open(folder);
         searcher = new IndexSearcher(reader);
+        searcher.setSimilarity(new BooleanSimilarity());
 
-        if(useIdTable)
+        @SuppressWarnings("unused")
+        boolean useCache = useIdTable || useSizeTable;
+
+        if(useCache)
         {
-            idTable = new int[reader.maxDoc()];
+            if(useIdTable)
+                idTable = new int[reader.maxDoc()];
+
+            if(useSizeTable)
+                sizeTable = new int[reader.maxDoc()];
 
             searcher.search(new MatchAllDocsQuery(), new SimpleCollector()
             {
@@ -174,9 +220,20 @@ public class Lucene
                 public void collect(int docId) throws IOException
                 {
                     Document doc = searcher.doc(docBase + docId);
-                    IndexableField id = doc.getField(idFieldName);
-                    int moleculeId = id.numericValue().intValue();
-                    idTable[docBase + docId] = moleculeId;
+
+                    if(useIdTable)
+                    {
+                        IndexableField id = doc.getField(idFieldName);
+                        int moleculeId = id.numericValue().intValue();
+                        idTable[docBase + docId] = moleculeId;
+                    }
+
+                    if(useSizeTable)
+                    {
+                        StoredField field = (StoredField) doc.getField(sizeFieldName);
+                        int fpSize = field.numericValue().intValue();
+                        sizeTable[docBase + docId] = fpSize;
+                    }
                 }
 
                 @Override
@@ -202,6 +259,23 @@ public class Lucene
             int moleculeId = field.numericValue().intValue();
 
             return moleculeId;
+        }
+    }
+
+
+    protected final int getMoleculeFpSize(int id) throws IOException
+    {
+        if(useSizeTable)
+        {
+            return sizeTable[id];
+        }
+        else
+        {
+            Document document = searcher.doc(id);
+            StoredField field = (StoredField) document.getField(sizeFieldName);
+            int fpSize = field.numericValue().intValue();
+
+            return fpSize;
         }
     }
 }
