@@ -44,7 +44,6 @@ public class Lucene
     private static final String fpFieldName = "fp";
     private static final String sizeFieldName = "sz";
 
-    protected int maxMoleculeId;
     private Directory folder;
     private IndexSearcher searcher;
     private IndexWriter indexer;
@@ -53,9 +52,8 @@ public class Lucene
     private final FingerprintTokenizer tokenizer = new FingerprintTokenizer();
 
 
-    public void setFolder(String path, int maxId) throws IOException
+    public void setFolder(String path) throws IOException
     {
-        maxMoleculeId = maxId;
         folder = FSDirectory.open(Paths.get(path));
         searcher = null;
 
@@ -135,7 +133,7 @@ public class Lucene
     }
 
 
-    public long[] subsearch(int fp[]) throws IOException
+    public long[] subsearch(int fp[], int maxMoleculeId) throws IOException
     {
         if(searcher == null)
             initSearcher();
@@ -154,7 +152,7 @@ public class Lucene
                 builder.add(IntPoint.newExactQuery(fpFieldName, bit), BooleanClause.Occur.MUST);
         }
 
-        BitSetCollector collector = new BitSetCollector(this);
+        BitSetCollector collector = new BitSetCollector(this, maxMoleculeId);
         searcher.search(new ConstantScoreQuery(builder.build()), collector);
 
         return collector.getBitSet().toLongArray();

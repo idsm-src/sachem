@@ -229,7 +229,7 @@ void lucene_subsearch_init(void)
 #endif
 
             char *path = get_index_path(LUCENE_INDEX_PREFIX, LUCENE_INDEX_SUFFIX, dbIndexNumber);
-            lucene_set_folder(&lucene, path, moleculeCount);
+            lucene_set_folder(&lucene, path);
             indexId = dbIndexNumber;
         }
         PG_CATCH();
@@ -389,7 +389,7 @@ Datum lucene_substructure_search(PG_FUNCTION_ARGS)
 #if SHOW_STATS
                         struct timeval search_begin = time_get();
 #endif
-                        info->result = lucene_subsearch_submit(&lucene, fp);
+                        info->result = lucene_subsearch_submit(&lucene, fp, moleculeCount);
 #if SHOW_STATS
                         struct timeval search_end = time_get();
                         info->indexTime += time_spent(search_begin, search_end);

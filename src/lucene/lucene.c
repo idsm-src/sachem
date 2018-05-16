@@ -40,7 +40,7 @@ void lucene_init(Lucene *lucene)
         constructor = (*env)->GetMethodID(env, luceneClass, "<init>", "()V");
         java_check_exception(__func__);
 
-        setFolderMethod = (*env)->GetMethodID(env, luceneClass, "setFolder", "(Ljava/lang/String;I)V");
+        setFolderMethod = (*env)->GetMethodID(env, luceneClass, "setFolder", "(Ljava/lang/String;)V");
         java_check_exception(__func__);
 
         beginMethod = (*env)->GetMethodID(env, luceneClass, "begin", "()V");
@@ -64,7 +64,7 @@ void lucene_init(Lucene *lucene)
         rollbackMethod = (*env)->GetMethodID(env, luceneClass, "rollback", "()V");
         java_check_exception(__func__);
 
-        subsearchMethod = (*env)->GetMethodID(env, luceneClass, "subsearch", "([I)[J");
+        subsearchMethod = (*env)->GetMethodID(env, luceneClass, "subsearch", "([II)[J");
         java_check_exception(__func__);
 
         simsearchMethod = (*env)->GetMethodID(env, luceneClass, "simsearch", "([IIF)[Lcz/iocb/sachem/lucene/ScoreHit;");
@@ -87,7 +87,7 @@ void lucene_init(Lucene *lucene)
 }
 
 
-void lucene_set_folder(Lucene *lucene, const char *path, int32_t maxId)
+void lucene_set_folder(Lucene *lucene, const char *path)
 {
     jstring folder = NULL;
 
@@ -96,7 +96,7 @@ void lucene_set_folder(Lucene *lucene, const char *path, int32_t maxId)
         folder = (*env)->NewStringUTF(env, path);
         java_check_exception(__func__);
 
-        (*env)->CallVoidMethod(env, lucene->instance, setFolderMethod, folder, maxId);
+        (*env)->CallVoidMethod(env, lucene->instance, setFolderMethod, folder);
         java_check_exception(__func__);
 
         JavaDeleteRef(folder);
@@ -197,7 +197,7 @@ void lucene_rollback(Lucene *lucene)
 }
 
 
-LuceneSubsearchResult lucene_subsearch_submit(Lucene *lucene, IntegerFingerprint fp)
+LuceneSubsearchResult lucene_subsearch_submit(Lucene *lucene, IntegerFingerprint fp, int32_t maxId)
 {
     LuceneSubsearchResult result = { .bitsetArray = NULL, .bitsetWords = NULL };
     jintArray fpArray = NULL;
@@ -210,7 +210,7 @@ LuceneSubsearchResult lucene_subsearch_submit(Lucene *lucene, IntegerFingerprint
         (*env)->SetIntArrayRegion(env, fpArray, 0, fp.size, (jint*) fp.data);
         java_check_exception(__func__);
 
-        result.bitsetArray = (jlongArray) (*env)->CallObjectMethod(env, lucene->instance, subsearchMethod, fpArray);
+        result.bitsetArray = (jlongArray) (*env)->CallObjectMethod(env, lucene->instance, subsearchMethod, fpArray, maxId);
         java_check_exception(__func__);
 
         jsize size = (*env)->GetArrayLength(env, result.bitsetArray);

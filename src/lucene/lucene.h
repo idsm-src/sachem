@@ -40,7 +40,7 @@ static inline bool lucene_subsearch_is_open(LuceneSubsearchResult *resultSet)
 
 
 void lucene_init(Lucene *lucene);
-void lucene_set_folder(Lucene *lucene, const char *path, int32_t maxId);
+void lucene_set_folder(Lucene *lucene, const char *path);
 void lucene_begin(Lucene *lucene);
 void lucene_add(Lucene *lucene, int32_t id, IntegerFingerprint fp);
 void lucene_add_index(Lucene *lucene, const char *path);
@@ -48,7 +48,7 @@ void lucene_delete(Lucene *lucene, int32_t id);
 void lucene_optimize(Lucene *lucene);
 void lucene_commit(Lucene *lucene);
 void lucene_rollback(Lucene *lucene);
-LuceneSubsearchResult lucene_subsearch_submit(Lucene *lucene, IntegerFingerprint fp);
+LuceneSubsearchResult lucene_subsearch_submit(Lucene *lucene, IntegerFingerprint fp, int32_t maxId);
 size_t lucene_subsearch_get(Lucene *lucene, LuceneSubsearchResult *resultSet, int32_t *buffer, size_t size);
 void lucene_subsearch_fail(Lucene *lucene, LuceneSubsearchResult *resultSet);
 LuceneSimsearchResult lucene_simsearch_submit(Lucene *lucene, IntegerFingerprint fp, int32_t topN, float cutoff);

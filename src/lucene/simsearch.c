@@ -38,7 +38,6 @@ static bool luceneInitialised = false;
 static int indexId = -1;
 static SPIPlanPtr snapshotQueryPlan;
 static Lucene lucene;
-static int moleculeCount;
 static TupleDesc tupdesc = NULL;
 
 
@@ -123,22 +122,8 @@ void lucene_simsearch_init(void)
 
     if(unlikely(dbIndexNumber != indexId))
     {
-        if(unlikely(SPI_execute("select max(id) + 1 from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
-            elog(ERROR, "%s: SPI_execute() failed", __func__);
-
-        if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
-            elog(ERROR, "%s: SPI_execute() failed", __func__);
-
-        char isNullFlag;
-        moleculeCount = DatumGetInt64(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
-
-        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-        SPI_freetuptable(SPI_tuptable);
-
         char *path = get_index_path(LUCENE_INDEX_PREFIX, LUCENE_INDEX_SUFFIX, dbIndexNumber);
-        lucene_set_folder(&lucene, path, moleculeCount);
+        lucene_set_folder(&lucene, path);
         indexId = dbIndexNumber;
     }
 

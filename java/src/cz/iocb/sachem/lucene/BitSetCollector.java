@@ -14,10 +14,10 @@ public class BitSetCollector extends SimpleCollector
     private int docBase;
 
 
-    BitSetCollector(Lucene lucene)
+    BitSetCollector(Lucene lucene, int maxMoleculeId)
     {
         this.lucene = lucene;
-        this.bitset = new BitSet(lucene.maxMoleculeId);
+        this.bitset = new BitSet(maxMoleculeId);
     }
 
 
