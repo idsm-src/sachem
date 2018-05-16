@@ -166,7 +166,7 @@ void lucene_subsearch_init(void)
             if(unlikely(SPI_connect() != SPI_OK_CONNECT))
                 elog(ERROR, "%s: SPI_connect() failed", __func__);
 
-            if(unlikely(SPI_execute("select max(id) + 1 from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
+            if(unlikely(SPI_execute("select coalesce(max(id) + 1, 0) from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
                 elog(ERROR, "%s: SPI_execute() failed", __func__);
 
             if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
