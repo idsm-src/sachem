@@ -2,7 +2,7 @@
 #define ORCHEM_COMMON_H_
 
 
-#define USE_MOLECULE_INDEX      1
+#define USE_MOLECULE_INDEX      0
 #define USE_COUNT_FINGERPRINT   1
 #define FP_SIZE                 788
 #define EXTFP_SIZE              907

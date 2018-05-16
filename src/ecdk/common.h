@@ -2,7 +2,7 @@
 #define ECDK_COMMON_H_
 
 
-#define USE_MOLECULE_INDEX      1
+#define USE_MOLECULE_INDEX      0
 #define USE_COUNT_FINGERPRINT   0
 #define FP_SIZE                 1024
 #define EXTFP_SIZE              1024

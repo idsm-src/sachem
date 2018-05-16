@@ -2,7 +2,7 @@
 #define LUCENE_COMMON_H_
 
 
-#define USE_MOLECULE_INDEX      1
+#define USE_MOLECULE_INDEX      0
 #define LUCENE_INDEX_PREFIX     "lucene"
 #define LUCENE_INDEX_SUFFIX     ""
 #define COMPOUNDS_TABLE         "compounds"
