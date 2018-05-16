@@ -16,15 +16,17 @@ public class SimilarDocCollector extends SimpleCollector
     private final Lucene lucene;
     private final PriorityQueue<ScoreHit> queue;
     private final ArrayList<ScoreHit> list;
+    private final int querySize;
     private final int top;
     private final float cutoff;
     private Scorer scorer;
     private int docBase;
 
 
-    SimilarDocCollector(Lucene lucene, int top, float cutoff)
+    SimilarDocCollector(Lucene lucene, int querySize, int top, float cutoff)
     {
         this.lucene = lucene;
+        this.querySize = querySize;
         this.top = top;
         this.cutoff = cutoff;
 
@@ -58,7 +60,9 @@ public class SimilarDocCollector extends SimpleCollector
     @Override
     public void collect(int docId) throws IOException
     {
-        float score = scorer.score();
+        float sharedSize = scorer.score();
+        int targetSize = lucene.getMoleculeFpSize(docBase + docId);
+        float score = sharedSize / (querySize + targetSize - sharedSize);
 
         if(score < cutoff)
             return;

@@ -180,8 +180,8 @@ public class Lucene
         }
 
 
-        SimilarDocCollector collector = new SimilarDocCollector(this, top, cutoff);
-        searcher.search(new TanimotoScoreQuery(this, builder.build()), collector);
+        SimilarDocCollector collector = new SimilarDocCollector(this, fp.length, top, cutoff);
+        searcher.search(builder.build(), collector);
 
         return collector.getDocs();
     }

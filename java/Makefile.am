@@ -42,8 +42,6 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/lucene/Lucene.java \
     src/cz/iocb/sachem/lucene/ScoreHit.java \
     src/cz/iocb/sachem/lucene/SimilarDocCollector.java \
-    src/cz/iocb/sachem/lucene/TanimotoScoreProvider.java \
-    src/cz/iocb/sachem/lucene/TanimotoScoreQuery.java \
     src/cz/iocb/sachem/search/LucyLoader.java \
     src/cz/iocb/sachem/search/EcdkLoader.java \
     src/cz/iocb/sachem/search/EcdkSimilaritySearch.java \
