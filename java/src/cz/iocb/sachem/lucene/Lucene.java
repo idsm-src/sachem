@@ -36,7 +36,7 @@ public class Lucene
     };
 
 
-    private static final IndexType indexType = IndexType.POINTS;
+    private static final IndexType indexType = IndexType.TEXT;
     private static final boolean useIdTable = true;
     private static final boolean useSizeTable = true;
 
