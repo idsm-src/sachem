@@ -135,7 +135,7 @@ public class Lucene
     }
 
 
-    public long[] search(int fp[]) throws IOException
+    public long[] subsearch(int fp[]) throws IOException
     {
         if(searcher == null)
             initSearcher();

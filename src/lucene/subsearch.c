@@ -41,7 +41,7 @@ typedef struct
     int queryDataCount;
     int queryDataPosition;
 
-    LuceneResultSet resultSet;
+    LuceneSubsearchResult result;
 
 #if USE_MOLECULE_INDEX == 0
     SPITupleTable *table;
@@ -299,7 +299,7 @@ Datum lucene_substructure_search(PG_FUNCTION_ARGS)
         PG_FREE_IF_COPY(query, 0);
 
         info->queryDataPosition = -1;
-        info->resultSet = NULL_RESULT_SET;
+        info->result = NULL_SUBSEARCH_RESULT;
         info->tableRowCount = -1;
         info->tableRowPosition = -1;
         info->foundResults = 0;
@@ -359,7 +359,7 @@ Datum lucene_substructure_search(PG_FUNCTION_ARGS)
                     }
 #endif
 
-                    if(!lucene_is_open(&info->resultSet))
+                    if(!lucene_subsearch_is_open(&info->result))
                     {
                         info->queryDataPosition++;
 
@@ -389,7 +389,7 @@ Datum lucene_substructure_search(PG_FUNCTION_ARGS)
 #if SHOW_STATS
                         struct timeval search_begin = time_get();
 #endif
-                        info->resultSet = lucene_search(&lucene, fp);
+                        info->result = lucene_subsearch_submit(&lucene, fp);
 #if SHOW_STATS
                         struct timeval search_end = time_get();
                         info->indexTime += time_spent(search_begin, search_end);
@@ -410,7 +410,7 @@ Datum lucene_substructure_search(PG_FUNCTION_ARGS)
 #if SHOW_STATS
                     struct timeval get_begin = time_get();
 #endif
-                    size_t count = lucene_get(&lucene, &info->resultSet, arrayData, FETCH_SIZE);
+                    size_t count = lucene_subsearch_get(&lucene, &info->result, arrayData, FETCH_SIZE);
 #if SHOW_STATS
                     struct timeval get_end = time_get();
                     info->indexTime += time_spent(get_begin, get_end);
@@ -520,7 +520,7 @@ Datum lucene_substructure_search(PG_FUNCTION_ARGS)
     }
     PG_CATCH();
     {
-        lucene_fail(&lucene, &info->resultSet);
+        lucene_subsearch_fail(&lucene, &info->result);
 
         PG_RE_THROW();
     }

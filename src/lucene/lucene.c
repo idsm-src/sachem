@@ -21,7 +21,7 @@ static jmethodID deleteMethod;
 static jmethodID optimizeMethod;
 static jmethodID commitMethod;
 static jmethodID rollbackMethod;
-static jmethodID searchMethod;
+static jmethodID subsearchMethod;
 static jmethodID simsearchMethod;
 static jclass scoreHitClass;
 static jfieldID idField;
@@ -64,7 +64,7 @@ void lucene_init(Lucene *lucene)
         rollbackMethod = (*env)->GetMethodID(env, luceneClass, "rollback", "()V");
         java_check_exception(__func__);
 
-        searchMethod = (*env)->GetMethodID(env, luceneClass, "search", "([I)[J");
+        subsearchMethod = (*env)->GetMethodID(env, luceneClass, "subsearch", "([I)[J");
         java_check_exception(__func__);
 
         simsearchMethod = (*env)->GetMethodID(env, luceneClass, "simsearch", "([IIF)[Lcz/iocb/sachem/lucene/ScoreHit;");
@@ -84,9 +84,6 @@ void lucene_init(Lucene *lucene)
 
     lucene->instance = (*env)->NewObject(env, luceneClass, constructor);
     java_check_exception(__func__);
-
-    lucene->bitsetArray = NULL;
-    lucene->bitsetWords = NULL;
 }
 
 
@@ -200,8 +197,9 @@ void lucene_rollback(Lucene *lucene)
 }
 
 
-LuceneResultSet lucene_search(Lucene *lucene, IntegerFingerprint fp)
+LuceneSubsearchResult lucene_subsearch_submit(Lucene *lucene, IntegerFingerprint fp)
 {
+    LuceneSubsearchResult result = { .bitsetArray = NULL, .bitsetWords = NULL };
     jintArray fpArray = NULL;
 
     PG_TRY();
@@ -212,42 +210,42 @@ LuceneResultSet lucene_search(Lucene *lucene, IntegerFingerprint fp)
         (*env)->SetIntArrayRegion(env, fpArray, 0, fp.size, (jint*) fp.data);
         java_check_exception(__func__);
 
-        lucene->bitsetArray = (jlongArray) (*env)->CallObjectMethod(env, lucene->instance, searchMethod, fpArray);
+        result.bitsetArray = (jlongArray) (*env)->CallObjectMethod(env, lucene->instance, subsearchMethod, fpArray);
         java_check_exception(__func__);
 
-        jsize size = (*env)->GetArrayLength(env, lucene->bitsetArray);
-        lucene->bitsetWords = (*env)->GetLongArrayElements(env, lucene->bitsetArray, NULL);
+        jsize size = (*env)->GetArrayLength(env, result.bitsetArray);
+        result.bitsetWords = (*env)->GetLongArrayElements(env, result.bitsetArray, NULL);
         java_check_exception(__func__);
 
-        bitset_init(&lucene->hits, (uint64_t *) lucene->bitsetWords, size);
+        bitset_init(&result.hits, (uint64_t *) result.bitsetWords, size);
 
         JavaDeleteRef(fpArray);
     }
     PG_CATCH();
     {
         JavaDeleteRef(fpArray);
-        JavaDeleteLongArray(lucene->bitsetArray, lucene->bitsetWords, JNI_ABORT);
+        JavaDeleteLongArray(result.bitsetArray, result.bitsetWords, JNI_ABORT);
 
         PG_RE_THROW();
     }
     PG_END_TRY();
 
-    return (LuceneResultSet) { .possition = 0 };;
+    return result;
 }
 
 
-size_t lucene_get(Lucene *lucene, LuceneResultSet *resultSet, int32_t *buffer, size_t size)
+size_t lucene_subsearch_get(Lucene *lucene, LuceneSubsearchResult *result, int32_t *buffer, size_t size)
 {
     int ret = 0;
 
     while(size > 0)
     {
-        int id = bitset_next_set_bit(&lucene->hits, resultSet->possition);
-        resultSet->possition = id == -1 ? -1 : id + 1;
+        int id = bitset_next_set_bit(&result->hits, result->possition);
+        result->possition = id == -1 ? -1 : id + 1;
 
         if(id == -1)
         {
-            JavaDeleteLongArray(lucene->bitsetArray, lucene->bitsetWords, JNI_ABORT);
+            JavaDeleteLongArray(result->bitsetArray, result->bitsetWords, JNI_ABORT);
             break;
         }
 
@@ -261,9 +259,9 @@ size_t lucene_get(Lucene *lucene, LuceneResultSet *resultSet, int32_t *buffer, s
 }
 
 
-void lucene_fail(Lucene *lucene, LuceneResultSet *resultSet)
+void lucene_subsearch_fail(Lucene *lucene, LuceneSubsearchResult *result)
 {
-    JavaDeleteLongArray(lucene->bitsetArray, lucene->bitsetWords, JNI_ABORT);
+    JavaDeleteLongArray(result->bitsetArray, result->bitsetWords, JNI_ABORT);
 }
 
 
