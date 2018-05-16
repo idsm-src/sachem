@@ -25,6 +25,7 @@ libsachem_la_SOURCES = \
         ecdk/subsearch.c \
         ecdk/sync.c \
         lucene/lucene.c \
+        lucene/search.c \
         lucene/simsearch.c \
         lucene/subsearch.c \
         lucene/sync.c \
@@ -59,6 +60,7 @@ EXTRA_DIST = \
         ecdk/ecdk.h \
         lucene/common.h \
         lucene/lucene.h \
+        lucene/search.h \
         lucy/common.h \
         lucy/lucy.h \
         orchem/common.h \

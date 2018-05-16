@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include "bitset.h"
 #include "common.h"
+#include "search.h"
 #include "isomorphism.h"
 #include "molecule.h"
 #include "molindex.h"
@@ -72,12 +73,8 @@ typedef struct
 
 
 static bool initialized = false;
-static bool javaInitialized = false;
-static bool luceneInitialised = false;
 static int indexId = -1;
 static SPIPlanPtr mainQueryPlan;
-static SPIPlanPtr snapshotQueryPlan;
-static Lucene lucene;
 static int moleculeCount;
 
 #if USE_MOLECULE_INDEX
@@ -94,48 +91,25 @@ static int dbSize;
 
 void lucene_subsearch_init(void)
 {
-    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-        elog(ERROR, "%s: SPI_connect() failed", __func__);
-
-
     if(unlikely(initialized == false))
     {
-        if(unlikely(javaInitialized == false))
-        {
-            java_parse_init();
-            javaInitialized = true;
-        }
-
-
-        /* prepare lucene */
-        if(unlikely(luceneInitialised == false))
-        {
-            lucene_init(&lucene);
-            luceneInitialised = true;
-        }
-
-
-        /* prepare snapshot query plan */
-        if(unlikely(snapshotQueryPlan == NULL))
-        {
-            SPIPlanPtr plan = SPI_prepare("select id from " INDEX_TABLE, 0, NULL);
-
-            if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
-                elog(ERROR, "%s: SPI_keepplan() failed", __func__);
-
-            snapshotQueryPlan = plan;
-        }
+        lucene_search_init();
 
 
         /* prepare query plan */
         if(unlikely(mainQueryPlan == NULL))
         {
+            if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+                elog(ERROR, "%s: SPI_connect() failed", __func__);
+
             SPIPlanPtr plan = SPI_prepare("select id, molecule from " MOLECULES_TABLE " where id = any($1)", 1, (Oid[]) { INT4ARRAYOID });
 
             if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
                 elog(ERROR, "%s: SPI_keepplan() failed", __func__);
 
             mainQueryPlan = plan;
+
+            SPI_finish();
         }
 
 
@@ -144,17 +118,7 @@ void lucene_subsearch_init(void)
 
 
     /* get snapshot information */
-    if(unlikely(SPI_execute_plan(snapshotQueryPlan, NULL, NULL, true, 0) != SPI_OK_SELECT))
-        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
-
-    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
-
-    char isNullFlag;
-    int32_t dbIndexNumber = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
-
-    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-        elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+    int dbIndexNumber = lucene_search_update_snapshot();
 
 
     if(unlikely(dbIndexNumber != indexId))
@@ -199,6 +163,9 @@ void lucene_subsearch_init(void)
             offsetData = molIndexAddress + sizeof(uint64_t);
 #endif
 
+            if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+                elog(ERROR, "%s: SPI_connect() failed", __func__);
+
             if(unlikely(SPI_execute("select max(id) + 1 from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
                 elog(ERROR, "%s: SPI_execute() failed", __func__);
 
@@ -228,8 +195,8 @@ void lucene_subsearch_init(void)
             SPI_freetuptable(SPI_tuptable);
 #endif
 
-            char *path = get_index_path(LUCENE_INDEX_PREFIX, LUCENE_INDEX_SUFFIX, dbIndexNumber);
-            lucene_set_folder(&lucene, path);
+            SPI_finish();
+
             indexId = dbIndexNumber;
         }
         PG_CATCH();
@@ -248,8 +215,6 @@ void lucene_subsearch_init(void)
         }
         PG_END_TRY();
     }
-
-    SPI_finish();
 }
 
 
