@@ -17,6 +17,7 @@ libsachem_la_SOURCES = \
 	    fingerprints/IOCBFingerprint.cpp \
 	    fingerprints/AtomFingerprint.cpp \
 	    fingerprints/CRNGFingerprint.cpp \
+	    fingerprints/RCFingerprint.cpp \
 	    fingerprints/SGFingerprint.cpp \
         java/java.c \
         java/parse.c \
@@ -52,6 +53,7 @@ EXTRA_DIST = \
 	    fingerprints/IOCBFingerprint.hpp \
 	    fingerprints/AtomFingerprint.hpp \
 	    fingerprints/CRNGFingerprint.hpp \
+	    fingerprints/RCFingerprint.hpp \
 	    fingerprints/SGFingerprint.hpp \
 	    fingerprints/SubstructureMatch.hpp \
         java/java.h \
