@@ -46,7 +46,7 @@ void lucene_init(Lucene *lucene)
         beginMethod = (*env)->GetMethodID(env, luceneClass, "begin", "()V");
         java_check_exception(__func__);
 
-        addMethod = (*env)->GetMethodID(env, luceneClass, "add", "(I[I)V");
+        addMethod = (*env)->GetMethodID(env, luceneClass, "add", "(I[I[I)V");
         java_check_exception(__func__);
 
         addIndexMethod = (*env)->GetMethodID(env, luceneClass, "addIndex", "(Ljava/lang/String;)V");
@@ -118,26 +118,37 @@ void lucene_begin(Lucene *lucene)
 }
 
 
-void lucene_add(Lucene *lucene, int32_t id, IntegerFingerprint fp)
+void lucene_add(Lucene *lucene, int32_t id, IntegerFingerprint subfp, IntegerFingerprint simfp)
 {
-    jintArray fpArray = NULL;
+    jintArray subfpArray = NULL;
+    jintArray simfpArray = NULL;
 
     PG_TRY();
     {
-        fpArray = (jintArray) (*env)->NewIntArray(env, fp.size);
+        subfpArray = (jintArray) (*env)->NewIntArray(env, subfp.size);
         java_check_exception(__func__);
 
-        (*env)->SetIntArrayRegion(env, fpArray, 0, fp.size, (jint*) fp.data);
+        (*env)->SetIntArrayRegion(env, subfpArray, 0, subfp.size, (jint*) subfp.data);
         java_check_exception(__func__);
 
-        (*env)->CallVoidMethod(env, lucene->instance, addMethod, (jint) id, fpArray);
+
+        simfpArray = (jintArray) (*env)->NewIntArray(env, simfp.size);
         java_check_exception(__func__);
 
-        JavaDeleteRef(fpArray);
+        (*env)->SetIntArrayRegion(env, simfpArray, 0, simfp.size, (jint*) simfp.data);
+        java_check_exception(__func__);
+
+
+        (*env)->CallVoidMethod(env, lucene->instance, addMethod, (jint) id, subfpArray, simfpArray);
+        java_check_exception(__func__);
+
+        JavaDeleteRef(subfpArray);
+        JavaDeleteRef(simfpArray);
     }
     PG_CATCH();
     {
-        JavaDeleteRef(fpArray);
+        JavaDeleteRef(subfpArray);
+        JavaDeleteRef(simfpArray);
 
         PG_RE_THROW();
     }

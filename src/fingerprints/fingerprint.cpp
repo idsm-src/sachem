@@ -76,13 +76,13 @@ static inline IntegerFingerprint integer_fingerprint_create(std::set<uint32_t> &
 }
 
 
-static inline std::set<uint32_t> fingerprint_get_native(const Molecule *molecule)
+static inline std::set<uint32_t> substructure_fingerprint_get_native(const Molecule *molecule)
 {
-    return iocb_fingerprint_get(molecule, GRAPH_SIZE, MAX_FEAT_LOGCOUNT);
+    return iocb_substructure_fingerprint_get(molecule, GRAPH_SIZE, MAX_FEAT_LOGCOUNT);
 }
 
 
-static inline std::set<uint32_t> fingerprint_get_query_native(const Molecule *molecule)
+static inline std::set<uint32_t> substructure_fingerprint_get_query_native(const Molecule *molecule)
 {
     if(unlikely(initialized == false))
     {
@@ -92,7 +92,7 @@ static inline std::set<uint32_t> fingerprint_get_query_native(const Molecule *mo
 
 
     BitInfo info;
-    std::set<uint32_t> res = iocb_fingerprint_get(molecule, GRAPH_SIZE, MAX_FEAT_LOGCOUNT, true, &info);
+    std::set<uint32_t> res = iocb_substructure_fingerprint_get(molecule, GRAPH_SIZE, MAX_FEAT_LOGCOUNT, true, &info);
 
 
     // convert and pre-sort the fingerprints
@@ -153,11 +153,17 @@ static inline std::set<uint32_t> fingerprint_get_query_native(const Molecule *mo
 }
 
 
-StringFingerprint string_fingerprint_get(const Molecule *molecule)
+static inline std::set<uint32_t> similarity_fingerprint_get_native(const Molecule *molecule)
+{
+    return iocb_similarity_fingerprint_get(molecule, CIRC_SIZE, MAX_FEAT_LOGCOUNT);
+}
+
+
+StringFingerprint string_substructure_fingerprint_get(const Molecule *molecule)
 {
     SAFE_CPP_BEGIN;
 
-    std::set<uint32_t> res = fingerprint_get_native(molecule);
+    std::set<uint32_t> res = substructure_fingerprint_get_native(molecule);
 
     if(res.size() > 0)
     {
@@ -189,11 +195,11 @@ StringFingerprint string_fingerprint_get(const Molecule *molecule)
 }
 
 
-StringFingerprint string_fingerprint_get_query(const Molecule *molecule)
+StringFingerprint string_substructure_fingerprint_get_query(const Molecule *molecule)
 {
     SAFE_CPP_BEGIN;
 
-    std::set<uint32_t> fps = fingerprint_get_query_native(molecule);
+    std::set<uint32_t> fps = substructure_fingerprint_get_query_native(molecule);
 
     if(fps.size() > 0)
     {
@@ -226,22 +232,44 @@ StringFingerprint string_fingerprint_get_query(const Molecule *molecule)
 }
 
 
-IntegerFingerprint integer_fingerprint_get(const Molecule *molecule)
+IntegerFingerprint integer_substructure_fingerprint_get(const Molecule *molecule)
 {
     SAFE_CPP_BEGIN;
 
-    std::set<uint32_t> res = fingerprint_get_native(molecule);
+    std::set<uint32_t> res = substructure_fingerprint_get_native(molecule);
     return integer_fingerprint_create(res);
 
     SAFE_CPP_END;
 }
 
 
-IntegerFingerprint integer_fingerprint_get_query(const Molecule *molecule)
+IntegerFingerprint integer_substructure_fingerprint_get_query(const Molecule *molecule)
 {
     SAFE_CPP_BEGIN;
 
-    std::set<uint32_t> res = fingerprint_get_query_native(molecule);
+    std::set<uint32_t> res = substructure_fingerprint_get_query_native(molecule);
+    return integer_fingerprint_create(res);
+
+    SAFE_CPP_END;
+}
+
+
+IntegerFingerprint integer_similarity_fingerprint_get(const Molecule *molecule)
+{
+    SAFE_CPP_BEGIN;
+
+    std::set<uint32_t> res = similarity_fingerprint_get_native(molecule);
+    return integer_fingerprint_create(res);
+
+    SAFE_CPP_END;
+}
+
+
+IntegerFingerprint integer_similarity_fingerprint_get_query(const Molecule *molecule)
+{
+    SAFE_CPP_BEGIN;
+
+    std::set<uint32_t> res = similarity_fingerprint_get_native(molecule);
     return integer_fingerprint_create(res);
 
     SAFE_CPP_END;

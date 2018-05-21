@@ -61,7 +61,7 @@ public class SimilarDocCollector extends SimpleCollector
     public void collect(int docId) throws IOException
     {
         float sharedSize = scorer.score();
-        int targetSize = lucene.getMoleculeFpSize(docBase + docId);
+        int targetSize = lucene.getMoleculeSimFpSize(docBase + docId);
         float score = sharedSize / (querySize + targetSize - sharedSize);
 
         if(score < cutoff)

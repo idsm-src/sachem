@@ -41,8 +41,9 @@ public class Lucene
     private static final boolean useSizeTable = true;
 
     private static final String idFieldName = "id";
-    private static final String fpFieldName = "fp";
-    private static final String sizeFieldName = "sz";
+    private static final String subfpFieldName = "subfp";
+    private static final String simfpFieldName = "simfp";
+    private static final String simSizeFieldName = "simsz";
 
     private Directory folder;
     private IndexSearcher searcher;
@@ -79,21 +80,25 @@ public class Lucene
     }
 
 
-    public void add(int id, int[] fp) throws IOException
+    public void add(int id, int[] subfp, int[] simfp) throws IOException
     {
         Document document = new Document();
         document.add(new IntPoint(idFieldName, id));
         document.add(new StoredField(idFieldName, id));
-        document.add(new StoredField(sizeFieldName, fp.length));
+        document.add(new StoredField(simSizeFieldName, simfp.length));
 
         if(indexType == IndexType.TEXT)
         {
-            document.add(new TextField(fpFieldName, new FingerprintReader(fp)));
+            document.add(new TextField(subfpFieldName, new FingerprintReader(subfp)));
+            document.add(new TextField(simfpFieldName, new FingerprintReader(simfp)));
         }
         else
         {
-            for(int bit : fp)
-                document.add(new IntPoint(fpFieldName, bit));
+            for(int bit : subfp)
+                document.add(new IntPoint(subfpFieldName, bit));
+
+            for(int bit : simfp)
+                document.add(new IntPoint(simfpFieldName, bit));
         }
 
         indexer.addDocument(document);
@@ -144,12 +149,13 @@ public class Lucene
         if(indexType == IndexType.TEXT)
         {
             for(int bit : fp)
-                builder.add(new TermQuery(new Term(fpFieldName, tokenizer.bitAsString(bit))), BooleanClause.Occur.MUST);
+                builder.add(new TermQuery(new Term(subfpFieldName, tokenizer.bitAsString(bit))),
+                        BooleanClause.Occur.MUST);
         }
         else
         {
             for(int bit : fp)
-                builder.add(IntPoint.newExactQuery(fpFieldName, bit), BooleanClause.Occur.MUST);
+                builder.add(IntPoint.newExactQuery(subfpFieldName, bit), BooleanClause.Occur.MUST);
         }
 
         BitSetCollector collector = new BitSetCollector(this, maxMoleculeId);
@@ -170,13 +176,13 @@ public class Lucene
         if(indexType == IndexType.TEXT)
         {
             for(int bit : fp)
-                builder.add(new TermQuery(new Term(fpFieldName, tokenizer.bitAsString(bit))),
+                builder.add(new TermQuery(new Term(simfpFieldName, tokenizer.bitAsString(bit))),
                         BooleanClause.Occur.SHOULD);
         }
         else
         {
             for(int bit : fp)
-                builder.add(IntPoint.newExactQuery(fpFieldName, bit), BooleanClause.Occur.SHOULD);
+                builder.add(IntPoint.newExactQuery(simfpFieldName, bit), BooleanClause.Occur.SHOULD);
         }
 
 
@@ -228,7 +234,7 @@ public class Lucene
 
                     if(useSizeTable)
                     {
-                        StoredField field = (StoredField) doc.getField(sizeFieldName);
+                        StoredField field = (StoredField) doc.getField(simSizeFieldName);
                         int fpSize = field.numericValue().intValue();
                         sizeTable[docBase + docId] = fpSize;
                     }
@@ -261,7 +267,7 @@ public class Lucene
     }
 
 
-    protected final int getMoleculeFpSize(int id) throws IOException
+    protected final int getMoleculeSimFpSize(int id) throws IOException
     {
         if(useSizeTable)
         {
@@ -270,7 +276,7 @@ public class Lucene
         else
         {
             Document document = searcher.doc(id);
-            StoredField field = (StoredField) document.getField(sizeFieldName);
+            StoredField field = (StoredField) document.getField(simSizeFieldName);
             int fpSize = field.numericValue().intValue();
 
             return fpSize;

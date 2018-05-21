@@ -75,13 +75,14 @@ void lucene_index_worker(dsm_segment *seg, shm_toc *toc)
             uint8_t *data = shm_toc_lookup_key(toc, MOLECULE_KEY_OFFSET + position);
 
             Molecule molecule;
-
             molecule_simple_init(&molecule, data);
 
-            IntegerFingerprint result = integer_fingerprint_get(&molecule);
-            lucene_add(&lucene, ids[position], result);
+            IntegerFingerprint subfp = integer_substructure_fingerprint_get(&molecule);
+            IntegerFingerprint simfp = integer_similarity_fingerprint_get(&molecule);
+            lucene_add(&lucene, ids[position], subfp, simfp);
 
-            integer_fingerprint_free(result);
+            integer_fingerprint_free(subfp);
+            integer_fingerprint_free(simfp);
             molecule_simple_free(&molecule);
         }
 

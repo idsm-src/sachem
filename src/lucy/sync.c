@@ -78,7 +78,7 @@ void lucy_index_worker(dsm_segment *seg, shm_toc *toc)
 
             molecule_simple_init(&molecule, data);
 
-            StringFingerprint result = string_fingerprint_get(&molecule);
+            StringFingerprint result = string_substructure_fingerprint_get(&molecule);
             lucy_add(&lucy, ids[position], result);
 
             string_fingerprint_free(result);

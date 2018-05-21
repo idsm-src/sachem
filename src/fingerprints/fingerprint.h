@@ -8,6 +8,7 @@
 
 #define GRAPH_SIZE              7
 #define MAX_FEAT_LOGCOUNT       5
+#define CIRC_SIZE               3
 
 
 typedef struct Molecule Molecule;
@@ -27,11 +28,13 @@ typedef struct
 } IntegerFingerprint;
 
 
-StringFingerprint string_fingerprint_get(const Molecule *molecule);
-StringFingerprint string_fingerprint_get_query(const Molecule *molecule);
+StringFingerprint string_substructure_fingerprint_get(const Molecule *molecule);
+StringFingerprint string_substructure_fingerprint_get_query(const Molecule *molecule);
 
-IntegerFingerprint integer_fingerprint_get(const Molecule *molecule);
-IntegerFingerprint integer_fingerprint_get_query(const Molecule *molecule);
+IntegerFingerprint integer_substructure_fingerprint_get(const Molecule *molecule);
+IntegerFingerprint integer_substructure_fingerprint_get_query(const Molecule *molecule);
+IntegerFingerprint integer_similarity_fingerprint_get(const Molecule *molecule);
+IntegerFingerprint integer_similarity_fingerprint_get_query(const Molecule *molecule);
 
 
 static inline void string_fingerprint_free(StringFingerprint fingerprint)

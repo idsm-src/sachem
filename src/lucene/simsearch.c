@@ -111,7 +111,7 @@ Datum lucene_similarity_search(PG_FUNCTION_ARGS)
         Molecule molecule;
         molecule_simple_init(&molecule, queryData.molecule);
 
-        IntegerFingerprint fp = integer_fingerprint_get(&molecule);
+        IntegerFingerprint fp = integer_similarity_fingerprint_get_query(&molecule);
 
         info->result = lucene_simsearch_submit(&lucene, fp, topN, cutoff);
 

@@ -2,6 +2,7 @@
 #include "AtomFingerprint.hpp"
 #include "CRNGFingerprint.hpp"
 #include "SGFingerprint.hpp"
+#include "RCFingerprint.hpp"
 
 
 static inline void update_seed(const uint32_t x, uint32_t &seed)
@@ -56,7 +57,7 @@ static inline void process_elements(std::map<uint32_t, int> &var, BitInfo &vari,
 }
 
 
-std::set<uint32_t> iocb_fingerprint_get(const Molecule *molecule, int graphSize, int maxFeatLogCount,
+std::set<uint32_t> iocb_substructure_fingerprint_get(const Molecule *molecule, int graphSize, int maxFeatLogCount,
         bool forQuery, BitInfo *info)
 {
     std::set<uint32_t> fp;
@@ -72,6 +73,19 @@ std::set<uint32_t> iocb_fingerprint_get(const Molecule *molecule, int graphSize,
     BitInfo atomi;
     std::map<uint32_t, int> atom = atom_fingerprint_get(molecule, info ? &atomi : nullptr);
     process_elements(atom, atomi, 3, fp, maxFeatLogCount, forQuery, info);
+
+    return fp;
+}
+
+
+std::set<uint32_t> iocb_similarity_fingerprint_get(const Molecule *molecule, int circSize, int maxFeatLogCount,
+        BitInfo *info)
+{
+    std::set<uint32_t> fp;
+
+    BitInfo rci;
+    std::map<uint32_t, int> rc = rc_fingerprint_get(molecule, 0, circSize, info ? &rci : nullptr);
+    process_elements(rc, rci, 1, fp, maxFeatLogCount, false, info);
 
     return fp;
 }

@@ -345,7 +345,7 @@ Datum lucene_substructure_search(PG_FUNCTION_ARGS)
                         vf2state_init(&info->vf2state, &info->queryMolecule, info->graphMode, info->chargeMode, info->isotopeMode,
                                 info->stereoMode);
 
-                        IntegerFingerprint fp = integer_fingerprint_get_query(&info->queryMolecule);
+                        IntegerFingerprint fp = integer_substructure_fingerprint_get_query(&info->queryMolecule);
 #if SHOW_STATS
                         struct timeval fingerprint_end = time_get();
                         info->prepareTime += time_spent(fingerprint_begin, fingerprint_end);
