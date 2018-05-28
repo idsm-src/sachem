@@ -91,10 +91,15 @@ void lucene_index_worker(dsm_segment *seg, shm_toc *toc)
     PG_CATCH();
     {
         lucene_rollback(&lucene);
+        lucene_terminate(&lucene);
+        java_terminate();
 
         PG_RE_THROW();
     }
     PG_END_TRY();
+
+    lucene_terminate(&lucene);
+    java_terminate();
 }
 
 
@@ -128,11 +133,16 @@ void lucene_optimize_worker(dsm_segment *seg, shm_toc *toc)
         PG_CATCH();
         {
             lucene_rollback(&lucene);
+            lucene_terminate(&lucene);
+            java_terminate();
 
             PG_RE_THROW();
         }
         PG_END_TRY();
     }
+
+    lucene_terminate(&lucene);
+    java_terminate();
 }
 
 

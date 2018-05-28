@@ -87,6 +87,12 @@ void lucene_init(Lucene *lucene)
 }
 
 
+void lucene_terminate(Lucene *lucene)
+{
+    JavaDeleteRef(lucene->instance);
+}
+
+
 void lucene_set_folder(Lucene *lucene, const char *path)
 {
     jstring folder = NULL;

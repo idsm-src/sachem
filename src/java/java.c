@@ -88,6 +88,13 @@ void java_init(void)
 }
 
 
+void java_terminate(void)
+{
+    if((*jvm)->DestroyJavaVM(jvm) != JNI_OK)
+        elog(WARNING, "JVM not properly ended");
+}
+
+
 void java_check_exception(const char *str)
 {
     jthrowable exception = (*env)->ExceptionOccurred(env);

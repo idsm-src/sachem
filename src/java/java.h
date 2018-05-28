@@ -64,5 +64,6 @@ extern JNIEnv* env;
 
 void java_check_exception(const char *str);
 void java_init(void);
+void java_terminate(void);
 
 #endif /* JAVA_H_ */
