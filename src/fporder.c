@@ -140,8 +140,12 @@ void fporder_worker(dsm_segment *seg, shm_toc *toc)
     }
     PG_END_TRY();
 
-
+#if PG_VERSION_NUM < 100000
     shm_mq_detach(queue);
+#else
+    shm_mq_detach(out);
+#endif
+
     stats_delete(stats);
 }
 
@@ -205,7 +209,11 @@ Datum sachem_generate_fporder(PG_FUNCTION_ARGS)
                     break;
             }
 
+#if PG_VERSION_NUM < 100000
             shm_mq_detach(queue);
+#else
+            shm_mq_detach(in);
+#endif
         }
 
         WaitForParallelWorkersToFinish(pcxt);
