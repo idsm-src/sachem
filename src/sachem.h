@@ -72,6 +72,15 @@ static inline void create_base_directory(void)
 }
 
 
+static inline char *get_index_name(const char *prefix, const char *suffix, int indexNumber)
+{
+    char *indexPath = (char *) palloc(strlen(prefix) + strlen(suffix) + 24);
+    sprintf(indexPath, "%s-%i%s", prefix, indexNumber, suffix);
+
+    return indexPath;
+}
+
+
 static inline char *get_index_path(const char *prefix, const char *suffix, int indexNumber)
 {
     Name database = DatumGetName(DirectFunctionCall1(current_database, 0));

@@ -5,7 +5,9 @@
 #include <access/parallel.h>
 #include <storage/shm_toc.h>
 #include <storage/spin.h>
+#include <dirent.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include "common.h"
 #include "molecule.h"
 #include "molindex.h"
@@ -506,5 +508,106 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
 
 
     SPI_finish();
+    PG_RETURN_VOID();
+}
+
+
+PG_FUNCTION_INFO_V1(lucene_cleanup);
+Datum lucene_cleanup(PG_FUNCTION_ARGS)
+{
+    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+        elog(ERROR, "%s: SPI_connect() failed", __func__);
+
+    int indexNumber = -1;
+
+    if(unlikely(SPI_exec("select id from " INDEX_TABLE, 0) != SPI_OK_SELECT))
+        elog(ERROR, "%s: SPI_exec() failed", __func__);
+
+    if(SPI_processed != 0)
+    {
+        if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
+            elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+        char isNullFlag;
+        indexNumber = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
+
+        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE) || isNullFlag)
+            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+    }
+
+    SPI_finish();
+
+
+    char *luceneIndexName = get_index_name(LUCENE_INDEX_PREFIX, LUCENE_INDEX_SUFFIX, indexNumber);
+#if USE_MOLECULE_INDEX
+    char *moleculeIndexName = get_index_name(MOLECULE_INDEX_PREFIX, MOLECULE_INDEX_SUFFIX, indexNumber);
+#endif
+
+
+    int dirfd = -1;
+    DIR *dp = NULL;
+
+    PG_TRY();
+    {
+        char *path = get_file_path("");
+
+
+        if((dirfd = open(path, O_DIRECTORY)) == -1)
+            elog(ERROR, "%s: open() failed", __func__);
+
+        if((dp = fdopendir(dirfd)) == NULL)
+            elog(ERROR, "%s: fdopendir() failed", __func__);
+
+
+        struct dirent *ep;
+
+        while((ep = readdir(dp)))
+        {
+            if(!strncmp(ep->d_name, LUCENE_INDEX_PREFIX, sizeof(LUCENE_INDEX_PREFIX) - 1))
+            {
+                if(!strcmp(ep->d_name, luceneIndexName))
+                    continue;
+
+                elog(NOTICE, "delete lucene index '%s'", ep->d_name);
+
+                char *luceneIndexPath = get_file_path(ep->d_name);
+                lucene_delete_directory(luceneIndexPath);
+            }
+#if USE_MOLECULE_INDEX
+            else if(!strncmp(ep->d_name, MOLECULE_INDEX_PREFIX, sizeof(MOLECULE_INDEX_PREFIX) - 1))
+            {
+                if(!strcmp(ep->d_name, moleculeIndexName))
+                    continue;
+
+                elog(NOTICE, "delete molecule index '%s'", ep->d_name);
+
+                if(unlinkat(dirfd, ep->d_name, 0) != 0)
+                    elog(ERROR, "%s: unlinkat() failed", __func__);
+            }
+#endif
+            else if(strcmp(ep->d_name, ".") && strcmp(ep->d_name, ".."))
+            {
+                elog(WARNING, "unknown content '%s'", ep->d_name);
+            }
+        }
+
+        closedir(dp);
+        dp = NULL;
+
+        close(dirfd);
+        dirfd = -1;
+    }
+    PG_CATCH();
+    {
+        if(dp != NULL)
+            closedir(dp);
+
+        if(dirfd != -1)
+            close(dirfd);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
+
     PG_RETURN_VOID();
 }

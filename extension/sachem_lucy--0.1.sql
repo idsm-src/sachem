@@ -72,6 +72,7 @@ GRANT SELECT ON TABLE sachem_molecule_errors TO PUBLIC;
 
 CREATE FUNCTION "sachem_substructure_search"(varchar, int, int = 0, int = 0, int = 2, int = 0, int = 0, int = 0, int = 5000) RETURNS SETOF int AS 'MODULE_PATHNAME','lucy_substructure_search' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
 CREATE FUNCTION "sachem_sync_data"(boolean = false, boolean = true) RETURNS void AS 'MODULE_PATHNAME','lucy_sync_data' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
+CREATE FUNCTION "sachem_cleanup"() RETURNS void AS 'MODULE_PATHNAME','lucy_cleanup' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
 CREATE FUNCTION "sachem_generate_fporder"(int = 1000, boolean = false) RETURNS void AS 'MODULE_PATHNAME','sachem_generate_fporder' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
 
 
