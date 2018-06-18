@@ -31,7 +31,6 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/load/ConfigurationProperties.java \
     src/cz/iocb/sachem/load/CompoundLoader.java \
     src/cz/iocb/sachem/load/CompoundUpdater.java \
-    src/cz/iocb/sachem/load/ConnectionPool.java \
     src/cz/iocb/sachem/load/GeneralCompoundLoader.java \
     src/cz/iocb/sachem/load/DrugbankCompoundUpdater.java \
     src/cz/iocb/sachem/load/PubChemCompoundUpdater.java \
