@@ -4,10 +4,10 @@ $$
   begin
     select into value 
       case iri
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/UnspecifiedFormat' then 0
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/SMILES' then 1
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/MolFile' then 2
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/RGroup' then 3
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#UnspecifiedFormat' then 0
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#SMILES' then 1
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#MolFile' then 2
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#RGroup' then 3
       end::integer AS retval;
     return value.retval;
   end;
@@ -21,8 +21,8 @@ $$
   begin
     select into value 
       case iri
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/substructureSearch' then 0
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/exactSearch' then 1
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#substructureSearch' then 0
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#exactSearch' then 1
       end::integer AS retval;
     return value.retval;
   end;
@@ -36,9 +36,9 @@ $$
   begin
     select into value 
       case iri
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/ignoreCharges' then 0
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/defaultChargeAsZero' then 1
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/defaultChargeAsAny' then 2
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#ignoreCharges' then 0
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#defaultChargeAsZero' then 1
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#defaultChargeAsAny' then 2
       end::integer AS retval;
     return value.retval;
   end;
@@ -52,9 +52,9 @@ $$
   begin
     select into value 
       case iri
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/ignoreIsotopes' then 0
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/defaultIsotopeAsStandard' then 1
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/defaultIsotopeAsAny' then 2
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#ignoreIsotopes' then 0
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#defaultIsotopeAsStandard' then 1
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#defaultIsotopeAsAny' then 2
       end::integer AS retval;
     return value.retval;
   end;
@@ -68,8 +68,8 @@ $$
   begin
     select into value 
       case iri
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/ignoreStrereo' then 0
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/strictStereo' then 1
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#ignoreStrereo' then 0
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#strictStereo' then 1
       end::integer AS retval;
     return value.retval;
   end;
@@ -83,8 +83,8 @@ $$
   begin
     select into value 
       case iri
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/ignoreTautomers' then 0
-        when 'http://bioinfo.uochb.cas.cz/sparql-endpoint/sachem/inchiTautomers' then 1
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#ignoreTautomers' then 0
+        when 'http://bioinfo.uochb.cas.cz/rdf/v1.0/sachem#inchiTautomers' then 1
       end::integer AS retval;
     return value.retval;
   end;
