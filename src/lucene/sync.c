@@ -13,6 +13,7 @@
 #include "molindex.h"
 #include "sachem.h"
 #include "lucene.h"
+#include "fporder.h"
 #include "java/parse.h"
 #include "fingerprints/fingerprint.h"
 
@@ -585,7 +586,7 @@ Datum lucene_cleanup(PG_FUNCTION_ARGS)
                     elog(ERROR, "%s: unlinkat() failed", __func__);
             }
 #endif
-            else if(strcmp(ep->d_name, ".") && strcmp(ep->d_name, ".."))
+            else if(strcmp(ep->d_name, ".") && strcmp(ep->d_name, "..") && strcmp(ep->d_name, ORDER_FILE))
             {
                 elog(WARNING, "unknown content '%s'", ep->d_name);
             }
