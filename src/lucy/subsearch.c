@@ -199,7 +199,7 @@ void lucy_subsearch_init(void)
             offsetData = molIndexAddress + sizeof(uint64_t);
 #endif
 
-            if(unlikely(SPI_execute("coalesce(select max(id) + 1, 0) from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
+            if(unlikely(SPI_execute("select coalesce(max(id) + 1, 0) from " MOLECULES_TABLE, true, FETCH_ALL) != SPI_OK_SELECT))
                 elog(ERROR, "%s: SPI_execute() failed", __func__);
 
             if(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1)
