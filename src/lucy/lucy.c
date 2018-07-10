@@ -30,6 +30,7 @@
 #define FP_NAME     "fp"
 #define FP_PATTERN  "[a-zA-Z0-9+/]+"
 #define BOOLOP      "AND"
+#define INVALID_ID  -2147483648
 
 #define safePfree(x)            do { void *ptr = x; x = NULL; if(ptr) pfree(ptr); } while(0)
 #define safeDecref(x)           do { void *obj = x; x = NULL; DECREF(obj); } while(0)
@@ -87,7 +88,7 @@ typedef struct
     StringFingerprint fp;
     String *queryStr;
     Query *query;
-#if USE_ID_TABLE
+#if USE_ID_TABLE && LAZY_INITIALIZATION == 0
     HitDoc *hit;
     String *id;
 #endif
@@ -101,7 +102,7 @@ typedef struct
     int32_t *results;
     size_t size;
     size_t loaded;
-#if USE_ID_TABLE == 0
+#if USE_ID_TABLE == 0 || LAZY_INITIALIZATION
     HitDoc *hit;
     String *id;
 #endif
@@ -438,6 +439,10 @@ static void base_search(SearchRoutineContext *context)
         if(context->lucy->idTable == NULL)
             THROW(ERR, "out of memory");
 
+#if LAZY_INITIALIZATION
+        for(int i = 0; i < maxId + 1; i++)
+            context->lucy->idTable[i] = INVALID_ID;
+#else
         context->query = (Query *) MatchAllQuery_new();
         IxSearcher_Collect(context->lucy->searcher, context->query, context->lucy->collector);
 
@@ -460,6 +465,7 @@ static void base_search(SearchRoutineContext *context)
             safeDecref(context->id);
             safeDecref(context->hit);
         }
+#endif
 #endif
     }
 
@@ -489,7 +495,7 @@ LucyResultSet lucy_search(Lucy *lucy, StringFingerprint fp)
     context.fp = fp;
     context.queryStr = NULL;
     context.query = NULL;
-#if USE_ID_TABLE
+#if USE_ID_TABLE && LAZY_INITIALIZATION == 0
     context.hit = NULL;
     context.id = NULL;
 #endif
@@ -514,7 +520,7 @@ LucyResultSet lucy_search(Lucy *lucy, StringFingerprint fp)
 
         safeNothrowDecref(context.query);
         safeNothrowDecref(context.queryStr);
-#if USE_ID_TABLE
+#if USE_ID_TABLE && LAZY_INITIALIZATION == 0
         safeNothrowDecref(context.hit);
         safeNothrowDecref(context.id);
 #endif
@@ -541,6 +547,19 @@ static void base_get(GetRoutineContext *context)
             break;
 
 #if USE_ID_TABLE
+#if LAZY_INITIALIZATION
+        if(context->lucy->idTable[docId] == INVALID_ID)
+        {
+            context->hit = IxSearcher_Fetch_Doc(context->lucy->searcher, docId);
+
+            context->id = (String *) HitDoc_Extract(context->hit, context->lucy->idF);
+            context->lucy->idTable[docId] = Str_To_I64(context->id);
+
+            safeDecref(context->id);
+            safeDecref(context->hit);
+        }
+#endif
+
         *(results++) = context->lucy->idTable[docId];
 #else
         context->hit = IxSearcher_Fetch_Doc(context->lucy->searcher, docId);
@@ -568,7 +587,7 @@ size_t lucy_get(Lucy *lucy, LucyResultSet *resultSet, int32_t *results, size_t s
     context.results = results;
     context.size = size;
     context.loaded = 0;
-#if USE_ID_TABLE == 0
+#if USE_ID_TABLE == 0 || LAZY_INITIALIZATION
     context.hit = NULL;
     context.id = NULL;
 #endif
@@ -577,7 +596,7 @@ size_t lucy_get(Lucy *lucy, LucyResultSet *resultSet, int32_t *results, size_t s
 
     if(error != NULL)
     {
-#if USE_ID_TABLE == 0
+#if USE_ID_TABLE == 0 || LAZY_INITIALIZATION
         safeNothrowDecref(context.hit);
         safeNothrowDecref(context.id);
 #endif

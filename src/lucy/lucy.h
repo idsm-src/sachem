@@ -6,6 +6,7 @@
 #include "fingerprints/fingerprint.h"
 
 #define USE_ID_TABLE        1
+#define LAZY_INITIALIZATION 1
 #define NULL_RESULT_SET     ((LucyResultSet) { .possition = -1 })
 
 

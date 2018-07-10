@@ -39,6 +39,7 @@ public class Lucene
     private static final IndexType indexType = IndexType.TEXT;
     private static final boolean useIdTable = true;
     private static final boolean useSizeTable = true;
+    private static final boolean lazyInitialization = true;
 
     private static final String idFieldName = "id";
     private static final String subfpFieldName = "subfp";
@@ -210,42 +211,60 @@ public class Lucene
             if(useSizeTable)
                 sizeTable = new int[reader.maxDoc()];
 
-            searcher.search(new MatchAllDocsQuery(), new SimpleCollector()
+
+            if(lazyInitialization)
             {
-                private int docBase;
-
-                @Override
-                protected void doSetNextReader(LeafReaderContext context) throws IOException
+                if(useIdTable)
                 {
-                    docBase = context.docBase;
+                    for(int i = 0; i < idTable.length; i++)
+                        idTable[i] = Integer.MIN_VALUE;
                 }
 
-                @Override
-                public void collect(int docId) throws IOException
+                if(useSizeTable)
                 {
-                    Document doc = searcher.doc(docBase + docId);
+                    for(int i = 0; i < sizeTable.length; i++)
+                        sizeTable[i] = Integer.MIN_VALUE;
+                }
+            }
+            else
+            {
+                searcher.search(new MatchAllDocsQuery(), new SimpleCollector()
+                {
+                    private int docBase;
 
-                    if(useIdTable)
+                    @Override
+                    protected void doSetNextReader(LeafReaderContext context) throws IOException
                     {
-                        IndexableField id = doc.getField(idFieldName);
-                        int moleculeId = id.numericValue().intValue();
-                        idTable[docBase + docId] = moleculeId;
+                        docBase = context.docBase;
                     }
 
-                    if(useSizeTable)
+                    @Override
+                    public void collect(int docId) throws IOException
                     {
-                        StoredField field = (StoredField) doc.getField(simSizeFieldName);
-                        int fpSize = field.numericValue().intValue();
-                        sizeTable[docBase + docId] = fpSize;
-                    }
-                }
+                        Document doc = searcher.doc(docBase + docId);
 
-                @Override
-                public boolean needsScores()
-                {
-                    return false;
-                }
-            });
+                        if(useIdTable)
+                        {
+                            IndexableField id = doc.getField(idFieldName);
+                            int moleculeId = id.numericValue().intValue();
+                            idTable[docBase + docId] = moleculeId;
+                        }
+
+                        if(useSizeTable)
+                        {
+                            StoredField field = (StoredField) doc.getField(simSizeFieldName);
+                            int fpSize = field.numericValue().intValue();
+                            sizeTable[docBase + docId] = fpSize;
+                        }
+                    }
+
+                    @Override
+                    public boolean needsScores()
+                    {
+                        return false;
+                    }
+                });
+            }
         }
     }
 
@@ -254,6 +273,13 @@ public class Lucene
     {
         if(useIdTable)
         {
+            if(lazyInitialization && idTable[id] == Integer.MIN_VALUE)
+            {
+                Document doc = searcher.doc(id);
+                IndexableField field = doc.getField(idFieldName);
+                idTable[id] = field.numericValue().intValue();
+            }
+
             return idTable[id];
         }
         else
@@ -271,6 +297,13 @@ public class Lucene
     {
         if(useSizeTable)
         {
+            if(lazyInitialization && sizeTable[id] == Integer.MIN_VALUE)
+            {
+                Document document = searcher.doc(id);
+                StoredField field = (StoredField) document.getField(simSizeFieldName);
+                sizeTable[id] = field.numericValue().intValue();
+            }
+
             return sizeTable[id];
         }
         else
