@@ -41,6 +41,7 @@ public class DrugbankCompoundUpdater
         String pgUserName = properties.getProperty("postgres.username");
         String pgPassword = properties.getProperty("postgres.password");
         String pgDatabase = properties.getProperty("postgres.database");
+        boolean autoclean = properties.getBooleanProperty("sachem.autoclean");
 
         String httpServer = properties.getProperty("http.server");
         String httpUserName = properties.getProperty("http.username");
@@ -56,6 +57,15 @@ public class DrugbankCompoundUpdater
 
         try(Connection connection = DriverManager.getConnection(pgUrl, pgUserName, pgPassword))
         {
+            if(autoclean)
+            {
+                try(Statement statement = connection.createStatement())
+                {
+                    statement.execute("select \"sachem_cleanup\"()");
+                }
+            }
+
+
             URL infoUrl = new URL(httpServer + "/releases/latest#structures");
             HttpURLConnection infoConnection = (HttpURLConnection) infoUrl.openConnection();
 

@@ -43,6 +43,7 @@ public class PubChemCompoundUpdater
         String pgUserName = properties.getProperty("postgres.username");
         String pgPassword = properties.getProperty("postgres.password");
         String pgDatabase = properties.getProperty("postgres.database");
+        boolean autoclean = properties.getBooleanProperty("sachem.autoclean");
 
         String ftpServer = properties.getProperty("ftp.server");
         int ftpPort = properties.getIntProperty("ftp.port");
@@ -63,6 +64,15 @@ public class PubChemCompoundUpdater
 
         try(Connection connection = DriverManager.getConnection(pgUrl, pgUserName, pgPassword))
         {
+            if(autoclean)
+            {
+                try(Statement statement = connection.createStatement())
+                {
+                    statement.execute("select \"sachem_cleanup\"()");
+                }
+            }
+
+
             String loadedVersion = null;
 
             try(Statement statement = connection.createStatement())

@@ -43,4 +43,17 @@ public class ConfigurationProperties extends Properties
             throw new InvalidParameterException("wrong value for key " + key);
         }
     }
+
+
+    public boolean getBooleanProperty(String key)
+    {
+        try
+        {
+            return Boolean.parseBoolean(getProperty(key));
+        }
+        catch(NumberFormatException e)
+        {
+            throw new InvalidParameterException("wrong value for key " + key);
+        }
+    }
 }
