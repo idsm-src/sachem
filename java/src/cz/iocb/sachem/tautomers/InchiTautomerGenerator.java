@@ -40,7 +40,6 @@ import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IBond;
 import org.openscience.cdk.interfaces.IChemObjectBuilder;
 import org.openscience.cdk.silent.AtomContainer;
-import org.openscience.cdk.tools.CDKHydrogenAdder;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 import cz.iocb.sachem.shared.MoleculeCreator;
 import cz.iocb.sachem.tautomers.InChI.Fragment;
@@ -100,7 +99,7 @@ public class InchiTautomerGenerator
         //Process the molecule based on the molfile input file
         IAtomContainer molecule = MoleculeCreator.getMoleculeFromMolfile(kekuleMDL);
         AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(molecule);
-        CDKHydrogenAdder.getInstance(molecule.getBuilder()).addImplicitHydrogens(molecule);
+        //CDKHydrogenAdder.getInstance(molecule.getBuilder()).addImplicitHydrogens(molecule);
 
 
         List<IAtomContainer> tautomers = new ArrayList<IAtomContainer>();
@@ -457,7 +456,7 @@ public class InchiTautomerGenerator
         for(IAtom atom : inputMolecule.atoms())
             atom.setID(null);
 
-        IAtom[] atoms = new IAtom[inchiMolGraph.getAtomCount()];
+        ArrayList<IAtom> atoms = new ArrayList<IAtom>();
 
         StringTokenizer tokenizer = new StringTokenizer(aux, ",");
 
@@ -471,11 +470,27 @@ public class InchiTautomerGenerator
 
             IAtom atom = inputMolecule.getAtom(position - 1);
             atom.setID(prefix + ":" + id);
-
-            if(id - 1 < atoms.length)
-                atoms[id - 1] = atom;
+            atoms.add(atom);
         }
 
+        for(IBond bond : inputMolecule.bonds())
+        {
+            IAtom atom0 = bond.getAtom(0);
+            IAtom atom1 = bond.getAtom(1);
+
+            if(atom0.getSymbol().equals("H") && atom1.getID() != null)
+            {
+                atoms.add(atom0);
+                atom0.setID(prefix + ":" + ++id);
+            }
+
+            if(atom1.getSymbol().equals("H") && atom0.getID() != null)
+            {
+                atoms.add(atom1);
+                atom1.setID(prefix + ":" + ++id);
+            }
+        }
+        
 
         List<IAtom> remove = new ArrayList<IAtom>();
 
@@ -504,47 +519,16 @@ public class InchiTautomerGenerator
 
         for(IBond b : removeBonds)
         {
-            /*
-            for(int i = 0; i < b.getAtomCount(); i++)
-            {
-                IAtom a = b.getAtom(i);
-            
-                if(a.getSymbol().equals("H"))
-                {
-                    for(int j = 0; j < b.getAtomCount(); j++)
-                    {
-                        if(j != i)
-                        {
-                            IAtom atom = b.getAtom(j);
-                            atom.setImplicitHydrogenCount(atom.getImplicitHydrogenCount() + 1);
-                            //atom.setValency(atom.getValency() - 1);
-                        }
-                    }
-                }
-            }
-            */
-
             IAtom atom0 = b.getAtom(0);
             IAtom atom1 = b.getAtom(1);
 
-            if(atom0.getSymbol().equals("H"))
-            {
-                atom1.setImplicitHydrogenCount(atom1.getImplicitHydrogenCount() + 1);
-            }
-            else if(atom1.getSymbol().equals("H"))
-            {
-                atom0.setImplicitHydrogenCount(atom0.getImplicitHydrogenCount() + 1);
-            }
-            else
-            {
-                atom0.setValency(atom0.getValency() - 1);
-                atom1.setValency(atom1.getValency() - 1);
-            }
+            atom0.setValency(atom0.getValency() - 1);
+            atom1.setValency(atom1.getValency() - 1);
 
             inputMolecule.removeBond(b);
         }
 
-        inputMolecule.setAtoms(atoms);
+        inputMolecule.setAtoms(atoms.toArray(new IAtom[0]));
         return inputMolecule;
     }
 
