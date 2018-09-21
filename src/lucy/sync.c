@@ -537,14 +537,15 @@ Datum lucy_cleanup(PG_FUNCTION_ARGS)
     int dirfd = -1;
     DIR *dp = NULL;
 
+    if((dirfd = open(get_file_path(""), O_DIRECTORY)) == -1 && errno != ENOENT)
+        elog(ERROR, "%s: open() failed", __func__);
+
+    if(dirfd == -1)
+        PG_RETURN_VOID();
+
+
     PG_TRY();
     {
-        char *path = get_file_path("");
-
-
-        if((dirfd = open(path, O_DIRECTORY)) == -1)
-            elog(ERROR, "%s: open() failed", __func__);
-
         if((dp = fdopendir(dirfd)) == NULL)
             elog(ERROR, "%s: fdopendir() failed", __func__);
 
