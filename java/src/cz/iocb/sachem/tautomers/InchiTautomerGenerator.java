@@ -105,11 +105,8 @@ public class InchiTautomerGenerator
 
         List<IAtomContainer> tautomers = new ArrayList<IAtomContainer>();
 
-        if(inchi.getValue() == null || inchi.getValue().indexOf("(H") == -1)
+        if(inchi.getValue() == null)
         {
-            //No mobile H atoms according to InChI, so bail out.
-            //CDKHueckelAromaticityDetector.detectAromaticity(inputMolecule);
-
             MoleculeCreator.configureAromaticity(molecule);
             tautomers.add(molecule);
         }
