@@ -32,10 +32,9 @@ public class InChI
         public String formula;
         public String connections;
         public String hydrogens;
-        public String charge;
-        public String fixedHydrogens;
         public String formalCharge;
-        public int protonation;
+        public String doubleBondStereo;
+        public String tetrahedralStereo;
         String aux;
 
 
@@ -49,11 +48,14 @@ public class InChI
                 case 'h':
                     hydrogens = part;
                     break;
-                case 'f':
-                    fixedHydrogens = part;
-                    break;
                 case 'q':
                     formalCharge = part;
+                    break;
+                case 'b':
+                    doubleBondStereo = part;
+                    break;
+                case 't':
+                    tetrahedralStereo = part;
                     break;
             }
         }
@@ -65,13 +67,12 @@ public class InChI
     private String key = null;
     private String aux = null;
     private String value = null;
-    private String fixedH = null;
 
 
     static
     {
         String path = System.getProperty("inchi.path");
-        pb = new ProcessBuilder(path, "-STDIO", "-Key", "-NoLabels", "-W0", "-FixedH", "-RecMet");
+        pb = new ProcessBuilder(path, "-STDIO", "-Key", "-NoLabels", "-W0", "-SUU", "-RecMet");
     }
 
 
@@ -91,28 +92,11 @@ public class InChI
             aux = input.readLine();
             key = input.readLine();
 
-
             // workaround
             if(value != null && value.contains("/r"))
             {
                 value = "InChI=1/" + value.substring(value.indexOf("/r") + 2);
                 aux = "AuxInfo=1/" + aux.substring(aux.indexOf("/R:") + 4);
-            }
-
-
-            if(value != null)
-            {
-                int fixedHIdx = value.indexOf("/f");
-
-                if(fixedHIdx != -1)
-                {
-                    fixedH = value.substring(fixedHIdx + 2);
-                    value = value.substring(0, fixedHIdx);
-                }
-                else
-                {
-                    fixedH = "";
-                }
             }
 
             input.close();
@@ -201,90 +185,6 @@ public class InChI
         }
 
 
-        if(!fixedH.startsWith("/"))
-        {
-            String orgFormulaComponent = fixedH.substring(0, fixedH.indexOf('/', 0));
-            String[] orgFormulas = orgFormulaComponent.split("\\.");
-
-            int index = 0;
-
-            for(String orgFormula : orgFormulas)
-            {
-                Pattern formulaPattern = Pattern.compile("^[0-9]+");
-                Matcher match = formulaPattern.matcher(orgFormula);
-
-                int count = 1;
-
-                if(match.find())
-                {
-                    count = Integer.valueOf(match.group());
-                    orgFormula = orgFormula.substring(match.group().length());
-                }
-
-
-                for(int i = 0; i < count; i++)
-                {
-                    if(index < fragments.size())
-                    {
-                        Fragment fragment = fragments.get(index);
-                        fragment.protonation = countOfHydrogens(orgFormula) - countOfHydrogens(fragment.formula);
-                        fragment.formula = orgFormula;
-                    }
-                    else
-                    {
-                        Fragment fragment = new Fragment();
-                        fragment.formula = orgFormula;
-                        fragments.add(fragment);
-                    }
-
-                    index++;
-                }
-            }
-        }
-
-
-        String[] fixedHcomponents = fixedH.split("/");
-
-        for(int i = 1; i < fixedHcomponents.length; i++)
-        {
-            char name = fixedHcomponents[i].charAt(0);
-
-            if(name == 'h')
-                name = 'f';
-
-            String[] parts = fixedHcomponents[i].substring(1).split(";");
-            int index = 0;
-
-            for(String part : parts)
-            {
-                Pattern formulaPattern = Pattern.compile("^[0-9]+\\*");
-                Matcher match = formulaPattern.matcher(part);
-
-                if(!match.find())
-                {
-                    if(!part.isEmpty())
-                        fragments.get(index).setPart(name, part);
-
-                    index++;
-                }
-                else
-                {
-                    String countString = match.group();
-                    String value = part.substring(countString.length());
-                    int count = Integer.valueOf(countString.substring(0, countString.length() - 1));
-
-                    for(int j = 0; j < count; j++)
-                    {
-                        if(!value.isEmpty())
-                            fragments.get(index).setPart(name, value);
-
-                        index++;
-                    }
-                }
-            }
-        }
-
-
         String[] auxComponents = aux.split("/");
 
         if(auxComponents[2].startsWith("N:"))
@@ -297,21 +197,6 @@ public class InChI
         }
 
         return fragments;
-    }
-
-
-    private int countOfHydrogens(String formula)
-    {
-        if(!formula.contains("H"))
-            return 0;
-
-        Pattern hPattern = Pattern.compile("H[0-9]+");
-        Matcher match = hPattern.matcher(formula);
-
-        if(match.find())
-            return Integer.valueOf(match.group().substring(1));
-
-        return 1;
     }
 
 
@@ -330,11 +215,5 @@ public class InChI
     public String getValue()
     {
         return value;
-    }
-
-
-    public String getFixedH()
-    {
-        return fixedH;
     }
 }

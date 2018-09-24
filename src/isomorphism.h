@@ -533,7 +533,7 @@ static inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2st
             if(normalize_atom_stereo(targetAtoms, targetStereo) != queryStereo)
                 return false;
         }
-        else if(vf2state->graphMode == GRAPH_EXACT)
+        else if(queryStereo != TETRAHEDRAL_STEREO_NONE && vf2state->graphMode == GRAPH_EXACT)
         {
             if(queryStereo != targetStereo)
                 return false;
@@ -602,7 +602,7 @@ static inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2st
             if(normalize_bond_stereo(targetAtoms, targetStereo) != queryStereo)
                 return false;
         }
-        else if(vf2state->graphMode == GRAPH_EXACT)
+        else if(queryStereo != BOND_STEREO_NONE && vf2state->graphMode == GRAPH_EXACT)
         {
             if(queryStereo != targetStereo)
                 return false;

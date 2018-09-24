@@ -41,6 +41,7 @@ import org.openscience.cdk.interfaces.IBond;
 import org.openscience.cdk.interfaces.IChemObjectBuilder;
 import org.openscience.cdk.silent.AtomContainer;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
+import cz.iocb.sachem.search.SachemMoleculeBuilder;
 import cz.iocb.sachem.shared.MoleculeCreator;
 import cz.iocb.sachem.tautomers.InChI.Fragment;
 
@@ -283,7 +284,7 @@ public class InchiTautomerGenerator
         //Preparation: translate the InChi
         Map<Integer, IAtom> inchiAtomsByPosition = getElementsByPosition(fragment.formula, inputMolecule);
         IAtomContainer inchiMolGraph = connectAtoms(fragment.connections, inputMolecule, inchiAtomsByPosition);
-        inputMolecule = mapInputMoleculeToInchiMolgraph(inchiMolGraph, inputMolecule, fragment.aux, prefix);
+        inputMolecule = mapInputMoleculeToInchiMolgraph(inchiMolGraph, inputMolecule, fragment, prefix);
 
         setUnsetBondOrders(inputMolecule);
 
@@ -449,7 +450,8 @@ public class InchiTautomerGenerator
      * @throws CDKException
      */
     private static IAtomContainer mapInputMoleculeToInchiMolgraph(IAtomContainer inchiMolGraph,
-            IAtomContainer inputMolecule, String aux, String prefix) throws CDKException, CloneNotSupportedException
+            IAtomContainer inputMolecule, Fragment fragment, String prefix)
+            throws CDKException, CloneNotSupportedException
     {
         inputMolecule = inputMolecule.clone();
 
@@ -458,7 +460,7 @@ public class InchiTautomerGenerator
 
         ArrayList<IAtom> atoms = new ArrayList<IAtom>();
 
-        StringTokenizer tokenizer = new StringTokenizer(aux, ",");
+        StringTokenizer tokenizer = new StringTokenizer(fragment.aux, ",");
 
 
         int id = 0;
@@ -490,7 +492,7 @@ public class InchiTautomerGenerator
                 atom1.setID(prefix + ":" + ++id);
             }
         }
-        
+
 
         List<IAtom> remove = new ArrayList<IAtom>();
 
@@ -529,6 +531,46 @@ public class InchiTautomerGenerator
         }
 
         inputMolecule.setAtoms(atoms.toArray(new IAtom[0]));
+
+
+        ArrayList<IAtom> chiralAtoms = new ArrayList<IAtom>();
+
+        if(fragment.tetrahedralStereo != null)
+        {
+            for(String definition : fragment.tetrahedralStereo.split(","))
+            {
+                String index = definition.substring(0, definition.length() - 1);
+                IAtom atom = inputMolecule.getAtom(Integer.parseInt(index) - 1);
+                chiralAtoms.add(atom);
+            }
+        }
+
+        for(IAtom atom : inputMolecule.atoms())
+            if(!chiralAtoms.contains(atom))
+                atom.setProperty(SachemMoleculeBuilder.STEREO_PROPERTY, SachemMoleculeBuilder.IGNORE_STEREO);
+
+
+        ArrayList<IBond> stereoBonds = new ArrayList<IBond>();
+
+        if(fragment.doubleBondStereo != null)
+        {
+            for(String definition : fragment.doubleBondStereo.split(","))
+            {
+                String[] indexes = definition.substring(0, definition.length() - 1).split("-");
+
+                IAtom a0 = inputMolecule.getAtom(Integer.parseInt(indexes[0]) - 1);
+                IAtom a1 = inputMolecule.getAtom(Integer.parseInt(indexes[1]) - 1);
+
+                IBond bond = inputMolecule.getBond(a0, a1);
+                stereoBonds.add(bond);
+            }
+        }
+
+        for(IBond bond : inputMolecule.bonds())
+            if(!stereoBonds.contains(bond))
+                bond.setProperty(SachemMoleculeBuilder.STEREO_PROPERTY, SachemMoleculeBuilder.IGNORE_STEREO);
+
+
         return inputMolecule;
     }
 

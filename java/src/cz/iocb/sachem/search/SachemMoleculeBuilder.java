@@ -120,6 +120,8 @@ public class SachemMoleculeBuilder
     }
 
 
+    public static String STEREO_PROPERTY = "STEREO";
+    public static String IGNORE_STEREO = "IGNORE";
     private static String BOND_NUMBER = "BOND_NUMBER";
     private static int[] validReorder = { 0x1234, 0x1423, 0x1342, 0x2314, 0x2431, 0x2143, 0x3124, 0x3412, 0x3241,
             0x4213, 0x4321, 0x4132 };
@@ -496,6 +498,11 @@ public class SachemMoleculeBuilder
 
     private boolean isTetrahedralChirality(int index)
     {
+        IAtom focus = molecule.getAtom(index);
+
+        if(focus.getProperty(STEREO_PROPERTY) == IGNORE_STEREO)
+            return false;
+
         if(tetrahedralChirality[index] != null)
             return true;
 
@@ -514,6 +521,11 @@ public class SachemMoleculeBuilder
 
     private boolean isExtendedTetrahedral(int index)
     {
+        IAtom focus = molecule.getAtom(index);
+
+        if(focus.getProperty(STEREO_PROPERTY) == IGNORE_STEREO)
+            return false;
+
         if(tetrahedralChirality[index] != null)
             return true;
 
@@ -526,7 +538,6 @@ public class SachemMoleculeBuilder
         if(centers.elementType(index) != Type.Bicoordinate)
             return false;
 
-        IAtom focus = molecule.getAtom(index);
         List<IBond> bonds = molecule.getConnectedBondsList(focus);
 
         if(bonds.size() != 2)
@@ -616,6 +627,9 @@ public class SachemMoleculeBuilder
     private boolean isDoubleBondStereochemistry(int index)
     {
         IBond bond = molecule.getBond(index);
+
+        if(bond.getProperty(STEREO_PROPERTY) == IGNORE_STEREO)
+            return false;
 
         if(bond.isAromatic())
             return false;
