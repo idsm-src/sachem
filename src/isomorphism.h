@@ -503,11 +503,8 @@ static inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2st
 
         if(queryStereo != TETRAHEDRAL_STEREO_NONE && queryStereo != TETRAHEDRAL_STEREO_UNDEFINED)
         {
-            if(targetStereo == TETRAHEDRAL_STEREO_NONE)
+            if(targetStereo == TETRAHEDRAL_STEREO_NONE || targetStereo == TETRAHEDRAL_STEREO_UNDEFINED)
                 continue;
-
-            if(targetStereo == TETRAHEDRAL_STEREO_UNDEFINED)
-                return false;
 
 
             AtomIdx queryAtoms[4];
@@ -533,11 +530,6 @@ static inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2st
             if(normalize_atom_stereo(targetAtoms, targetStereo) != queryStereo)
                 return false;
         }
-        else if(queryStereo != TETRAHEDRAL_STEREO_NONE && vf2state->graphMode == GRAPH_EXACT)
-        {
-            if(queryStereo != targetStereo)
-                return false;
-        }
     }
 
 
@@ -553,11 +545,8 @@ static inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2st
 
         if(queryStereo != BOND_STEREO_NONE && queryStereo != BOND_STEREO_UNDEFINED)
         {
-            if(targetStereo == BOND_STEREO_NONE)
+            if(targetStereo == BOND_STEREO_NONE || targetStereo == BOND_STEREO_UNDEFINED)
                 continue;
-
-            if(targetStereo == BOND_STEREO_UNDEFINED)
-                return false;
 
 
             AtomIdx queryAtoms[4];
@@ -600,11 +589,6 @@ static inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2st
                 targetAtoms[3] = molecule_get_last_stereo_bond_ligand(target, targetBondAtom1, targetBondIdx, targetAtoms[2]);
 
             if(normalize_bond_stereo(targetAtoms, targetStereo) != queryStereo)
-                return false;
-        }
-        else if(queryStereo != BOND_STEREO_NONE && vf2state->graphMode == GRAPH_EXACT)
-        {
-            if(queryStereo != targetStereo)
                 return false;
         }
     }
