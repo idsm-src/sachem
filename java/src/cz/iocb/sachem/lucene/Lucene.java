@@ -145,6 +145,14 @@ public class Lucene
             initSearcher();
 
 
+        if(fp.length == 0)
+        {
+            BitSetCollector collector = new BitSetCollector(this, maxMoleculeId);
+            searcher.search(new ConstantScoreQuery(new MatchAllDocsQuery()), collector);
+            return collector.getBitSet().toLongArray();
+        }
+
+
         Builder builder = new BooleanQuery.Builder();
 
         if(indexType == IndexType.TEXT)
