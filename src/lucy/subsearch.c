@@ -374,7 +374,9 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
 #if SHOW_STATS
                         struct timeval fingerprint_begin = time_get();
 #endif
-                        info->extended = molecule_is_extended_search_needed(data->molecule, info->chargeMode, info->isotopeMode);
+                        info->extended = molecule_is_extended_search_needed(data->molecule, info->chargeMode != CHARGE_IGNORE,
+                                info->isotopeMode != ISOTOPE_IGNORE,
+                                info->chargeMode == CHARGE_DEFAULT_AS_UNCHARGED || info->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD);
                         molecule_init(&info->queryMolecule, data->molecule, data->restH, info->extended,
                                 info->chargeMode != CHARGE_IGNORE, info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
                         vf2state_init(&info->vf2state, &info->queryMolecule, info->graphMode, info->chargeMode, info->isotopeMode,

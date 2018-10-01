@@ -393,7 +393,7 @@ static inline void molecule_simple_init(Molecule *const molecule, const uint8_t 
 }
 
 
-static inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, bool withIsotopes)
+static inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, bool withIsotopes, bool distinguishHydrogens)
 {
     int xAtomCount = *data << 8 | *(data + 1);
     data += 2;
@@ -412,6 +412,8 @@ static inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCh
 
     int heavyAtomCount = xAtomCount + cAtomCount;
 
+    if(hAtomCount > 0 && distinguishHydrogens)
+        return true;
 
     for(int i = 0; i < xAtomCount; i++)
         if(((int8_t) data[i]) < 0)
@@ -451,15 +453,10 @@ static inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCh
         int offset = i * HBOND_BLOCK_SIZE;
         int value = data[offset + 0] * 256 | data[offset + 1];
 
-        if(value == 0)
-            continue;
+        if(value == 0 || (value & 0xFFF) >= heavyAtomCount)
+            return true;
 
         hBonds[i]++;
-
-        int idx = value & 0xFFF;
-
-        if(idx >= heavyAtomCount)
-            hBonds[idx - heavyAtomCount]++;
     }
 
     data += hAtomCount * HBOND_BLOCK_SIZE;
@@ -468,7 +465,6 @@ static inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCh
     for(int i = 0; i < hAtomCount; i++)
         if(hBonds[i] != 1)
             return true;
-
 
     if(!withCharges && !withIsotopes)
         return false;
