@@ -331,6 +331,13 @@ static PathList find_subgraphs(const Molecule *molecule, uint lowerLen, uint upp
         if(molecule_get_bond_type(molecule, i) > BOND_AROMATIC)
             continue;
 
+        if(molecule_get_atom_number(molecule, molecule_bond_atoms(molecule, i)[0]) <= H_ATOM_NUMBER)
+            continue;
+
+        if(molecule_get_atom_number(molecule, molecule_bond_atoms(molecule, i)[1]) <= H_ATOM_NUMBER)
+            continue;
+
+
         // if we are only returning paths rooted at a particular atom, check now that this bond involves that atom:
         if(rootedAtAtom >= 0 && molecule_bond_atoms(molecule, i)[0] != rootedAtAtom &&
                 molecule_bond_atoms(molecule, i)[1] != rootedAtAtom)
