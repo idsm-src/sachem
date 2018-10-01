@@ -145,12 +145,18 @@ public class InChI
             }
         }
 
+
+        boolean hasIsomericPart = false;
+
         for(int i = 2; i < components.length; i++)
         {
             char name = components[i].charAt(0);
 
-            if(name == 'p')
+            if(name == 'p' || name == 'h' && hasIsomericPart)
                 continue;
+
+            if(name == 'i')
+                hasIsomericPart = true;
 
             String[] parts = components[i].substring(1).split(";");
             int index = 0;
