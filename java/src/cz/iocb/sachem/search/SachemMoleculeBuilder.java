@@ -308,14 +308,13 @@ public class SachemMoleculeBuilder
             IAtom atom = molecule.getAtom(i);
 
             List<IBond> list = molecule.getConnectedBondsList(atom);
-            assert list.size() <= 1;
 
             if(list.size() == 1)
             {
                 IAtom other = list.get(0).getOther(atom);
                 int idx = molecule.indexOf(other);
 
-                if(other.getSymbol().equals("H") && i > idx)
+                if(other.getSymbol().equals("H") && i > idx && molecule.getConnectedBondsCount(other) == 1)
                 {
                     // empty record
                     stream.write(0);
