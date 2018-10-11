@@ -26,12 +26,13 @@ import org.openscience.cdk.interfaces.IAtomContainer;
 import cz.iocb.sachem.fingerprint.ExtendedFingerprinter;
 import cz.iocb.sachem.isomorphism.IsomorphismSort;
 import cz.iocb.sachem.tautomers.CombinationCountException;
+import cz.iocb.sachem.tautomers.InChIException;
 
 
 
 public abstract class EcdkSubstructureSearch extends SubstructureSearch
 {
-    public static class EcdkQueryData extends SubstructureSearch.QueryData
+    public static class EcdkQueryDataItem extends SubstructureSearch.QueryDataItem
     {
         //public short[] counts;
         public short[] fp;
@@ -48,13 +49,26 @@ public abstract class EcdkSubstructureSearch extends SubstructureSearch
     };
 
 
-    public static EcdkQueryData[] getQueryData(byte[] queryArray, int type, boolean implicitHydrogens,
-            boolean tautomers)
-            throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException
+    public static QueryData getQueryData(byte[] queryArray, int type, boolean implicitHydrogens, boolean tautomers)
+            throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException,
+            InChIException
     {
         String query = new String(queryArray, StandardCharsets.ISO_8859_1);
-        List<IAtomContainer> queryMolecules = translateUserQuery(query, type, tautomers);
-        EcdkQueryData[] data = new EcdkQueryData[queryMolecules.size()];
+
+        List<IAtomContainer> queryMolecules;
+        String message = null;
+
+        try
+        {
+            queryMolecules = translateUserQuery(query, type, tautomers);
+        }
+        catch(CombinationCountException | InChIException e)
+        {
+            queryMolecules = translateUserQuery(query, type, false);
+            message = "cannot generate tautomers: " + e.getMessage();
+        }
+
+        EcdkQueryDataItem[] items = new EcdkQueryDataItem[queryMolecules.size()];
 
         for(int idx = 0; idx < queryMolecules.size(); idx++)
         {
@@ -87,7 +101,7 @@ public abstract class EcdkSubstructureSearch extends SubstructureSearch
             }
 
 
-            data[idx] = new EcdkQueryData();
+            items[idx] = new EcdkQueryDataItem();
 
             /*
             data[idx].counts = new short[13];
@@ -107,10 +121,15 @@ public abstract class EcdkSubstructureSearch extends SubstructureSearch
             */
 
 
-            data[idx].fp = fp;
-            data[idx].molecule = moleculeBytes;
-            data[idx].restH = restH;
+            items[idx].fp = fp;
+            items[idx].molecule = moleculeBytes;
+            items[idx].restH = restH;
         }
+
+
+        QueryData data = new QueryData();
+        data.items = items;
+        data.message = message;
 
         return data;
     }

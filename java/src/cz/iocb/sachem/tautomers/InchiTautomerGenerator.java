@@ -92,101 +92,93 @@ public class InchiTautomerGenerator
      * @throws CombinationCountException
      * @throws CloneNotSupportedException
      * @throws TimeoutException
+     * @throws InChIException
      */
-    public List<IAtomContainer> getTautomers(String kekuleMDL)
-            throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException
+    public List<IAtomContainer> getTautomers(String kekuleMDL) throws CDKException, IOException, TimeoutException,
+            CloneNotSupportedException, CombinationCountException, InChIException
     {
         InChI inchi = new InChI(kekuleMDL);
 
         //Process the molecule based on the molfile input file
         IAtomContainer molecule = MoleculeCreator.getMoleculeFromMolfile(kekuleMDL);
         AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(molecule);
-        //CDKHydrogenAdder.getInstance(molecule.getBuilder()).addImplicitHydrogens(molecule);
 
 
         List<IAtomContainer> tautomers = new ArrayList<IAtomContainer>();
 
-        if(inchi.getValue() == null)
+        assignAtomLabel(molecule, inchi.getAuxInfo());
+
+        List<IAtom> remainingAtoms = new LinkedList<IAtom>();
+
+        for(IAtom a : molecule.atoms())
+            if(a.getID() == null)
+                remainingAtoms.add(a);
+
+        for(IBond b : molecule.bonds())
         {
-            MoleculeCreator.configureAromaticity(molecule);
-            tautomers.add(molecule);
+            IAtom a0 = b.getAtom(0);
+            IAtom a1 = b.getAtom(1);
+
+            if(a0.getID() != null && a1.getAtomicNumber() == AtomicNumbers.H)
+                remainingAtoms.remove(a1);
+
+            if(a1.getID() != null && a0.getAtomicNumber() == AtomicNumbers.H)
+                remainingAtoms.remove(a0);
         }
-        else
+
+        /*
+        for(IAtom atom : remainingAtoms)
         {
-            assignAtomLabel(molecule, inchi.getAuxInfo());
+            for(IBond bond : molecule.bonds())
+                for(IAtom a : bond.atoms())
+                    if(a == atom)
+                        throw new CDKException("remaining atom has a bond");
+        }
+        */
 
-            List<IAtom> remainingAtoms = new LinkedList<IAtom>();
+        List<IBond> crossBonds = getCrossBondLabels(molecule);
 
-            for(IAtom a : molecule.atoms())
-                if(a.getID() == null)
-                    remainingAtoms.add(a);
+        tautomers.add(new AtomContainer());
 
-            for(IBond b : molecule.bonds())
+        int idx = 0;
+
+        for(Fragment localInchi : inchi.decompose())
+        {
+            List<IAtomContainer> localTautomers = getTautomers(molecule, localInchi, Integer.toString(++idx));
+
+            List<IAtomContainer> tmps = tautomers;
+            tautomers = new ArrayList<IAtomContainer>();
+
+            if(tmps.size() * localTautomers.size() > tautomerCombinationLimit)
+                throw new CombinationCountException("too many tautomer combinations");
+
+            for(IAtomContainer tmp : tmps)
             {
-                IAtom a0 = b.getAtom(0);
-                IAtom a1 = b.getAtom(1);
-
-                if(a0.getID() != null && a1.getAtomicNumber() == AtomicNumbers.H)
-                    remainingAtoms.remove(a1);
-
-                if(a1.getID() != null && a0.getAtomicNumber() == AtomicNumbers.H)
-                    remainingAtoms.remove(a0);
-            }
-
-            /*
-            for(IAtom atom : remainingAtoms)
-            {
-                for(IBond bond : molecule.bonds())
-                    for(IAtom a : bond.atoms())
-                        if(a == atom)
-                            throw new CDKException("remaining atom has a bond");
-            }
-            */
-
-            List<IBond> crossBonds = getCrossBondLabels(molecule);
-
-            tautomers.add(new AtomContainer());
-
-            int idx = 0;
-
-            for(Fragment localInchi : inchi.decompose())
-            {
-                List<IAtomContainer> localTautomers = getTautomers(molecule, localInchi, Integer.toString(++idx));
-
-                List<IAtomContainer> tmps = tautomers;
-                tautomers = new ArrayList<IAtomContainer>();
-
-                if(tmps.size() * localTautomers.size() > tautomerCombinationLimit)
-                    throw new CombinationCountException("too many tautomer combinations");
-
-                for(IAtomContainer tmp : tmps)
+                for(IAtomContainer t : localTautomers)
                 {
-                    for(IAtomContainer t : localTautomers)
-                    {
-                        IAtomContainer container = tmp.clone();
-                        container.add(t.clone());
-                        tautomers.add(container);
-                    }
+                    IAtomContainer container = tmp.clone();
+                    container.add(t.clone());
+                    tautomers.add(container);
                 }
             }
-
-            for(IBond bond : crossBonds)
-            {
-                String label0 = bond.getAtom(0).getID();
-                String label1 = bond.getAtom(1).getID();
-
-                for(IAtomContainer tautomer : tautomers)
-                {
-                    IBond newBond = tautomer.getBuilder().newInstance(IBond.class, getAtomById(tautomer, label0),
-                            getAtomById(tautomer, label1), bond.getOrder());
-                    tautomer.addBond(newBond);
-                }
-            }
-
-            for(IAtom a : remainingAtoms)
-                for(IAtomContainer tautomer : tautomers)
-                    tautomer.addAtom(a.clone());
         }
+
+        for(IBond bond : crossBonds)
+        {
+            String label0 = bond.getAtom(0).getID();
+            String label1 = bond.getAtom(1).getID();
+
+            for(IAtomContainer tautomer : tautomers)
+            {
+                IBond newBond = tautomer.getBuilder().newInstance(IBond.class, getAtomById(tautomer, label0),
+                        getAtomById(tautomer, label1), bond.getOrder());
+                tautomer.addBond(newBond);
+            }
+        }
+
+        for(IAtom a : remainingAtoms)
+            for(IAtomContainer tautomer : tautomers)
+                tautomer.addAtom(a.clone());
 
 
         return tautomers;

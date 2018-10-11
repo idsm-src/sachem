@@ -27,12 +27,13 @@ import cz.iocb.sachem.fingerprint.OrchemFingerprinter;
 import cz.iocb.sachem.isomorphism.IsomorphismSort;
 import cz.iocb.sachem.shared.MoleculeCounts;
 import cz.iocb.sachem.tautomers.CombinationCountException;
+import cz.iocb.sachem.tautomers.InChIException;
 
 
 
 public abstract class OrchemSubstructureSearch extends SubstructureSearch
 {
-    public static class OrchemQueryData extends SubstructureSearch.QueryData
+    public static class OrchemQueryDataItem extends SubstructureSearch.QueryDataItem
     {
         public short[] counts;
         public short[] fp;
@@ -49,13 +50,26 @@ public abstract class OrchemSubstructureSearch extends SubstructureSearch
     };
 
 
-    public static OrchemQueryData[] getQueryData(byte[] queryArray, int type, boolean implicitHydrogens,
-            boolean tautomers)
-            throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException
+    public static QueryData getQueryData(byte[] queryArray, int type, boolean implicitHydrogens, boolean tautomers)
+            throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException,
+            InChIException
     {
         String query = new String(queryArray, StandardCharsets.ISO_8859_1);
-        List<IAtomContainer> queryMolecules = translateUserQuery(query, type, tautomers);
-        OrchemQueryData[] data = new OrchemQueryData[queryMolecules.size()];
+
+        List<IAtomContainer> queryMolecules;
+        String message = null;
+
+        try
+        {
+            queryMolecules = translateUserQuery(query, type, tautomers);
+        }
+        catch(CombinationCountException | InChIException e)
+        {
+            queryMolecules = translateUserQuery(query, type, false);
+            message = "cannot generate tautomers: " + e.getMessage();
+        }
+
+        OrchemQueryDataItem[] items = new OrchemQueryDataItem[queryMolecules.size()];
 
         for(int idx = 0; idx < queryMolecules.size(); idx++)
         {
@@ -88,29 +102,34 @@ public abstract class OrchemSubstructureSearch extends SubstructureSearch
             }
 
 
-            data[idx] = new OrchemQueryData();
+            items[idx] = new OrchemQueryDataItem();
 
-            data[idx].counts = new short[13];
-            data[idx].counts[0] = counts.molSingleBondCount;
-            data[idx].counts[1] = counts.molDoubleBondCount;
-            data[idx].counts[2] = counts.molTripleBondCount;
-            data[idx].counts[3] = counts.molAromaticBondCount;
-            data[idx].counts[4] = counts.molSCount;
-            data[idx].counts[5] = counts.molOCount;
-            data[idx].counts[6] = counts.molNCount;
-            data[idx].counts[7] = counts.molFCount;
-            data[idx].counts[8] = counts.molClCount;
-            data[idx].counts[9] = counts.molBrCount;
-            data[idx].counts[10] = counts.molICount;
-            data[idx].counts[11] = counts.molCCount;
-            data[idx].counts[12] = counts.molPCount;
+            items[idx].counts = new short[13];
+            items[idx].counts[0] = counts.molSingleBondCount;
+            items[idx].counts[1] = counts.molDoubleBondCount;
+            items[idx].counts[2] = counts.molTripleBondCount;
+            items[idx].counts[3] = counts.molAromaticBondCount;
+            items[idx].counts[4] = counts.molSCount;
+            items[idx].counts[5] = counts.molOCount;
+            items[idx].counts[6] = counts.molNCount;
+            items[idx].counts[7] = counts.molFCount;
+            items[idx].counts[8] = counts.molClCount;
+            items[idx].counts[9] = counts.molBrCount;
+            items[idx].counts[10] = counts.molICount;
+            items[idx].counts[11] = counts.molCCount;
+            items[idx].counts[12] = counts.molPCount;
 
 
 
-            data[idx].fp = fp;
-            data[idx].molecule = moleculeBytes;
-            data[idx].restH = restH;
+            items[idx].fp = fp;
+            items[idx].molecule = moleculeBytes;
+            items[idx].restH = restH;
         }
+
+
+        QueryData data = new QueryData();
+        data.items = items;
+        data.message = message;
 
         return data;
     }

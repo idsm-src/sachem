@@ -76,7 +76,7 @@ public class InChI
     }
 
 
-    public InChI(String molfile)
+    public InChI(String molfile) throws InChIException
     {
         try
         {
@@ -97,6 +97,15 @@ public class InChI
             {
                 value = "InChI=1/" + value.substring(value.indexOf("/r") + 2);
                 aux = "AuxInfo=1/" + aux.substring(aux.indexOf("/R:") + 4);
+            }
+
+            if(value == null)
+            {
+                for(String line = error.readLine(); line != null; line = error.readLine())
+                    if(line.startsWith("Error"))
+                        throw new InChIException("cannot generate InChI: " + line);
+
+                throw new InChIException("cannot generate InChI");
             }
 
             input.close();

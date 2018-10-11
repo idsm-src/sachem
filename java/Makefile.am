@@ -57,4 +57,5 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/shared/MoleculeCreator.java \
     src/cz/iocb/sachem/tautomers/CombinationCountException.java \
     src/cz/iocb/sachem/tautomers/InChI.java \
+    src/cz/iocb/sachem/tautomers/InChIException.java \
     src/cz/iocb/sachem/tautomers/InchiTautomerGenerator.java

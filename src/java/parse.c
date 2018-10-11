@@ -10,6 +10,9 @@ static jclass byteArrayClass = NULL;
 
 static jclass substructureSearchClass = NULL;
 static jclass substructureQueryDataClass = NULL;
+static jfieldID itemsField = NULL;
+static jfieldID messageField = NULL;
+static jclass substructureQueryDataItemClass = NULL;
 static jfieldID moleculeField = NULL;
 static jfieldID restHField = NULL;
 static jmethodID substructureQueryDataMethod = NULL;
@@ -42,13 +45,22 @@ void java_parse_init(void)
     substructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/sachem/search/SubstructureSearch$QueryData");
     java_check_exception(__func__);
 
-    moleculeField = (*env)->GetFieldID(env, substructureQueryDataClass, "molecule", "[B");
+    itemsField = (*env)->GetFieldID(env, substructureQueryDataClass, "items", "[Lcz/iocb/sachem/search/SubstructureSearch$QueryDataItem;");
     java_check_exception(__func__);
 
-    restHField = (*env)->GetFieldID(env, substructureQueryDataClass, "restH", "[Z");
+    messageField = (*env)->GetFieldID(env, substructureQueryDataClass, "message", "Ljava/lang/String;");
     java_check_exception(__func__);
 
-    substructureQueryDataMethod = (*env)->GetStaticMethodID(env, substructureSearchClass, "getQueryData", "([BIZZ)[Lcz/iocb/sachem/search/SubstructureSearch$QueryData;");
+    substructureQueryDataItemClass = (*env)->FindClass(env, "cz/iocb/sachem/search/SubstructureSearch$QueryDataItem");
+    java_check_exception(__func__);
+
+    moleculeField = (*env)->GetFieldID(env, substructureQueryDataItemClass, "molecule", "[B");
+    java_check_exception(__func__);
+
+    restHField = (*env)->GetFieldID(env, substructureQueryDataItemClass, "restH", "[Z");
+    java_check_exception(__func__);
+
+    substructureQueryDataMethod = (*env)->GetStaticMethodID(env, substructureSearchClass, "getQueryData", "([BIZZ)Lcz/iocb/sachem/search/SubstructureSearch$QueryData;");
     java_check_exception(__func__);
 
 
@@ -82,7 +94,9 @@ void java_parse_init(void)
 int java_parse_substructure_query(SubstructureQueryData **data, char* query, size_t queryLength, int32_t type, bool implicitHydrogens, bool tautomers)
 {
     jbyteArray queryArg = NULL;
-    jobjectArray result = NULL;
+    jobject result = NULL;
+    jobjectArray items = NULL;
+    jstring message = NULL;
     jobject element = NULL;
     jbyteArray moleculeArray = NULL;
     jbooleanArray restHArray = NULL;
@@ -98,19 +112,30 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
 
         (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte *) query);
 
-
-        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, substructureSearchClass, substructureQueryDataMethod, queryArg, (jint) type, (jboolean) implicitHydrogens, (jboolean) tautomers);
+        result = (*env)->CallStaticObjectMethod(env, substructureSearchClass, substructureQueryDataMethod, queryArg, (jint) type, (jboolean) implicitHydrogens, (jboolean) tautomers);
         java_check_exception(__func__);
 
+        items = (jobjectArray) (*env)->GetObjectField(env, result, itemsField);
+        message = (jstring) (*env)->GetObjectField(env, result, messageField);
+
+        if(message != NULL)
+        {
+            const char *mstr = (*env)->GetStringUTFChars(env, message, NULL);
+            elog(WARNING, "%s", mstr);
+            (*env)->ReleaseStringUTFChars(env, message, mstr);
+        }
+
         JavaDeleteRef(queryArg);
+        JavaDeleteRef(result);
+        JavaDeleteRef(message);
 
 
-        length = (*env)->GetArrayLength(env, result);
+        length = (*env)->GetArrayLength(env, items);
         SubstructureQueryData *results = (SubstructureQueryData *) palloc(length * sizeof(SubstructureQueryData));
 
         for(int i = 0; i < length; i++)
         {
-            element = (*env)->GetObjectArrayElement(env, result, i);
+            element = (*env)->GetObjectArrayElement(env, items, i);
 
             moleculeArray = (jbyteArray) (*env)->GetObjectField(env, element, moleculeField);
             restHArray = (jbooleanArray) (*env)->GetObjectField(env, element, restHField);
@@ -145,7 +170,7 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
             JavaDeleteRef(element);
         }
 
-        JavaDeleteRef(result);
+        JavaDeleteRef(items);
 
         *data = results;
     }
@@ -153,6 +178,8 @@ int java_parse_substructure_query(SubstructureQueryData **data, char* query, siz
     {
         JavaDeleteRef(queryArg);
         JavaDeleteRef(result);
+        JavaDeleteRef(items);
+        JavaDeleteRef(message);
         JavaDeleteRef(element);
         JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
         JavaDeleteBooleanArray(restHArray, restH, JNI_ABORT);

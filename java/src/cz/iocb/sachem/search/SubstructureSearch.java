@@ -32,6 +32,7 @@ import cz.iocb.sachem.convert.ConvertMolecule;
 import cz.iocb.sachem.isomorphism.IsomorphismSort;
 import cz.iocb.sachem.shared.MoleculeCreator;
 import cz.iocb.sachem.tautomers.CombinationCountException;
+import cz.iocb.sachem.tautomers.InChIException;
 import cz.iocb.sachem.tautomers.InchiTautomerGenerator;
 
 
@@ -40,17 +41,38 @@ public abstract class SubstructureSearch
 {
     public static class QueryData
     {
+        QueryDataItem[] items;
+        String message;
+    }
+
+
+    public static class QueryDataItem
+    {
         public byte[] molecule;
         public boolean[] restH;
     }
 
 
-    public static QueryData[] getQueryData(byte[] queryArray, int type, boolean implicitHydrogens, boolean tautomers)
-            throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException
+    public static QueryData getQueryData(byte[] queryArray, int type, boolean implicitHydrogens, boolean tautomers)
+            throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException,
+            InChIException
     {
         String query = new String(queryArray, StandardCharsets.ISO_8859_1);
-        List<IAtomContainer> queryMolecules = translateUserQuery(query, type, tautomers);
-        QueryData[] data = new QueryData[queryMolecules.size()];
+
+        List<IAtomContainer> queryMolecules;
+        String message = null;
+
+        try
+        {
+            queryMolecules = translateUserQuery(query, type, tautomers);
+        }
+        catch(CombinationCountException | InChIException e)
+        {
+            queryMolecules = translateUserQuery(query, type, false);
+            message = "cannot generate tautomers: " + e.getMessage();
+        }
+
+        QueryDataItem[] items = new QueryDataItem[queryMolecules.size()];
 
         for(int idx = 0; idx < queryMolecules.size(); idx++)
         {
@@ -72,10 +94,15 @@ public abstract class SubstructureSearch
                         && atom.getProperty(CDKConstants.REST_H).equals(true);
             }
 
-            data[idx] = new QueryData();
-            data[idx].molecule = moleculeBytes;
-            data[idx].restH = restH;
+            items[idx] = new QueryDataItem();
+            items[idx].molecule = moleculeBytes;
+            items[idx].restH = restH;
         }
+
+
+        QueryData data = new QueryData();
+        data.items = items;
+        data.message = message;
 
         return data;
     }
@@ -96,9 +123,11 @@ public abstract class SubstructureSearch
      * @throws CombinationCountException
      * @throws CloneNotSupportedException
      * @throws TimeoutException
+     * @throws InChIException
      */
     protected static List<IAtomContainer> translateUserQuery(String query, int queryTypeIdx, boolean tautomers)
-            throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException
+            throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException,
+            InChIException
     {
         QueryFormat queryType = QueryFormat.values()[queryTypeIdx];
         List<IAtomContainer> userQueries = null;

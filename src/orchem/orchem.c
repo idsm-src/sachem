@@ -12,6 +12,9 @@ static jclass byteArrayClass = NULL;
 
 static jclass orchemSubstructureSearchClass = NULL;
 static jclass orchemSubstructureQueryDataClass = NULL;
+static jfieldID itemsField = NULL;
+static jfieldID messageField = NULL;
+static jclass orchemSubstructureQueryDataItemClass = NULL;
 static jfieldID fpField = NULL;
 static jfieldID moleculeField = NULL;
 static jfieldID restHField = NULL;
@@ -52,21 +55,30 @@ void orchem_java_init(void)
     orchemSubstructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/sachem/search/OrchemSubstructureSearch$OrchemQueryData");
     java_check_exception(__func__);
 
+    itemsField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "items", "[Lcz/iocb/sachem/search/SubstructureSearch$QueryDataItem;");
+    java_check_exception(__func__);
+
+    messageField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "message", "Ljava/lang/String;");
+    java_check_exception(__func__);
+
+    orchemSubstructureQueryDataItemClass = (*env)->FindClass(env, "cz/iocb/sachem/search/OrchemSubstructureSearch$OrchemQueryDataItem");
+    java_check_exception(__func__);
+
 #if USE_COUNT_FINGERPRINT
-    countsField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "counts", "[S");
+    countsField = (*env)->GetFieldID(env, orchemSubstructureQueryDataItemClass, "counts", "[S");
     java_check_exception(__func__);
 #endif
 
-    fpField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "fp", "[S");
+    fpField = (*env)->GetFieldID(env, orchemSubstructureQueryDataItemClass, "fp", "[S");
     java_check_exception(__func__);
 
-    moleculeField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "molecule", "[B");
+    moleculeField = (*env)->GetFieldID(env, orchemSubstructureQueryDataItemClass, "molecule", "[B");
     java_check_exception(__func__);
 
-    restHField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "restH", "[Z");
+    restHField = (*env)->GetFieldID(env, orchemSubstructureQueryDataItemClass, "restH", "[Z");
     java_check_exception(__func__);
 
-    orchemSubstructureQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSubstructureSearchClass, "getQueryData", "([BIZZ)[Lcz/iocb/sachem/search/OrchemSubstructureSearch$OrchemQueryData;");
+    orchemSubstructureQueryDataMethod = (*env)->GetStaticMethodID(env, orchemSubstructureSearchClass, "getQueryData", "([BIZZ)Lcz/iocb/sachem/search/SubstructureSearch$QueryData;");
     java_check_exception(__func__);
 
 
@@ -108,7 +120,9 @@ void orchem_java_init(void)
 int orchem_java_parse_substructure_query(OrchemSubstructureQueryData **data, char* query, size_t queryLength, int32_t type, bool implicitHydrogens, bool tautomers)
 {
     jbyteArray queryArg = NULL;
-    jobjectArray result = NULL;
+    jobject result = NULL;
+    jobjectArray items = NULL;
+    jstring message = NULL;
     jobject element = NULL;
     jshortArray fpArray = NULL;
     jbyteArray moleculeArray = NULL;
@@ -131,18 +145,30 @@ int orchem_java_parse_substructure_query(OrchemSubstructureQueryData **data, cha
         (*env)->SetByteArrayRegion(env, queryArg, 0, queryLength, (jbyte *) query);
 
 
-        result = (jobjectArray) (*env)->CallStaticObjectMethod(env, orchemSubstructureSearchClass, orchemSubstructureQueryDataMethod, queryArg, (jint) type, (jboolean) implicitHydrogens, (jboolean) tautomers);
+        result = (*env)->CallStaticObjectMethod(env, orchemSubstructureSearchClass, orchemSubstructureQueryDataMethod, queryArg, (jint) type, (jboolean) implicitHydrogens, (jboolean) tautomers);
         java_check_exception(__func__);
 
+        items = (jobjectArray) (*env)->GetObjectField(env, result, itemsField);
+        message = (jstring) (*env)->GetObjectField(env, result, messageField);
+
+        if(message != NULL)
+        {
+            const char *mstr = (*env)->GetStringUTFChars(env, message, NULL);
+            elog(WARNING, "%s", mstr);
+            (*env)->ReleaseStringUTFChars(env, message, mstr);
+        }
+
         JavaDeleteRef(queryArg);
+        JavaDeleteRef(result);
+        JavaDeleteRef(message);
 
 
-        length = (*env)->GetArrayLength(env, result);
+        length = (*env)->GetArrayLength(env, items);
         OrchemSubstructureQueryData *results = (OrchemSubstructureQueryData *) palloc(length * sizeof(OrchemSubstructureQueryData));
 
         for(int i = 0; i < length; i++)
         {
-            element = (*env)->GetObjectArrayElement(env, result, i);
+            element = (*env)->GetObjectArrayElement(env, items, i);
 
             fpArray = (jshortArray) (*env)->GetObjectField(env, element, fpField);
             moleculeArray = (jbyteArray) (*env)->GetObjectField(env, element, moleculeField);
@@ -203,7 +229,7 @@ int orchem_java_parse_substructure_query(OrchemSubstructureQueryData **data, cha
             JavaDeleteRef(element);
         }
 
-        JavaDeleteRef(result);
+        JavaDeleteRef(items);
 
         *data = results;
     }
@@ -211,6 +237,8 @@ int orchem_java_parse_substructure_query(OrchemSubstructureQueryData **data, cha
     {
         JavaDeleteRef(queryArg);
         JavaDeleteRef(result);
+        JavaDeleteRef(items);
+        JavaDeleteRef(message);
         JavaDeleteRef(element);
         JavaDeleteShortArray(fpArray, fp, JNI_ABORT);
         JavaDeleteByteArray(moleculeArray, molecule, JNI_ABORT);
