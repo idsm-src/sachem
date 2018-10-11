@@ -145,6 +145,26 @@ static inline void sort_bond_atoms(AtomIdx array[4])
 }
 
 
+static inline bool is_extended_tetrahedral_centre(const Molecule *const restrict molecule, AtomIdx centre)
+{
+    MolSize listSize = molecule_get_bonded_atom_list_size(molecule, centre);
+
+    if(listSize != 2)
+        return false;
+
+    for(int i = 0; i < listSize; i++)
+    {
+        AtomIdx ligand = molecule_get_bonded_atom_list(molecule, centre)[i];
+        BondIdx bond = molecule_get_bond(molecule, centre, ligand);
+
+        if(molecule_get_bond_type(molecule, bond) != BOND_DOUBLE)
+            return false;
+    }
+
+    return true;
+}
+
+
 static inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *const restrict query,
         GraphMode graphMode, ChargeMode chargeMode, IsotopeMode isotopeMode, StereoMode stereoMode)
 {
@@ -508,10 +528,63 @@ static inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2st
 
 
             AtomIdx queryAtoms[4];
-            MolSize listSize = molecule_get_bonded_atom_list_size(query, queryAtomIdx);
+            MolSize listSize = 0;
 
-            for(int i = 0; i < listSize; i++)
-                queryAtoms[i] = molecule_get_bonded_atom_list(query, queryAtomIdx)[i];
+            if(is_extended_tetrahedral_centre(query, queryAtomIdx))
+            {
+                for(int i = 0; i < 2; i++)
+                {
+                    AtomIdx atom = queryAtomIdx;
+                    AtomIdx bonded = molecule_get_bonded_atom_list(query, queryAtomIdx)[i];
+
+                    while(true)
+                    {
+                        MolSize newListSize = molecule_get_bonded_atom_list_size(query, bonded);
+
+                        if(newListSize == 3)
+                        {
+                            for(int j = 0; j < 3; j++)
+                            {
+                                AtomIdx o = molecule_get_bonded_atom_list(query, bonded)[j];
+
+                                if(o == atom)
+                                    continue;
+
+                                queryAtoms[listSize++] = o;
+                            }
+
+                            break;
+                        }
+                        else if(newListSize == 2)
+                        {
+                            AtomIdx next = molecule_get_opposite_atom(query, bonded, atom);
+
+                            if(molecule_get_bond_type(query, molecule_get_bond(query, bonded, next)) != BOND_DOUBLE)
+                            {
+                                queryAtoms[listSize++] = next;
+                                break;
+                            }
+
+                            atom = bonded;
+                            bonded = next;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                listSize = molecule_get_bonded_atom_list_size(query, queryAtomIdx);
+
+                for(int i = 0; i < listSize; i++)
+                    queryAtoms[i] = molecule_get_bonded_atom_list(query, queryAtomIdx)[i];
+            }
+
+            if(listSize < 3)
+                continue;
 
             if(listSize == 3)
                 queryAtoms[3] = MAX_ATOM_IDX;
@@ -549,10 +622,17 @@ static inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2st
                 continue;
 
 
-            AtomIdx queryAtoms[4];
-
             AtomIdx *bondedAtomList0 = molecule_get_bonded_atom_list(query, queryBondAtoms[0]);
             MolSize bondedAtomListSize0 = molecule_get_bonded_atom_list_size(query, queryBondAtoms[0]);
+
+            AtomIdx *bondedAtomList1 = molecule_get_bonded_atom_list(query, queryBondAtoms[1]);
+            MolSize bondedAtomListSize1 = molecule_get_bonded_atom_list_size(query, queryBondAtoms[1]);
+
+            if(bondedAtomListSize0 < 2 || bondedAtomListSize1 < 2)
+                continue;
+
+
+            AtomIdx queryAtoms[4];
 
             int idx = 0;
 
@@ -563,8 +643,6 @@ static inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2st
             if(bondedAtomListSize0 == 2)
                 queryAtoms[idx++] = MAX_ATOM_IDX;
 
-            AtomIdx *bondedAtomList1 = molecule_get_bonded_atom_list(query, queryBondAtoms[1]);
-            MolSize bondedAtomListSize1 = molecule_get_bonded_atom_list_size(query, queryBondAtoms[1]);
 
             for(int i = 0; i < bondedAtomListSize1; i++)
                 if(bondedAtomList1[i] != queryBondAtoms[0])
