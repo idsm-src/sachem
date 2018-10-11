@@ -113,6 +113,8 @@ public class InChI
     {
         LinkedList<Fragment> fragments = new LinkedList<Fragment>();
 
+        if(!aux.contains("/N:"))
+            return fragments;
 
         String[] components = value.split("/");
 

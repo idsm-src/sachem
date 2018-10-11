@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Jakub Galgonek   galgonek@uochb.cas.cz
+ * Copyright (C) 2015-2018 Jakub Galgonek   galgonek@uochb.cas.cz
  * Copyright (C) 2011-2011 Mark Rijnbeek    markr@ebi.ac.uk
  *
  * Contact: cdk-devel@lists.sourceforge.net
@@ -22,12 +22,9 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import java.util.Stack;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
@@ -38,7 +35,6 @@ import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IBond;
-import org.openscience.cdk.interfaces.IChemObjectBuilder;
 import org.openscience.cdk.silent.AtomContainer;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 import cz.iocb.sachem.search.SachemMoleculeBuilder;
@@ -113,6 +109,35 @@ public class InchiTautomerGenerator
         else
         {
             assignAtomLabel(molecule, inchi.getAuxInfo());
+
+            List<IAtom> remainingAtoms = new LinkedList<IAtom>();
+
+            for(IAtom a : molecule.atoms())
+                if(a.getID() == null)
+                    remainingAtoms.add(a);
+
+            for(IBond b : molecule.bonds())
+            {
+                IAtom a0 = b.getAtom(0);
+                IAtom a1 = b.getAtom(1);
+
+                if(a0.getID() != null && a1.getSymbol().equals("H"))
+                    remainingAtoms.remove(a1);
+
+                if(a1.getID() != null && a0.getSymbol().equals("H"))
+                    remainingAtoms.remove(a0);
+            }
+
+            /*
+            for(IAtom atom : remainingAtoms)
+            {
+                for(IBond bond : molecule.bonds())
+                    for(IAtom a : bond.atoms())
+                        if(a == atom)
+                            throw new CDKException("remaining atom has a bond");
+            }
+            */
+
             List<IBond> crossBonds = getCrossBondLabels(molecule);
 
             tautomers.add(new AtomContainer());
@@ -152,21 +177,12 @@ public class InchiTautomerGenerator
                     tautomer.addBond(newBond);
                 }
             }
+
+            for(IAtom a : remainingAtoms)
+                for(IAtomContainer tautomer : tautomers)
+                    tautomer.addAtom(a.clone());
         }
 
-
-        /*
-        // ugly hack ...
-        ArrayList<String> validNames = new ArrayList<String>();
-        
-        for(String n : new String[] { "C", "O", "H", "N", "P", "S", "As", "B" })
-            validNames.add(n);
-        
-        for(IAtomContainer t : tautomers)
-            for(IAtom a : t.atoms())
-                if(!validNames.contains(a.getSymbol()))
-                    a.setValency(0);
-        */
 
         return tautomers;
     }
@@ -247,42 +263,7 @@ public class InchiTautomerGenerator
     {
         List<IAtomContainer> tautomers = new ArrayList<IAtomContainer>();
 
-
-        // treat special cases ...
-        if(fragment.formula.matches("H2?"))
-        {
-            IChemObjectBuilder builder = inputMolecule.getBuilder();
-            IAtomContainer molecule = builder.newInstance(IAtomContainer.class);
-
-            if(fragment.formula.equals("H"))
-            {
-                IAtom atom = builder.newInstance(IAtom.class, "H");
-
-                if(fragment.formalCharge != null && fragment.formalCharge.equals("+1"))
-                    atom.setFormalCharge(1);
-
-                molecule.addAtom(atom);
-            }
-            else if(fragment.formula.equals("H2"))
-            {
-                IAtom atom1 = builder.newInstance(IAtom.class, "H");
-                IAtom atom2 = builder.newInstance(IAtom.class, "H");
-                molecule.addAtom(atom1);
-                molecule.addAtom(atom2);
-
-                IBond b = builder.newInstance(IBond.class, atom1, atom2);
-                molecule.addBond(b);
-            }
-
-            tautomers.add(molecule);
-            return tautomers;
-        }
-
-        //Preparation: translate the InChi
-        Map<Integer, IAtom> inchiAtomsByPosition = getElementsByPosition(fragment.formula, inputMolecule);
-        IAtomContainer inchiMolGraph = connectAtoms(fragment.connections, inputMolecule, inchiAtomsByPosition);
-        inputMolecule = mapInputMoleculeToInchiMolgraph(inchiMolGraph, inputMolecule, fragment, prefix);
-
+        inputMolecule = getMoleculeFragment(inputMolecule, fragment, prefix);
         setUnsetBondOrders(inputMolecule);
 
         List<MobileHydrogenConfig> mobileHydrogens = parseMobileHydrogens(fragment.hydrogens);
@@ -301,153 +282,12 @@ public class InchiTautomerGenerator
 
 
     /**
-     * Parses the InChI's formula (ignoring hydrogen) and returns a map with with a position for each atom, increasing
-     * in the order of the elements as listed in the formula.
+     * Gets the part of the input molecule that corresponds to the given InChI fragment.
      *
-     * @param inputInchi user input InChI
-     * @param inputMolecule user input molecule
-     * @return <Integer,IAtom> map indicating position and atom
-     */
-    private static Map<Integer, IAtom> getElementsByPosition(String formula, IAtomContainer inputMolecule)
-            throws CDKException
-    {
-        Map<Integer, IAtom> inchiAtomsByPosition = new HashMap<Integer, IAtom>();
-        int position = 0;
-
-
-        Pattern formulaPattern = Pattern.compile("\\.?[0-9]*[A-Z]{1}[a-z]?[0-9]*");
-        Matcher match = formulaPattern.matcher(formula);
-        while(match.find())
-        {
-            String symbolAndCount = match.group();
-            String elementSymbol = symbolAndCount.split("[0-9]")[0];
-
-            if(!elementSymbol.equals("H"))
-            {
-                int elementCnt = 1;
-
-                if(!(elementSymbol.length() == symbolAndCount.length()))
-                    elementCnt = Integer.valueOf(symbolAndCount.substring(elementSymbol.length()));
-
-                for(int i = 0; i < elementCnt; i++)
-                {
-                    position++;
-                    IAtom atom = inputMolecule.getBuilder().newInstance(IAtom.class, elementSymbol);
-                    /* This class uses the atom's ID attribute to keep track of atom positions defined in the InChi.
-                     * So if for example atom.ID=14, it means this atom has position 14 in the InChI connection table.*/
-                    atom.setID(position + "");
-                    inchiAtomsByPosition.put(position, atom);
-                }
-            }
-        }
-
-        return inchiAtomsByPosition;
-    }
-
-
-    /**
-     * Pops and pushes its ways through the InChI connection table to build up a simple molecule.
-     *
-     * @param inputInchi user input InChI
-     * @param inputMolecule user input molecule
-     * @param inchiAtomsByPosition
-     * @return molecule with single bonds and no hydrogens.
-     */
-    private static IAtomContainer connectAtoms(String connections, IAtomContainer inputMolecule,
-            Map<Integer, IAtom> inchiAtomsByPosition) throws CDKException
-    {
-        IAtomContainer inchiMolGraph = inputMolecule.getBuilder().newInstance(IAtomContainer.class);
-
-        if(connections != null)
-        {
-            Pattern connectionPattern = Pattern.compile("(-|\\(|\\)|,|([0-9])*)");
-            Matcher match = connectionPattern.matcher(connections);
-            Stack<IAtom> atomStack = new Stack<IAtom>();
-
-            boolean pop = false;
-            boolean push = true;
-
-            while(match.find())
-            {
-                String group = match.group();
-                push = true;
-
-                if(group.length() != 0)
-                {
-                    if(group.matches("[0-9]*"))
-                    {
-                        IAtom atom = inchiAtomsByPosition.get(Integer.valueOf(group));
-
-                        if(!inchiMolGraph.contains(atom))
-                            inchiMolGraph.addAtom(atom);
-
-                        IAtom prevAtom = null;
-
-                        if(atomStack.size() != 0)
-                        {
-                            if(pop)
-                                prevAtom = atomStack.pop();
-                            else
-                                prevAtom = atomStack.get(atomStack.size() - 1);
-
-                            IBond bond = inputMolecule.getBuilder().newInstance(IBond.class, prevAtom, atom,
-                                    IBond.Order.SINGLE);
-                            inchiMolGraph.addBond(bond);
-                        }
-                        if(push)
-                        {
-                            atomStack.push(atom);
-                        }
-                    }
-                    else if(group.equals("-"))
-                    {
-                        pop = true;
-                        push = true;
-                    }
-                    else if(group.equals(","))
-                    {
-                        atomStack.pop();
-                        pop = false;
-                        push = false;
-                    }
-                    else if(group.equals("("))
-                    {
-                        pop = false;
-                        push = true;
-                    }
-                    else if(group.equals(")"))
-                    {
-                        atomStack.pop();
-                        pop = true;
-                        push = true;
-                    }
-                    else
-                    {
-                        throw new CDKException("Unexpected token " + group + " in connection table encountered.");
-                    }
-                }
-            }
-        }
-
-        //put any unconnected atoms in the output as well
-        for(IAtom at : inchiAtomsByPosition.values())
-            if(!inchiMolGraph.contains(at))
-                inchiMolGraph.addAtom(at);
-
-        return inchiMolGraph;
-    }
-
-
-    /**
-     * Atom-atom mapping of the input molecule to the bare container constructed from the InChI connection table. This
-     * makes it possible to map the positions of the mobile hydrogens in the InChI back to the input molecule.
-     *
-     * @param inchiMolGraph molecule (bare) as defined in InChI
      * @param inputMolecule user input molecule
      * @throws CDKException
      */
-    private static IAtomContainer mapInputMoleculeToInchiMolgraph(IAtomContainer inchiMolGraph,
-            IAtomContainer inputMolecule, Fragment fragment, String prefix)
+    private static IAtomContainer getMoleculeFragment(IAtomContainer inputMolecule, Fragment fragment, String prefix)
             throws CDKException, CloneNotSupportedException
     {
         inputMolecule = inputMolecule.clone();
