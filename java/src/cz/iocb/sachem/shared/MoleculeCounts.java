@@ -51,26 +51,26 @@ public class MoleculeCounts
         {
             if(!(atom instanceof IPseudoAtom))
             {
-                if(!atom.getSymbol().equals("H"))
+                if(atom.getAtomicNumber() != AtomicNumbers.H)
                     molAtomCount++;
 
-                if(atom.getSymbol().equals("S"))
+                if(atom.getAtomicNumber() == AtomicNumbers.S)
                     molSCount++;
-                else if(atom.getSymbol().equals("N"))
+                else if(atom.getAtomicNumber() == AtomicNumbers.N)
                     molNCount++;
-                else if(atom.getSymbol().equals("O"))
+                else if(atom.getAtomicNumber() == AtomicNumbers.O)
                     molOCount++;
-                else if(atom.getSymbol().equals("F"))
+                else if(atom.getAtomicNumber() == AtomicNumbers.F)
                     molFCount++;
-                else if(atom.getSymbol().equals("Cl"))
+                else if(atom.getAtomicNumber() == AtomicNumbers.Cl)
                     molClCount++;
-                else if(atom.getSymbol().equals("Br"))
+                else if(atom.getAtomicNumber() == AtomicNumbers.Br)
                     molBrCount++;
-                else if(atom.getSymbol().equals("I"))
+                else if(atom.getAtomicNumber() == AtomicNumbers.I)
                     molICount++;
-                else if(atom.getSymbol().equals("C"))
+                else if(atom.getAtomicNumber() == AtomicNumbers.C)
                     molCCount++;
-                else if(atom.getSymbol().equals("P"))
+                else if(atom.getAtomicNumber() == AtomicNumbers.P)
                     molPCount++;
             }
             else if(isTarget)
@@ -93,7 +93,7 @@ public class MoleculeCounts
         for(IBond bond : iac.bonds())
         {
             for(IAtom atom : bond.atoms())
-                if(atom.getSymbol().equals("H") || !isTarget && atom instanceof IPseudoAtom)
+                if(atom.getAtomicNumber() == AtomicNumbers.H || !isTarget && atom instanceof IPseudoAtom)
                     continue bondLoop;
 
 

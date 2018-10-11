@@ -52,6 +52,7 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/search/SimilaritySearch.java \
     src/cz/iocb/sachem/search/SubstructureSearch.java \
     src/cz/iocb/sachem/search/QueryFormat.java \
+    src/cz/iocb/sachem/shared/AtomicNumbers.java \
     src/cz/iocb/sachem/shared/MoleculeCounts.java \
     src/cz/iocb/sachem/shared/MoleculeCreator.java \
     src/cz/iocb/sachem/tautomers/CombinationCountException.java \

@@ -42,6 +42,7 @@ import org.openscience.cdk.tools.CDKHydrogenAdder;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 import org.openscience.cdk.tools.manipulator.AtomTypeManipulator;
 import cz.iocb.sachem.search.SachemMoleculeBuilder;
+import cz.iocb.sachem.shared.AtomicNumbers;
 import cz.iocb.sachem.shared.MoleculeCreator;
 import cz.iocb.sachem.tautomers.InChI.Fragment;
 
@@ -125,10 +126,10 @@ public class InchiTautomerGenerator
                 IAtom a0 = b.getAtom(0);
                 IAtom a1 = b.getAtom(1);
 
-                if(a0.getID() != null && a1.getSymbol().equals("H"))
+                if(a0.getID() != null && a1.getAtomicNumber() == AtomicNumbers.H)
                     remainingAtoms.remove(a1);
 
-                if(a1.getID() != null && a0.getSymbol().equals("H"))
+                if(a1.getID() != null && a0.getAtomicNumber() == AtomicNumbers.H)
                     remainingAtoms.remove(a0);
             }
 
@@ -321,13 +322,13 @@ public class InchiTautomerGenerator
             IAtom atom0 = bond.getAtom(0);
             IAtom atom1 = bond.getAtom(1);
 
-            if(atom0.getSymbol().equals("H") && atom1.getID() != null)
+            if(atom0.getAtomicNumber() == AtomicNumbers.H && atom1.getID() != null)
             {
                 atoms.add(atom0);
                 atom0.setID(prefix + ":" + ++id);
             }
 
-            if(atom1.getSymbol().equals("H") && atom0.getID() != null)
+            if(atom1.getAtomicNumber() == AtomicNumbers.H && atom0.getID() != null)
             {
                 atoms.add(atom1);
                 atom1.setID(prefix + ":" + ++id);

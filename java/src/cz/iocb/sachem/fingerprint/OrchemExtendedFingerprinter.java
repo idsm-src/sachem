@@ -20,6 +20,7 @@ import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IBond;
 import org.openscience.cdk.interfaces.IRingSet;
 import cz.iocb.sachem.fingerprint.bitpos.BitPosApi;
+import cz.iocb.sachem.shared.AtomicNumbers;
 
 
 
@@ -69,6 +70,9 @@ public class OrchemExtendedFingerprinter extends OrchemFingerprinter
 
         for(IAtom atom : molecule.atoms())
         {
+            if(atom.getAtomicNumber() == 0)
+                continue;
+
             /* Fingerprint any element */
             mapKey = atom.getSymbol();
             bitPos = BitPosApi.bpExtended.allElements.get(mapKey);
@@ -77,7 +81,7 @@ public class OrchemExtendedFingerprinter extends OrchemFingerprinter
                 extendedFingerprint.set(bitPos, true);
 
             /* Atom count related fingerprinting */
-            if(!atom.getSymbol().equals("H"))
+            if(atom.getAtomicNumber() != AtomicNumbers.H)
                 atomCount++;
 
             mapKey = BitPosApi.bpExtended.atomCountMoreThan + atomCount;

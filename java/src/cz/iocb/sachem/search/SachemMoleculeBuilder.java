@@ -31,7 +31,7 @@ import org.openscience.cdk.stereo.ExtendedTetrahedral;
 import org.openscience.cdk.stereo.Stereocenters;
 import org.openscience.cdk.stereo.Stereocenters.Type;
 import org.openscience.cdk.stereo.TetrahedralChirality;
-import org.openscience.cdk.tools.periodictable.PeriodicTable;
+import cz.iocb.sachem.shared.AtomicNumbers;
 
 
 
@@ -189,9 +189,9 @@ public class SachemMoleculeBuilder
         {
             if(a instanceof IPseudoAtom)
                 xAtomCount++;
-            else if(a.getSymbol().equals("H"))
+            else if(a.getAtomicNumber() == AtomicNumbers.H)
                 hAtomCount++;
-            else if(a.getSymbol().equals("C"))
+            else if(a.getAtomicNumber() == AtomicNumbers.C)
                 cAtomCount++;
             else
                 xAtomCount++;
@@ -211,7 +211,7 @@ public class SachemMoleculeBuilder
             boolean hBond = false;
 
             for(IAtom a : b.atoms())
-                if(a.getSymbol().equals("H") && molecule.getConnectedBondsCount(a) == 1)
+                if(a.getAtomicNumber() == AtomicNumbers.H && molecule.getConnectedBondsCount(a) == 1)
                     hBond = true;
 
             if(!hBond)
@@ -265,10 +265,9 @@ public class SachemMoleculeBuilder
             }
             else
             {
-                String symbol = molecule.getAtom(i).getSymbol();
-                assert !symbol.equals("C") && !symbol.equals("H");
+                int num = molecule.getAtom(i).getAtomicNumber();
+                assert num != AtomicNumbers.C && num != AtomicNumbers.H;
 
-                int num = PeriodicTable.getAtomicNumber(symbol);
                 assert num > 0 && num < 128;
 
                 stream.write(num);
@@ -314,7 +313,7 @@ public class SachemMoleculeBuilder
                 IAtom other = list.get(0).getOther(atom);
                 int idx = molecule.indexOf(other);
 
-                if(other.getSymbol().equals("H") && i > idx && molecule.getConnectedBondsCount(other) == 1)
+                if(other.getAtomicNumber() == AtomicNumbers.H && i > idx && molecule.getConnectedBondsCount(other) == 1)
                 {
                     // empty record
                     stream.write(0);

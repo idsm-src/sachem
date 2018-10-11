@@ -161,6 +161,28 @@ public class OrchemFingerprinter implements IFingerprinter
 
     public BitSet getFingerprint(IAtomContainer molecule, int timeout) throws CDKException
     {
+        for(IAtom atoms : molecule.atoms())
+        {
+            if(atoms.getAtomicNumber() == 0)
+            {
+                try
+                {
+                    molecule = molecule.clone();
+                }
+                catch(CloneNotSupportedException e)
+                {
+                    throw new CDKException(e.getMessage());
+                }
+
+                for(IAtom a : molecule.atoms())
+                    if(atoms.getAtomicNumber() == 0)
+                        a.setSymbol("");
+
+                break;
+            }
+        }
+
+
         BitSet fingerprint = new BitSet(FINGERPRINT_SIZE);
 
         /* Set a dummy default bit. This prevents compounds with 0 bits set, which in turn makes the similarity search unhappy*/

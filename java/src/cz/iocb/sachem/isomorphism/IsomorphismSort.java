@@ -24,6 +24,7 @@ import java.util.TreeMap;
 import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IBond;
+import cz.iocb.sachem.shared.AtomicNumbers;
 
 
 
@@ -55,16 +56,16 @@ public class IsomorphismSort
     public static IAtom[] atomsByFrequency(IAtomContainer iac)
     {
         // Create a map with (key,value) being (atom symbol, overall count)
-        Map<String, Integer> elementCounts = new TreeMap<String, Integer>();
+        Map<Integer, Integer> elementCounts = new TreeMap<Integer, Integer>();
 
         for(IAtom atom : iac.atoms())
         {
-            Integer count = elementCounts.get(atom.getSymbol());
+            Integer count = elementCounts.get(atom.getAtomicNumber());
 
             if(count == null)
-                elementCounts.put(atom.getSymbol(), new Integer(1));
+                elementCounts.put(atom.getAtomicNumber(), new Integer(1));
             else
-                elementCounts.put(atom.getSymbol(), ++count);
+                elementCounts.put(atom.getAtomicNumber(), ++count);
         }
 
         // Create a map with (key,value) being (IAtom, number of bond IAtom occurs in)
@@ -72,7 +73,8 @@ public class IsomorphismSort
 
         for(IBond bond : iac.bonds())
         {
-            if(bond.getAtom(0).getSymbol().equals("H") || bond.getAtom(1).getSymbol().equals("H"))
+            if(bond.getAtom(0).getAtomicNumber() == AtomicNumbers.H
+                    || bond.getAtom(1).getAtomicNumber() == AtomicNumbers.H)
                 continue;
 
             for(IAtom atomInBond : bond.atoms())
@@ -96,7 +98,7 @@ public class IsomorphismSort
 
         for(IAtom atom : iac.atoms())
         {
-            AtomForIsomorphismSort afis = new AtomForIsomorphismSort(atom, elementCounts.get(atom.getSymbol()),
+            AtomForIsomorphismSort afis = new AtomForIsomorphismSort(atom, elementCounts.get(atom.getAtomicNumber()),
                     bondParticipationCount.get(atom));
             atomList.add(afis);
         }
@@ -145,17 +147,17 @@ public class IsomorphismSort
         @Override
         public int compare(AtomForIsomorphismSort e1, AtomForIsomorphismSort e2)
         {
-            if(e1.iatom.getSymbol().equals("H") && !e2.iatom.getSymbol().equals("H"))
+            if(e1.iatom.getAtomicNumber() == AtomicNumbers.H && e2.iatom.getAtomicNumber() != AtomicNumbers.H)
                 return 1;
 
-            if(!e1.iatom.getSymbol().equals("H") && e2.iatom.getSymbol().equals("H"))
+            if(e1.iatom.getAtomicNumber() != AtomicNumbers.H && e2.iatom.getAtomicNumber() == AtomicNumbers.H)
                 return -1;
 
 
-            if(e1.iatom.getSymbol().equals("C") && !e2.iatom.getSymbol().equals("C"))
+            if(e1.iatom.getAtomicNumber() == AtomicNumbers.C && e2.iatom.getAtomicNumber() != AtomicNumbers.C)
                 return 1;
 
-            if(!e1.iatom.getSymbol().equals("C") && e2.iatom.getSymbol().equals("C"))
+            if(e1.iatom.getAtomicNumber() != AtomicNumbers.C && e2.iatom.getAtomicNumber() == AtomicNumbers.C)
                 return -1;
 
 
