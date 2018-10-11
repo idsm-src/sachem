@@ -31,12 +31,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.openscience.cdk.CDKConstants;
 import org.openscience.cdk.aromaticity.Kekulization;
+import org.openscience.cdk.atomtype.CDKAtomTypeMatcher;
 import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
+import org.openscience.cdk.interfaces.IAtomType;
 import org.openscience.cdk.interfaces.IBond;
 import org.openscience.cdk.silent.AtomContainer;
+import org.openscience.cdk.tools.CDKHydrogenAdder;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
+import org.openscience.cdk.tools.manipulator.AtomTypeManipulator;
 import cz.iocb.sachem.search.SachemMoleculeBuilder;
 import cz.iocb.sachem.shared.MoleculeCreator;
 import cz.iocb.sachem.tautomers.InChI.Fragment;
@@ -414,6 +418,20 @@ public class InchiTautomerGenerator
 
     private static void setUnsetBondOrders(IAtomContainer inputMolecule) throws CDKException
     {
+        CDKAtomTypeMatcher matcher = CDKAtomTypeMatcher.getInstance(inputMolecule.getBuilder());
+
+        for(IAtom atom : inputMolecule.atoms())
+        {
+            if(atom.getImplicitHydrogenCount() == null)
+            {
+                IAtomType type = matcher.findMatchingAtomType(inputMolecule, atom);
+                AtomTypeManipulator.configure(atom, type);
+                CDKHydrogenAdder adder = CDKHydrogenAdder.getInstance(inputMolecule.getBuilder());
+                adder.addImplicitHydrogens(inputMolecule, atom);
+            }
+        }
+
+
         for(IBond b : inputMolecule.bonds())
         {
             if(b.getOrder() == IBond.Order.UNSET && b.isAromatic())
