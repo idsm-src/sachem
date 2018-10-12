@@ -750,7 +750,7 @@ static inline uint8_t normalize_atom_stereo(AtomIdx indexes[4], uint8_t stereo)
             reverse = false;
 
     if(reverse)
-        return (uint8_t) ~stereo;
+        return ~stereo & 0x03;
 
     return stereo;
 }
@@ -767,7 +767,7 @@ static inline uint8_t normalize_bond_stereo(AtomIdx indexes[4], uint8_t conforma
         reverse = !reverse;
 
     if(reverse)
-        return (uint8_t) ~conformation;
+        return ~conformation & 0x03;
 
     return conformation;
 }
