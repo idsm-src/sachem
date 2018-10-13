@@ -638,11 +638,7 @@ public class InchiTautomerGenerator
             }
 
 
-            IAtomContainer result = tryDoubleBondCombinations(0, tautomerSkeleton, 0, 0, doubleBondCount,
-                    freeConnectivity);
-
-            if(result != null)
-                tautomers.add(result);
+            generateDoubleBondCombinations(tautomers, 0, tautomerSkeleton, 0, 0, doubleBondCount, freeConnectivity);
         }
 
 
@@ -827,17 +823,15 @@ public class InchiTautomerGenerator
      * @param bondOffSet offset for next double bond position to consider
      * @param doubleBondMax maximum number of double bonds to add
      * @param atomsInNeedOfFix atoms that require more bonds
-     * @return a list of double bond positions (index) that make a valid combination, null if none found
      * @throws CloneNotSupportedException
      * @throws TimeoutException
+     * @throws CombinationCountException
      */
-    private IAtomContainer tryDoubleBondCombinations(int iter, IAtomContainer container, int dblBondsAdded,
-            int bondOffSet, int doubleBondMax, int[] freeConnectivity)
-            throws CloneNotSupportedException, TimeoutException
+    private void generateDoubleBondCombinations(List<IAtomContainer> result, int iter, IAtomContainer container,
+            int dblBondsAdded, int bondOffSet, int doubleBondMax, int[] freeConnectivity)
+            throws CloneNotSupportedException, TimeoutException, CombinationCountException
     {
         checkTime();
-
-        IAtomContainer result = null;
 
         HashSet<IAtom> atomsInNeedOfFix = new HashSet<IAtom>();
         List<IBond> clears = new ArrayList<IBond>();
@@ -854,7 +848,7 @@ public class InchiTautomerGenerator
                 freeConnectivity[container.indexOf(b.getAtom(1))]++;
             }
 
-            return null;
+            return;
         }
         else
         {
@@ -879,10 +873,13 @@ public class InchiTautomerGenerator
             }
 
             if(!validDoubleBondConfig)
-                return null;
+                return;
 
             IAtomContainer clone = container.clone();
-            result = clone;
+            result.add(clone);
+
+            if(result.size() > tautomerCombinationLimit)
+                throw new CombinationCountException("too many tautomers");
         }
 
 
@@ -898,11 +895,11 @@ public class InchiTautomerGenerator
                 freeConnectivity[container.indexOf(b.getAtom(1))]++;
             }
 
-            return null;
+            return;
         }
 
 
-        for(int offSet = bondOffSet; offSet < container.getBondCount() && result == null; offSet++)
+        for(int offSet = bondOffSet; offSet < container.getBondCount(); offSet++)
         {
             IBond bond = container.getBond(offSet);
 
@@ -925,9 +922,8 @@ public class InchiTautomerGenerator
                     freeConnectivity[a0idx]--;
                     freeConnectivity[a1idx]--;
 
-
-                    result = tryDoubleBondCombinations(iter + 1, container, dblBondsAdded, offSet + 1, doubleBondMax,
-                            freeConnectivity);
+                    generateDoubleBondCombinations(result, iter + 1, container, dblBondsAdded, offSet + 1,
+                            doubleBondMax, freeConnectivity);
 
                     bond.setOrder(IBond.Order.SINGLE);
                     dblBondsAdded = dblBondsAdded - 1;
@@ -945,8 +941,6 @@ public class InchiTautomerGenerator
             freeConnectivity[container.indexOf(b.getAtom(0))]++;
             freeConnectivity[container.indexOf(b.getAtom(1))]++;
         }
-
-        return result;
     }
 
 
