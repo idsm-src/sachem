@@ -422,65 +422,68 @@ Datum lucene_substructure_search(PG_FUNCTION_ARGS)
 #endif
                 }
 
-#if SHOW_STATS
-                struct timeval match_begin = time_get();
-#endif
-
 #if USE_MOLECULE_INDEX
                 int32_t id = info->arrayBuffer[info->tableRowPosition];
-                uint8_t *molecule = moleculeData + offsetData[id];
 #else
                 TupleDesc tupdesc = info->table->tupdesc;
                 HeapTuple tuple = info->table->vals[info->tableRowPosition];
                 char isNullFlag;
 
-
                 int32_t id = DatumGetInt32(SPI_getbinval(tuple, tupdesc, 1, &isNullFlag));
 
                 if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                     elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-
-                Datum moleculeDatum = SPI_getbinval(tuple, tupdesc, 2, &isNullFlag);
-
-                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-
-                bytea *moleculeData;
-
-                PG_MEMCONTEXT_BEGIN(info->targetContext);
-                moleculeData = DatumGetByteaP(moleculeDatum);
-                PG_MEMCONTEXT_END();
-
-                uint8_t *molecule = (uint8_t *) VARDATA(moleculeData);
 #endif
-
-                bool match;
-
-                PG_MEMCONTEXT_BEGIN(info->targetContext);
-                Molecule target;
-                molecule_init(&target, molecule, NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
-                        info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
-                match = vf2state_match(&info->vf2state, &target, id, info->vf2_timeout);
-                PG_MEMCONTEXT_END();
-                MemoryContextReset(info->targetContext);
 
                 info->tableRowPosition++;
 
-#if SHOW_STATS
-                info->candidateCount++;
-                struct timeval match_end = time_get();
-                info->matchTime += time_spent(match_begin, match_end);
+                if(!bitset_get(&info->resultMask, id))
+                {
+#if USE_MOLECULE_INDEX
+                    uint8_t *molecule = moleculeData + offsetData[id];
+#else
+                    Datum moleculeDatum = SPI_getbinval(tuple, tupdesc, 2, &isNullFlag);
+
+                    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+                        elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+                    bytea *moleculeData;
+
+                    PG_MEMCONTEXT_BEGIN(info->targetContext);
+                    moleculeData = DatumGetByteaP(moleculeDatum);
+                    PG_MEMCONTEXT_END();
+
+                    uint8_t *molecule = (uint8_t *) VARDATA(moleculeData);
 #endif
 
-                if(match)
-                {
-                    bitset_set(&info->resultMask, id);
-                    info->foundResults++;
-                    result = Int32GetDatum(id);
-                    isNull = false;
-                    break;
+#if SHOW_STATS
+                    struct timeval match_begin = time_get();
+#endif
+
+                    bool match;
+
+                    PG_MEMCONTEXT_BEGIN(info->targetContext);
+                    Molecule target;
+                    molecule_init(&target, molecule, NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
+                            info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
+                    match = vf2state_match(&info->vf2state, &target, id, info->vf2_timeout);
+                    PG_MEMCONTEXT_END();
+                    MemoryContextReset(info->targetContext);
+
+#if SHOW_STATS
+                    info->candidateCount++;
+                    struct timeval match_end = time_get();
+                    info->matchTime += time_spent(match_begin, match_end);
+#endif
+
+                    if(match)
+                    {
+                        bitset_set(&info->resultMask, id);
+                        info->foundResults++;
+                        result = Int32GetDatum(id);
+                        isNull = false;
+                        break;
+                    }
                 }
             }
         }
