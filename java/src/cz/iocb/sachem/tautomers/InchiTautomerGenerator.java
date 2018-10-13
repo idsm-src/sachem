@@ -314,13 +314,13 @@ public class InchiTautomerGenerator
             IAtom atom0 = bond.getAtom(0);
             IAtom atom1 = bond.getAtom(1);
 
-            if(atom0.getAtomicNumber() == AtomicNumbers.H && atom1.getID() != null)
+            if(atom0.getAtomicNumber() == AtomicNumbers.H && atom1.getID() != null && atom0.getID() == null)
             {
                 atoms.add(atom0);
                 atom0.setID(prefix + ":" + ++id);
             }
 
-            if(atom1.getAtomicNumber() == AtomicNumbers.H && atom0.getID() != null)
+            if(atom1.getAtomicNumber() == AtomicNumbers.H && atom0.getID() != null && atom1.getID() == null)
             {
                 atoms.add(atom1);
                 atom1.setID(prefix + ":" + ++id);
