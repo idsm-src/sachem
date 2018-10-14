@@ -62,7 +62,7 @@ public abstract class EcdkSubstructureSearch extends SubstructureSearch
         {
             queryMolecules = translateUserQuery(query, type, tautomers);
         }
-        catch(CombinationCountException | InChIException e)
+        catch(CombinationCountException | InChIException | TimeoutException e)
         {
             queryMolecules = translateUserQuery(query, type, false);
             message = "cannot generate tautomers: " + e.getMessage();
