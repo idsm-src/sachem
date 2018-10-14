@@ -16,7 +16,6 @@ package cz.iocb.sachem.shared;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.LinkedList;
 import org.openscience.cdk.aromaticity.Aromaticity;
 import org.openscience.cdk.aromaticity.ElectronDonation;
 import org.openscience.cdk.atomtype.CDKAtomTypeMatcher;
@@ -80,47 +79,26 @@ public class MoleculeCreator
         mdlReader.close();
 
 
-        /* fix deuterium and tritium pseudo atoms */
-        LinkedList<IAtom> pseudoHydrogens = new LinkedList<IAtom>();
-        LinkedList<IAtom> newHydrogens = new LinkedList<IAtom>();
-
-        for(IAtom atom : readMolecule.atoms())
-            if(atom instanceof IPseudoAtom && (atom.getSymbol().equals("D") || atom.getSymbol().equals("T")))
-                pseudoHydrogens.add(atom);
-
         IChemObjectBuilder builder = readMolecule.getBuilder();
 
-        for(IAtom atom : pseudoHydrogens)
+        for(int i = 0; i < readMolecule.getAtomCount(); i++)
         {
-            IIsotope isotope = builder.newInstance(IIsotope.class, "H", atom.getSymbol().equals("D") ? 2 : 3);
-            IAtom hydrogen = builder.newInstance(IAtom.class, isotope);
+            IAtom atom = readMolecule.getAtom(i);
 
-            newHydrogens.add(hydrogen);
-            readMolecule.addAtom(hydrogen);
-
-            for(IBond bond : readMolecule.bonds())
+            if(atom instanceof IPseudoAtom && (atom.getSymbol().equals("D") || atom.getSymbol().equals("T")))
             {
-                if(bond.contains(atom))
-                {
-                    IAtom other = bond.getOther(atom);
-                    IAtom[] atoms = { other, hydrogen };
-                    bond.setAtoms(atoms);
-                }
-            }
+                IIsotope isotope = builder.newInstance(IIsotope.class, "H", atom.getSymbol().equals("D") ? 2 : 3);
+                IAtom hydrogen = builder.newInstance(IAtom.class, isotope);
+                hydrogen.setFormalCharge(atom.getFormalCharge());
+                hydrogen.setPoint3d(atom.getPoint3d());
+                hydrogen.setPoint2d(atom.getPoint2d());
 
-            readMolecule.removeAtom(atom);
+                readMolecule.setAtom(i, hydrogen);
+            }
         }
 
 
         CDKAtomTypeMatcher matcher = CDKAtomTypeMatcher.getInstance(readMolecule.getBuilder());
-
-        for(IAtom atom : newHydrogens)
-        {
-            IAtomType type = matcher.findMatchingAtomType(readMolecule, atom);
-            AtomTypeManipulator.configure(atom, type);
-            CDKHydrogenAdder adder = CDKHydrogenAdder.getInstance(readMolecule.getBuilder());
-            adder.addImplicitHydrogens(readMolecule, atom);
-        }
 
         for(IAtom atom : readMolecule.atoms())
         {
