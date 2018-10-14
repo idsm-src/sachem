@@ -122,6 +122,17 @@ public class MoleculeCreator
             adder.addImplicitHydrogens(readMolecule, atom);
         }
 
+        for(IAtom atom : readMolecule.atoms())
+        {
+            if(atom.getImplicitHydrogenCount() == null)
+            {
+                IAtomType type = matcher.findMatchingAtomType(readMolecule, atom);
+                AtomTypeManipulator.configure(atom, type);
+                CDKHydrogenAdder adder = CDKHydrogenAdder.getInstance(readMolecule.getBuilder());
+                adder.addImplicitHydrogens(readMolecule, atom);
+            }
+        }
+
         return readMolecule;
     }
 
