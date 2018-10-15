@@ -391,18 +391,12 @@ public class SachemMoleculeBuilder
             {
                 TetrahedralStereoType flag = TetrahedralStereoType.UNDEFINED;
 
-                @SuppressWarnings("rawtypes")
-                IStereoElement element = tetrahedralChirality[idx];
-
-                if(element != null && element instanceof TetrahedralChirality)
+                if(tetrahedralChirality[idx] != null)
                 {
-                    TetrahedralChirality chirality = (TetrahedralChirality) element;
-                    flag = getChiralityValue(chirality.getChiralAtom(), chirality.getLigands(), chirality.getStereo());
-                }
-                else if(element != null && element instanceof ExtendedTetrahedral)
-                {
-                    ExtendedTetrahedral chirality = (ExtendedTetrahedral) element;
-                    flag = getChiralityValue(chirality.focus(), chirality.peripherals(), chirality.winding());
+                    if(tetrahedralChirality[idx] instanceof TetrahedralChirality)
+                        flag = getChiralityValue((TetrahedralChirality) tetrahedralChirality[idx]);
+                    else
+                        flag = getExtendedChiralityValue((ExtendedTetrahedral) tetrahedralChirality[idx]);
                 }
 
                 stream.write(SpecialRecordType.TETRAHEDRAL_STEREO.getValue() << 4 | idx / 256);
@@ -422,10 +416,8 @@ public class SachemMoleculeBuilder
             {
                 BondStereoType flag = BondStereoType.UNDEFINED;
 
-                DoubleBondStereochemistry stereo = doubleBondStereo[idx];
-
-                if(stereo != null)
-                    flag = getDoubleBondStereoType(bond, stereo.getBonds(), doubleBondStereo[idx].getStereo());
+                if(doubleBondStereo[idx] != null)
+                    flag = getDoubleBondStereoType(doubleBondStereo[idx]);
 
                 int index = bond.getProperty(BOND_NUMBER);
                 stream.write(SpecialRecordType.BOND_STEREO.getValue() << 4 | index / 256);
@@ -653,8 +645,12 @@ public class SachemMoleculeBuilder
     }
 
 
-    private TetrahedralStereoType getChiralityValue(IAtom center, IAtom[] ligands, Stereo stereo)
+    private TetrahedralStereoType getChiralityValue(TetrahedralChirality chirality)
     {
+        IAtom center = chirality.getChiralAtom();
+        IAtom[] ligands = chirality.getLigands();
+        Stereo stereo = chirality.getStereo();
+
         assert ligands.length == 4;
         int[] indexes = new int[4];
 
@@ -692,8 +688,44 @@ public class SachemMoleculeBuilder
     }
 
 
-    private BondStereoType getDoubleBondStereoType(IBond bond, IBond[] bonds, Conformation conformation)
+    private TetrahedralStereoType getExtendedChiralityValue(ExtendedTetrahedral chirality)
     {
+        IAtom[] terminals = chirality.findTerminalAtoms(molecule);
+        IAtom[] ligands = chirality.peripherals();
+        Stereo stereo = chirality.winding();
+
+        assert ligands.length == 4;
+        int[] indexes = new int[4];
+
+        for(int i = 0; i < 4; i++)
+        {
+            if(ligands[i] != terminals[0] && ligands[i] != terminals[1])
+                indexes[i] = molecule.indexOf(ligands[i]);
+            else
+                indexes[i] = Integer.MAX_VALUE;
+        }
+
+        boolean reverse = true;
+
+        if(indexes[0] > indexes[1])
+            reverse = !reverse;
+
+        if(indexes[2] > indexes[3])
+            reverse = !reverse;
+
+        if(reverse)
+            return stereo == Stereo.CLOCKWISE ? TetrahedralStereoType.ANTI_CLOCKWISE : TetrahedralStereoType.CLOCKWISE;
+        else
+            return stereo == Stereo.CLOCKWISE ? TetrahedralStereoType.CLOCKWISE : TetrahedralStereoType.ANTI_CLOCKWISE;
+    }
+
+
+    private BondStereoType getDoubleBondStereoType(DoubleBondStereochemistry stereo)
+    {
+        IBond bond = stereo.getStereoBond();
+        IBond[] bonds = stereo.getBonds();
+        Conformation conformation = stereo.getStereo();
+
         if(!bonds[0].contains(bond.getAtom(0)))
             bonds = new IBond[] { bonds[1], bonds[0] };
 

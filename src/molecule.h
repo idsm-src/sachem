@@ -627,7 +627,7 @@ static inline uint8_t molecule_get_bond_stereo(const Molecule *const restrict mo
 }
 
 
-static inline AtomIdx molecule_get_last_stereo_bond_ligand(const Molecule *const restrict molecule, AtomIdx atom, BondIdx bond, AtomIdx ligand)
+static inline AtomIdx molecule_get_last_stereo_bond_ligand(const Molecule *const restrict molecule, AtomIdx atom, AtomIdx other, AtomIdx ligand)
 {
     MolSize listSize = molecule_get_bonded_atom_list_size(molecule, atom);
 
@@ -637,8 +637,6 @@ static inline AtomIdx molecule_get_last_stereo_bond_ligand(const Molecule *const
     }
     else if(listSize == 3)
     {
-        AtomIdx other = molecule_get_other_bond_atom(molecule, bond, atom);
-
         for(int i = 0; i < 3; i++)
         {
             AtomIdx a = molecule_get_bonded_atom_list(molecule, atom)[i];
@@ -674,50 +672,6 @@ static inline AtomIdx molecule_get_last_chiral_ligand(const Molecule *const rest
 
             if(!contains)
                 return ligand;
-        }
-    }
-    else if(listSize == 2)
-    {
-        for(int i = 0; i < 2; i++)
-        {
-            AtomIdx atom = centre;
-            AtomIdx bonded = molecule_get_bonded_atom_list(molecule, centre)[i];
-
-            while(true)
-            {
-                MolSize newListSize = molecule_get_bonded_atom_list_size(molecule, bonded);
-
-                if(newListSize == 3)
-                {
-                    for(int j = 0; j < 3; j++)
-                    {
-                        AtomIdx o = molecule_get_bonded_atom_list(molecule, bonded)[j];
-
-                        if(o == atom)
-                            continue;
-
-                        if(o != ligands[0] && o != ligands[1] && o != ligands[2])
-                            return o;
-                    }
-
-                    break;
-                }
-                else if(newListSize == 2)
-                {
-                    AtomIdx next = molecule_get_opposite_atom(molecule, bonded, atom);
-
-                    if(molecule_get_bond_type(molecule, molecule_get_bond(molecule, bonded, next)) != BOND_DOUBLE)
-                        return MAX_ATOM_IDX;
-
-                    atom = bonded;
-                    bonded = next;
-                }
-                else
-                {
-                    elog(NOTICE, "unexpected branch: %s: %i", __FILE__, __LINE__);
-                    return MAX_ATOM_IDX;
-                }
-            }
         }
     }
 
