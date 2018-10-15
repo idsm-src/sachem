@@ -558,10 +558,28 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
                 bool match;
 
                 PG_MEMCONTEXT_BEGIN(info->targetContext);
-                Molecule target;
-                molecule_init(&target, molecule, NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
-                        info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
-                match = vf2state_match(&info->vf2state, &target, id, info->vf2_timeout);
+                if(!info->extended && molecule_has_multivalent_hydrogen(molecule))
+                {
+                    Molecule queryMolecule;
+                    Molecule target;
+                    VF2State vf2state;
+
+                    OrchemSubstructureQueryData *data = &(info->queryData[info->queryDataPosition]);
+                    molecule_init(&queryMolecule, data->molecule, data->restH, true,
+                            info->chargeMode != CHARGE_IGNORE, info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
+                    vf2state_init(&vf2state, &queryMolecule, info->graphMode, info->chargeMode, info->isotopeMode,
+                            info->stereoMode);
+                    molecule_init(&target, molecule, NULL, true, info->chargeMode != CHARGE_IGNORE,
+                            info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
+                    match = vf2state_match(&vf2state, &target, id, info->vf2_timeout);
+                }
+                else
+                {
+                    Molecule target;
+                    molecule_init(&target, molecule, NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
+                            info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
+                    match = vf2state_match(&info->vf2state, &target, id, info->vf2_timeout);
+                }
                 PG_MEMCONTEXT_END();
                 MemoryContextReset(info->targetContext);
 

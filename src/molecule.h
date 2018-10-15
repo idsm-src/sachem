@@ -493,6 +493,75 @@ static inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCh
 }
 
 
+static inline bool molecule_has_multivalent_hydrogen(uint8_t *data)
+{
+    int xAtomCount = *data << 8 | *(data + 1);
+    data += 2;
+
+    int cAtomCount = *data << 8 | *(data + 1);
+    data += 2;
+
+    int hAtomCount = *data << 8 | *(data + 1);
+    data += 2;
+
+    int xBondCount = *data << 8 | *(data + 1);
+    data += 2;
+
+    data += xAtomCount + 2;
+    int heavyAtomCount = xAtomCount + cAtomCount;
+
+
+    int hBonds[hAtomCount];
+
+    for(int i = 0; i < hAtomCount; i++)
+        hBonds[i] = 0;
+
+    for(int i = 0; i < xBondCount; i++)
+    {
+        int offset = i * BOND_BLOCK_SIZE;
+
+        int b0 = data[offset + 0];
+        int b1 = data[offset + 1];
+        int b2 = data[offset + 2];
+
+        int x = b0 | (b1 << 4 & 0xF00);
+        int y = b2 | (b1 << 8 & 0xF00);
+
+        if(x >= heavyAtomCount)
+            hBonds[x - heavyAtomCount]++;
+
+        if(y >= heavyAtomCount)
+            hBonds[y - heavyAtomCount]++;
+    }
+
+    data += xBondCount * BOND_BLOCK_SIZE;
+
+
+    for(int i = 0; i < hAtomCount; i++)
+    {
+        int offset = i * HBOND_BLOCK_SIZE;
+        int value = data[offset + 0] * 256 | data[offset + 1];
+
+        if(value != 0)
+        {
+            int idx = value & 0xFFF;
+
+            if(idx >= heavyAtomCount)
+                hBonds[idx - heavyAtomCount]++;
+
+            hBonds[i]++;
+        }
+    }
+
+
+    for(int i = 0; i < hAtomCount; i++)
+        if(hBonds[i] > 1)
+            return true;
+
+    return false;
+}
+
+
 static inline bool molecule_is_pseudo_atom(const Molecule *const restrict molecule, AtomIdx atom)
 {
     return molecule->atomNumbers[atom] < 0;
