@@ -831,11 +831,17 @@ static inline bool vf2state_match(VF2State *const restrict vf2state, const Molec
 
     if(likely(vf2state->graphMode != GRAPH_EXACT))
     {
+        if(vf2state->query->molSize > target->molSize)
+            return false;
+
         if(vf2state->queryAtomCount > target->atomCount || vf2state->query->bondCount > target->bondCount)
             return false;
     }
     else
     {
+        if(vf2state->query->molSize != target->molSize)
+            return false;
+
         if(vf2state->queryAtomCount != target->atomCount || vf2state->query->bondCount != target->bondCount)
             return false;
     }

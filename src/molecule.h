@@ -72,6 +72,8 @@ typedef struct Molecule
 {
     int atomCount;
     int bondCount;
+    int molSize;
+
     int8_t *restrict atomNumbers;
     uint8_t *restrict atomHydrogens;
     int8_t *restrict atomCharges;
@@ -135,6 +137,7 @@ static inline void molecule_init(Molecule *const molecule, const uint8_t *data, 
 
     molecule->atomCount = atomCount;
     molecule->bondCount = bondCount;
+    molecule->molSize = heavyAtomCount + hAtomCount;
     molecule->atomNumbers = atomNumbers;
     molecule->atomHydrogens = atomHydrogens;
     molecule->atomCharges = atomCharges;
