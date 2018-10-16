@@ -499,7 +499,7 @@ Datum lucy_substructure_search(PG_FUNCTION_ARGS)
                     bool match;
 
                     PG_MEMCONTEXT_BEGIN(info->targetContext);
-                    if(!info->extended && molecule_has_multivalent_hydrogen(molecule))
+                    if(!info->extended && (molecule_has_pseudo_atom(molecule) || molecule_has_multivalent_hydrogen(molecule)))
                     {
                         Molecule queryMolecule;
                         Molecule target;

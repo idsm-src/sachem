@@ -406,21 +406,20 @@ static inline bool vf2state_is_feasible_pair(const VF2State *const restrict vf2s
     }
 
 
-    if(likely(vf2state->graphMode != GRAPH_EXACT))
+    if(!vf2state->query->hasPseudoAtom && !vf2state->target->hasPseudoAtom)
     {
-        if(unlikely(molecule_get_hydrogen_count(vf2state->query, vf2state->queryIdx) >
-                molecule_get_hydrogen_count(vf2state->target, vf2state->targetIdx) &&
-                !molecule_is_pseudo_atom(vf2state->query, vf2state->queryIdx) &&
-                !molecule_is_pseudo_atom(vf2state->target, vf2state->targetIdx)))
-            return false;
-    }
-    else
-    {
-        if(unlikely(molecule_get_hydrogen_count(vf2state->query, vf2state->queryIdx) !=
-                molecule_get_hydrogen_count(vf2state->target, vf2state->targetIdx) &&
-                !molecule_is_pseudo_atom(vf2state->query, vf2state->queryIdx) &&
-                !molecule_is_pseudo_atom(vf2state->target, vf2state->targetIdx)))
-            return false;
+        if(likely(vf2state->graphMode != GRAPH_EXACT))
+        {
+            if(unlikely(molecule_get_hydrogen_count(vf2state->query, vf2state->queryIdx) >
+                    molecule_get_hydrogen_count(vf2state->target, vf2state->targetIdx)))
+                return false;
+        }
+        else
+        {
+            if(unlikely(molecule_get_hydrogen_count(vf2state->query, vf2state->queryIdx) !=
+                    molecule_get_hydrogen_count(vf2state->target, vf2state->targetIdx)))
+                return false;
+        }
     }
 
 

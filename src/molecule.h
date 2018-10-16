@@ -73,6 +73,7 @@ typedef struct Molecule
     int atomCount;
     int bondCount;
     int molSize;
+    bool hasPseudoAtom;
 
     int8_t *restrict atomNumbers;
     uint8_t *restrict atomHydrogens;
@@ -138,6 +139,7 @@ static inline void molecule_init(Molecule *const molecule, const uint8_t *data, 
     molecule->atomCount = atomCount;
     molecule->bondCount = bondCount;
     molecule->molSize = heavyAtomCount + hAtomCount;
+    molecule->hasPseudoAtom = false;
     molecule->atomNumbers = atomNumbers;
     molecule->atomHydrogens = atomHydrogens;
     molecule->atomCharges = atomCharges;
@@ -161,6 +163,10 @@ static inline void molecule_init(Molecule *const molecule, const uint8_t *data, 
 
     for(int i = heavyAtomCount; i < atomCount; i++)
         atomNumbers[i] = H_ATOM_NUMBER;
+
+    for(int i = 0; i < xAtomCount; i++)
+        if(atomNumbers[i] < 0)
+            molecule->hasPseudoAtom = true;
 
     data += xAtomCount;
 
@@ -491,6 +497,19 @@ static inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCh
                 break;
         }
     }
+
+    return false;
+}
+
+
+static inline bool molecule_has_pseudo_atom(uint8_t *data)
+{
+    int xAtomCount = *data << 8 | *(data + 1);
+    data += 10;
+
+    for(int i = 0; i < xAtomCount; i++)
+        if(((int8_t) data[i]) < 0)
+            return true;
 
     return false;
 }
