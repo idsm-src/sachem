@@ -93,8 +93,12 @@ typedef struct Molecule
 
 
 static inline void molecule_init(Molecule *const molecule, const uint8_t *data, bool *restH, bool extended,
-        bool withCharges, bool withIsotopes, bool withStereo)
+        bool withCharges, bool withIsotopes, bool withStereo, bool ignoreChargedHydrogens, bool ignoreHydrogenIsotopes)
 {
+    ignoreChargedHydrogens &= !extended;
+    ignoreHydrogenIsotopes &= !extended;
+
+
     int xAtomCount = *data << 8 | *(data + 1);
     data += 2;
 
@@ -219,6 +223,35 @@ static inline void molecule_init(Molecule *const molecule, const uint8_t *data, 
     data += xBondCount * BOND_BLOCK_SIZE;
 
 
+    bool *ignoredHydrogen = NULL;;
+
+    if(ignoreChargedHydrogens || ignoreHydrogenIsotopes)
+    {
+        const uint8_t *sdata = data + hAtomCount * HBOND_BLOCK_SIZE;
+        ignoredHydrogen = (bool *) palloc0(sizeof(bool) * hAtomCount);
+
+        for(int i = 0; i < specialCount; i++)
+        {
+            int offset = i * SPECIAL_BLOCK_SIZE;
+            int value = sdata[offset + 0] * 256 | sdata[offset + 1];
+            int idx = value & 0xFFF;
+
+            switch(sdata[offset] >> 4)
+            {
+                case RECORD_CHARGE:
+                    if(ignoreChargedHydrogens && idx >= heavyAtomCount)
+                        ignoredHydrogen[idx - heavyAtomCount] = true;
+                    break;
+
+                case RECORD_ISOTOPE:
+                    if(ignoreHydrogenIsotopes && idx >= heavyAtomCount)
+                        ignoredHydrogen[idx - heavyAtomCount] = true;
+                    break;
+            }
+        }
+    }
+
+
     for(int i = 0; i < hAtomCount; i++)
     {
         int offset = i * HBOND_BLOCK_SIZE;
@@ -235,7 +268,7 @@ static inline void molecule_init(Molecule *const molecule, const uint8_t *data, 
 
         AtomIdx idx = value & 0xFFF;
 
-        if(idx < atomCount)
+        if(idx < atomCount && ((!ignoreChargedHydrogens && !ignoreHydrogenIsotopes) || ignoredHydrogen[i] == false))
             atomHydrogens[idx]++;
 
 
@@ -264,6 +297,9 @@ static inline void molecule_init(Molecule *const molecule, const uint8_t *data, 
             boundIdx++;
         }
     }
+
+    if(ignoreChargedHydrogens || ignoreHydrogenIsotopes)
+        pfree(ignoredHydrogen);
 
     data += hAtomCount * HBOND_BLOCK_SIZE;
 
@@ -402,7 +438,7 @@ static inline void molecule_simple_init(Molecule *const molecule, const uint8_t 
 }
 
 
-static inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, bool withIsotopes, bool distinguishHydrogens)
+static inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCharges, bool withIsotopes)
 {
     int xAtomCount = *data << 8 | *(data + 1);
     data += 2;
@@ -420,9 +456,6 @@ static inline bool molecule_is_extended_search_needed(uint8_t *data, bool withCh
     data += 2;
 
     int heavyAtomCount = xAtomCount + cAtomCount;
-
-    if(hAtomCount > 0 && distinguishHydrogens)
-        return true;
 
     for(int i = 0; i < xAtomCount; i++)
         if(((int8_t) data[i]) < 0)

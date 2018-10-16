@@ -340,10 +340,10 @@ Datum lucene_substructure_search(PG_FUNCTION_ARGS)
                         struct timeval fingerprint_begin = time_get();
 #endif
                         info->extended = molecule_is_extended_search_needed(data->molecule, info->chargeMode != CHARGE_IGNORE,
-                                info->isotopeMode != ISOTOPE_IGNORE,
-                                info->chargeMode == CHARGE_DEFAULT_AS_UNCHARGED || info->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD);
+                                info->isotopeMode != ISOTOPE_IGNORE);
                         molecule_init(&info->queryMolecule, data->molecule, data->restH, info->extended,
-                                info->chargeMode != CHARGE_IGNORE, info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
+                                info->chargeMode != CHARGE_IGNORE, info->isotopeMode != ISOTOPE_IGNORE,
+                                info->stereoMode != STEREO_IGNORE, false, false);
                         vf2state_init(&info->vf2state, &info->queryMolecule, info->graphMode, info->chargeMode, info->isotopeMode,
                                 info->stereoMode);
 
@@ -471,18 +471,20 @@ Datum lucene_substructure_search(PG_FUNCTION_ARGS)
 
                         SubstructureQueryData *data = &(info->queryData[info->queryDataPosition]);
                         molecule_init(&queryMolecule, data->molecule, data->restH, true,
-                                info->chargeMode != CHARGE_IGNORE, info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
+                                info->chargeMode != CHARGE_IGNORE, info->isotopeMode != ISOTOPE_IGNORE,
+                                info->stereoMode != STEREO_IGNORE, false, false);
                         vf2state_init(&vf2state, &queryMolecule, info->graphMode, info->chargeMode, info->isotopeMode,
                                 info->stereoMode);
                         molecule_init(&target, molecule, NULL, true, info->chargeMode != CHARGE_IGNORE,
-                                info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
+                                info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE, false, false);
                         match = vf2state_match(&vf2state, &target, id, info->vf2_timeout);
                     }
                     else
                     {
                         Molecule target;
                         molecule_init(&target, molecule, NULL, info->extended, info->chargeMode != CHARGE_IGNORE,
-                                info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE);
+                                info->isotopeMode != ISOTOPE_IGNORE, info->stereoMode != STEREO_IGNORE,
+                                info->chargeMode == CHARGE_DEFAULT_AS_UNCHARGED, info->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD);
                         match = vf2state_match(&info->vf2state, &target, id, info->vf2_timeout);
                     }
                     PG_MEMCONTEXT_END();
