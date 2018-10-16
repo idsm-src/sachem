@@ -1021,7 +1021,6 @@ public class OrchemFingerprinter implements IFingerprinter
     {
         if(!threeSomes.containsKey(threeAtomString))
         {
-            //System.out.println(threeAtomString);
             // determine reverse string, so for example "C:C-Br" -> "Br-C:C"
             StringTokenizer s = new StringTokenizer(threeAtomString, ":#-=", true);
             StringBuilder sb = new StringBuilder();

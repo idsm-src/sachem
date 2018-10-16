@@ -33,10 +33,6 @@ public class SimilaritySearch
 
         MoleculeCreator.configureMolecule(molecule);
 
-        for(IAtom a : molecule.atoms())
-            System.out.println(a);
-
-
         molecule.setAtoms(IsomorphismSort.atomsByFrequency(molecule));
         SachemMoleculeBuilder builder = new SachemMoleculeBuilder(molecule);
         return builder.asBytes(false);
