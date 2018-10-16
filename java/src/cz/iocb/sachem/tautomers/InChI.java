@@ -76,45 +76,38 @@ public class InChI
     }
 
 
-    public InChI(String molfile) throws InChIException
+    public InChI(String molfile) throws InChIException, IOException
     {
-        try
+        Process p = pb.start();
+        BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        BufferedReader error = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+        BufferedWriter output = new BufferedWriter(new OutputStreamWriter(p.getOutputStream()));
+
+        output.write(molfile);
+        output.close();
+
+        value = input.readLine();
+        aux = input.readLine();
+        key = input.readLine();
+
+        // workaround
+        if(value != null && value.contains("/r"))
         {
-            Process p = pb.start();
-            BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            BufferedReader error = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-            BufferedWriter output = new BufferedWriter(new OutputStreamWriter(p.getOutputStream()));
-
-            output.write(molfile);
-            output.close();
-
-            value = input.readLine();
-            aux = input.readLine();
-            key = input.readLine();
-
-            // workaround
-            if(value != null && value.contains("/r"))
-            {
-                value = "InChI=1/" + value.substring(value.indexOf("/r") + 2);
-                aux = "AuxInfo=1/" + aux.substring(aux.indexOf("/R:") + 4);
-            }
-
-            if(value == null)
-            {
-                for(String line = error.readLine(); line != null; line = error.readLine())
-                    if(line.startsWith("Error"))
-                        throw new InChIException("cannot generate InChI: " + line);
-
-                throw new InChIException("cannot generate InChI");
-            }
-
-            input.close();
-            error.close();
+            value = "InChI=1/" + value.substring(value.indexOf("/r") + 2);
+            aux = "AuxInfo=1/" + aux.substring(aux.indexOf("/R:") + 4);
         }
-        catch(IOException e)
+
+        if(value == null)
         {
-            e.printStackTrace();
+            for(String line = error.readLine(); line != null; line = error.readLine())
+                if(line.startsWith("Error"))
+                    throw new InChIException("cannot generate InChI: " + line);
+
+            throw new InChIException("cannot generate InChI");
         }
+
+        input.close();
+        error.close();
     }
 
 
