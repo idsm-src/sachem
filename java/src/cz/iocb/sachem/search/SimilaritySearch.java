@@ -3,7 +3,6 @@ package cz.iocb.sachem.search;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.openscience.cdk.exception.CDKException;
-import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import cz.iocb.sachem.isomorphism.IsomorphismSort;
 import cz.iocb.sachem.shared.MoleculeCreator;
