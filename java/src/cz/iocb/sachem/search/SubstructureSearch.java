@@ -174,7 +174,7 @@ public abstract class SubstructureSearch
             }
             else
             {
-                String molfile = ConvertMolecule.smilesToMolfile(query, false, true);
+                String molfile = ConvertMolecule.smilesToMolfile(query);
                 InchiTautomerGenerator tautomerGenerator = new InchiTautomerGenerator();
                 userQueries = tautomerGenerator.getTautomers(molfile);
             }

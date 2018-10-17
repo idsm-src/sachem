@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Jakub Galgonek   galgonek@uochb.cas.cz
+ * Copyright (C) 2015-2018 Jakub Galgonek   galgonek@uochb.cas.cz
  * Copyright (C) 2011-2011 Mark Rijnbeek    markr@ebi.ac.uk
  * Copyright (C) 2008-2009 Federico Paoli
  *
@@ -23,7 +23,6 @@ import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.io.MDLV2000Writer;
 import org.openscience.cdk.io.listener.PropertiesListener;
-import org.openscience.cdk.layout.StructureDiagramGenerator;
 import org.openscience.cdk.silent.SilentChemObjectBuilder;
 import org.openscience.cdk.smiles.SmilesParser;
 
@@ -31,49 +30,31 @@ import org.openscience.cdk.smiles.SmilesParser;
 
 public class ConvertMolecule
 {
-    public static String smilesToMolfile(String smiles, boolean generateCoords, boolean useBondType4)
-            throws CDKException, IOException
+    public static String smilesToMolfile(String smiles) throws CDKException, IOException
     {
-        String cmolfile = null;
+        SmilesParser sp = new SmilesParser(SilentChemObjectBuilder.getInstance());
+        sp.kekulise(false);
+        IAtomContainer molecule = sp.parseSmiles(smiles);
 
-        if(smiles != null && !smiles.trim().equals(""))
+        //FIXME: why are valencies being set?
+        for(IAtom atom : molecule.atoms())
+            atom.setValency(null);
+
+        try(StringWriter out = new StringWriter())
         {
-            SmilesParser sp = new SmilesParser(SilentChemObjectBuilder.getInstance());
-            sp.kekulise(!useBondType4);
-
-            IAtomContainer molecule = sp.parseSmiles(smiles);
-
-            // why are valencies being set?
-            for(IAtom atom : molecule.atoms())
-                atom.setValency(null);
-
-            if(generateCoords)
-            {
-                StructureDiagramGenerator sdg = new StructureDiagramGenerator();
-                sdg.setMolecule(molecule);
-                sdg.generateCoordinates();
-                molecule = sdg.getMolecule();
-            }
-
-            StringWriter out = new StringWriter();
-            MDLV2000Writer mdlWriter = new MDLV2000Writer(out);
-
-            if(useBondType4)
+            try(MDLV2000Writer mdlWriter = new MDLV2000Writer(out))
             {
                 Properties prop = new Properties();
                 prop.setProperty("WriteAromaticBondTypes", "true");
                 PropertiesListener listener = new PropertiesListener(prop);
                 mdlWriter.addChemObjectIOListener(listener);
                 mdlWriter.customizeJob();
+
+                mdlWriter.setWriter(out);
+                mdlWriter.write(molecule);
+
+                return out.toString();
             }
-
-            mdlWriter.setWriter(out);
-            mdlWriter.write(molecule);
-            mdlWriter.close();
-            cmolfile = out.toString();
-            out.close();
         }
-
-        return cmolfile;
     }
 }
