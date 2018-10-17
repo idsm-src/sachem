@@ -29,7 +29,6 @@ import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.io.RGroupQueryReader;
 import org.openscience.cdk.isomorphism.matchers.RGroupQuery;
 import org.openscience.cdk.silent.SilentChemObjectBuilder;
-import cz.iocb.sachem.convert.ConvertMolecule;
 import cz.iocb.sachem.isomorphism.IsomorphismSort;
 import cz.iocb.sachem.shared.MoleculeCreator;
 import cz.iocb.sachem.tautomers.CombinationCountException;
@@ -171,16 +170,16 @@ public abstract class SubstructureSearch
         }
         else if(queryType == QueryFormat.SMILES)
         {
+            IAtomContainer molecule = MoleculeCreator.getMoleculeFromSmiles(query);
+
             if(!tautomers)
             {
-                IAtomContainer molecule = MoleculeCreator.getMoleculeFromSmiles(query);
-
                 userQueries = new ArrayList<IAtomContainer>();
                 userQueries.add(molecule);
             }
             else
             {
-                String molfile = ConvertMolecule.smilesToMolfile(query);
+                String molfile = MoleculeCreator.getMolfileFromMolecule(molecule);
                 InchiTautomerGenerator tautomerGenerator = new InchiTautomerGenerator();
                 userQueries = tautomerGenerator.getTautomers(molfile);
             }

@@ -16,6 +16,8 @@ package cz.iocb.sachem.shared;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.io.StringWriter;
+import java.util.Properties;
 import org.openscience.cdk.aromaticity.Aromaticity;
 import org.openscience.cdk.aromaticity.ElectronDonation;
 import org.openscience.cdk.atomtype.CDKAtomTypeMatcher;
@@ -30,7 +32,9 @@ import org.openscience.cdk.interfaces.IIsotope;
 import org.openscience.cdk.interfaces.IPseudoAtom;
 import org.openscience.cdk.io.DefaultChemObjectReader;
 import org.openscience.cdk.io.MDLV2000Reader;
+import org.openscience.cdk.io.MDLV2000Writer;
 import org.openscience.cdk.io.MDLV3000Reader;
+import org.openscience.cdk.io.listener.PropertiesListener;
 import org.openscience.cdk.silent.AtomContainer;
 import org.openscience.cdk.silent.SilentChemObjectBuilder;
 import org.openscience.cdk.smiles.SmilesParser;
@@ -131,6 +135,27 @@ public class MoleculeCreator
         IAtomContainer molecule = sp.parseSmiles(smiles);
 
         return molecule;
+    }
+
+
+    public static String getMolfileFromMolecule(IAtomContainer molecule) throws CDKException, IOException
+    {
+        try(StringWriter out = new StringWriter())
+        {
+            try(MDLV2000Writer mdlWriter = new MDLV2000Writer(out))
+            {
+                Properties prop = new Properties();
+                prop.setProperty("WriteAromaticBondTypes", "true");
+                PropertiesListener listener = new PropertiesListener(prop);
+                mdlWriter.addChemObjectIOListener(listener);
+                mdlWriter.customizeJob();
+
+                mdlWriter.setWriter(out);
+                mdlWriter.write(molecule);
+
+                return out.toString();
+            }
+        }
     }
 
 

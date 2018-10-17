@@ -19,7 +19,6 @@ EXTRA_DIST = \
     lib/jdbc-postgresql.jar \
     lib/lucene-core-7.2.1.jar \
     lib/lucene-queries-7.2.1.jar \
-    src/cz/iocb/sachem/convert/ConvertMolecule.java \
     src/cz/iocb/sachem/fingerprint/bitpos/BitPosApi.java \
     src/cz/iocb/sachem/fingerprint/bitpos/BitPositions.java \
     src/cz/iocb/sachem/fingerprint/bitpos/ExtendedBitPositions.java \
