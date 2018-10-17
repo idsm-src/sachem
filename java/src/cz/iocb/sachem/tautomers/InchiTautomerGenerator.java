@@ -93,8 +93,6 @@ public class InchiTautomerGenerator
     public List<IAtomContainer> getTautomers(String kekuleMDL) throws CDKException, IOException, TimeoutException,
             CloneNotSupportedException, CombinationCountException, InChIException
     {
-        InChI inchi = new InChI(kekuleMDL);
-
         //Process the molecule based on the molfile input file
         IAtomContainer molecule = MoleculeCreator.getMoleculeFromMolfile(kekuleMDL);
         AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(molecule);
@@ -102,6 +100,7 @@ public class InchiTautomerGenerator
 
         List<IAtomContainer> tautomers = new ArrayList<IAtomContainer>();
 
+        InChI inchi = new InChI(kekuleMDL);
         assignAtomLabel(molecule, inchi.getAuxInfo());
 
         List<IAtom> remainingAtoms = new LinkedList<IAtom>();

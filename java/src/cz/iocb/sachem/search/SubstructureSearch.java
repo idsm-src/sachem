@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.openscience.cdk.CDKConstants;
@@ -70,6 +71,11 @@ public abstract class SubstructureSearch
         {
             queryMolecules = translateUserQuery(query, type, false);
             message = "cannot generate tautomers: " + e.getMessage();
+        }
+        catch(CDKException e)
+        {
+            queryMolecules = new LinkedList<IAtomContainer>();
+            message = "cannot parse query '" + query + "'";
         }
 
         QueryDataItem[] items = new QueryDataItem[queryMolecules.size()];

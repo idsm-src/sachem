@@ -17,6 +17,7 @@ package cz.iocb.sachem.search;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.BitSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.openscience.cdk.CDKConstants;
@@ -66,6 +67,11 @@ public abstract class EcdkSubstructureSearch extends SubstructureSearch
         {
             queryMolecules = translateUserQuery(query, type, false);
             message = "cannot generate tautomers: " + e.getMessage();
+        }
+        catch(CDKException e)
+        {
+            queryMolecules = new LinkedList<IAtomContainer>();
+            message = "cannot parse query '" + query + "'";
         }
 
         EcdkQueryDataItem[] items = new EcdkQueryDataItem[queryMolecules.size()];

@@ -72,12 +72,21 @@ public class MoleculeCreator
         else
             mdlReader = new MDLV2000Reader();
 
-        IAtomContainer readMolecule = new AtomContainer();
+        IAtomContainer readMolecule = null;
         mdlReader.setReader(new StringReader(mol));
 
-        readMolecule = mdlReader.read(readMolecule);
-        mdlReader.close();
-
+        try
+        {
+            readMolecule = mdlReader.read(new AtomContainer());
+        }
+        catch(Exception e)
+        {
+            throw new CDKException("invalid molile");
+        }
+        finally
+        {
+            mdlReader.close();
+        }
 
         IChemObjectBuilder builder = readMolecule.getBuilder();
 
