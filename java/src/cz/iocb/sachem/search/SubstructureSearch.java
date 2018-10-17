@@ -151,7 +151,19 @@ public abstract class SubstructureSearch
                 userQueries = rGroupQuery.getAllConfigurations();
             }
 
-            //TODO: add support for tautomers
+            if(tautomers)
+            {
+                List<IAtomContainer> queries = new ArrayList<IAtomContainer>();
+
+                for(IAtomContainer molecule : userQueries)
+                {
+                    String molfile = MoleculeCreator.getMolfileFromMolecule(molecule);
+                    InchiTautomerGenerator tautomerGenerator = new InchiTautomerGenerator();
+                    queries.addAll(tautomerGenerator.getTautomers(molfile));
+                }
+
+                userQueries = queries;
+            }
         }
         else if(queryType == QueryFormat.MOLFILE)
         {
