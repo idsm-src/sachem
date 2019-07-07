@@ -29,12 +29,21 @@ AC_DEFUN([AX_JDK8],
     fi
 
 
-    AC_CHECK_FILES([${JDK8_HOME}/include/jni.h ${JDK8_HOME}/jre/lib/amd64/server/libjvm.so], [], [AC_MSG_ERROR([JDK8 was not found])])
+    AC_CHECK_FILE([${JDK8_HOME}/jre/lib/amd64/server/libjvm.so],
+        [JDK8_LIB=${JDK8_HOME}/jre/lib/amd64/server],
+        [AC_CHECK_FILE([${JDK8_HOME}/lib/server/libjvm.so],
+            [JDK8_LIB=${JDK8_HOME}/lib/server],
+            [AC_MSG_ERROR([JDK8 was not found])])
+        ])
+
+    AC_CHECK_FILE([${JDK8_HOME}/include/jni.h],
+        [JDK8_INCLUDE=${JDK8_HOME}/include],
+        [AC_MSG_ERROR([JDK8 was not found])])
 
 
     AC_MSG_CHECKING([whether jni.h supports 1.8])
     
-    if grep "^#define JNI_VERSION_1_8 0x00010008$" ${JDK8_HOME}/include/jni.h > /dev/null; then
+    if grep "^#define JNI_VERSION_1_8 0x00010008$" ${JDK8_INCLUDE}/jni.h > /dev/null; then
         AC_MSG_RESULT([yes])
     else
         AC_MSG_RESULT([no])
@@ -42,8 +51,8 @@ AC_DEFUN([AX_JDK8],
     fi
     
 
-    JDK8_CPPFLAGS="-I${JDK8_HOME}/include -I${JDK8_HOME}/include/linux"
-    JDK8_LDFLAGS="-Wl,-rpath,${JDK8_HOME}/jre/lib/amd64/server -L${JDK8_HOME}/jre/lib/amd64/server -ljvm"
+    JDK8_CPPFLAGS="-I${JDK8_INCLUDE} -I${JDK8_INCLUDE}/linux"
+    JDK8_LDFLAGS="-Wl,-rpath,${JDK8_LIB} -L${JDK8_LIB} -ljvm"
 
     AC_SUBST([JDK8_LDFLAGS])
     AC_SUBST([JDK8_CPPFLAGS])
