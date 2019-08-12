@@ -12,7 +12,7 @@
 #include "molecule.h"
 #include "molindex.h"
 #include "sachem.h"
-#include "lucene.h"
+#include "indexer.h"
 #include "fporder.h"
 #include "java/parse.h"
 #include "fingerprints/fingerprint.h"
@@ -44,8 +44,8 @@ typedef struct
 
 
 static bool javaInitialized = false;
-static bool luceneInitialised = false;
-static Lucene lucene;
+static bool luceneSyncInitialised = false;
+static LuceneIndexer lucene;
 
 
 void lucene_index_worker(dsm_segment *seg, shm_toc *toc)
@@ -58,9 +58,8 @@ void lucene_index_worker(dsm_segment *seg, shm_toc *toc)
     int *ids = shm_toc_lookup_key(toc, ID_TABLE_KEY);
     char *indexPath = shm_toc_lookup_key(toc, IDEX_KEY_OFFSET + workerNumber);
 
-    lucene_init(&lucene);
-    lucene_set_folder(&lucene, indexPath);
-    lucene_begin(&lucene);
+    lucene_indexer_init(&lucene);
+    lucene_indexer_begin(&lucene, indexPath);
 
     PG_TRY();
     {
@@ -82,26 +81,26 @@ void lucene_index_worker(dsm_segment *seg, shm_toc *toc)
 
             IntegerFingerprint subfp = integer_substructure_fingerprint_get(&molecule);
             IntegerFingerprint simfp = integer_similarity_fingerprint_get(&molecule);
-            lucene_add(&lucene, ids[position], subfp, simfp);
+            lucene_indexer_add(&lucene, ids[position], subfp, simfp);
 
             integer_fingerprint_free(subfp);
             integer_fingerprint_free(simfp);
             molecule_simple_free(&molecule);
         }
 
-        lucene_commit(&lucene);
+        lucene_indexer_commit(&lucene);
     }
     PG_CATCH();
     {
-        lucene_rollback(&lucene);
-        lucene_terminate(&lucene);
+        lucene_indexer_rollback(&lucene);
+        lucene_indexer_terminate(&lucene);
         java_terminate();
 
         PG_RE_THROW();
     }
     PG_END_TRY();
 
-    lucene_terminate(&lucene);
+    lucene_indexer_terminate(&lucene);
     java_terminate();
 }
 
@@ -110,7 +109,7 @@ void lucene_optimize_worker(dsm_segment *seg, shm_toc *toc)
 {
     volatile OptimizeWorkerHeader *header = shm_toc_lookup_key(toc, HEADER_KEY);
 
-    lucene_init(&lucene);
+    lucene_indexer_init(&lucene);
 
     while(true)
     {
@@ -124,19 +123,17 @@ void lucene_optimize_worker(dsm_segment *seg, shm_toc *toc)
             break;
 
         char *indexPath = shm_toc_lookup_key(toc, IDEX_KEY_OFFSET + position);
-
-        lucene_set_folder(&lucene, indexPath);
-        lucene_begin(&lucene);
+        lucene_indexer_begin(&lucene, indexPath);
 
         PG_TRY();
         {
-            lucene_optimize(&lucene);
-            lucene_commit(&lucene);
+            lucene_indexer_optimize(&lucene);
+            lucene_indexer_commit(&lucene);
         }
         PG_CATCH();
         {
-            lucene_rollback(&lucene);
-            lucene_terminate(&lucene);
+            lucene_indexer_rollback(&lucene);
+            lucene_indexer_terminate(&lucene);
             java_terminate();
 
             PG_RE_THROW();
@@ -144,7 +141,7 @@ void lucene_optimize_worker(dsm_segment *seg, shm_toc *toc)
         PG_END_TRY();
     }
 
-    lucene_terminate(&lucene);
+    lucene_indexer_terminate(&lucene);
     java_terminate();
 }
 
@@ -166,10 +163,10 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
 
 
     /* prepare lucene */
-    if(unlikely(luceneInitialised == false))
+    if(unlikely(luceneSyncInitialised == false))
     {
-        lucene_init(&lucene);
-        luceneInitialised = true;
+        lucene_indexer_init(&lucene);
+        luceneSyncInitialised = true;
     }
 
 
@@ -210,8 +207,7 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
         subindexPath[p] = get_subindex_path(LUCENE_INDEX_PREFIX, LUCENE_INDEX_SUFFIX, indexNumber, p);
 
 
-    lucene_link_directory(oldIndexPath, indexPath);
-    lucene_set_folder(&lucene, indexPath);
+    lucene_indexer_link_directory(oldIndexPath, indexPath);
 
     if(unlikely(SPI_exec("delete from " INDEX_TABLE, 0) != SPI_OK_DELETE))
         elog(ERROR, "%s: SPI_exec() failed", __func__);
@@ -221,7 +217,7 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
         elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
 
-    lucene_begin(&lucene);
+    lucene_indexer_begin(&lucene, indexPath);
     int subindexCount = 0;
 
 
@@ -253,7 +249,7 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
                 if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
                     elog(ERROR, "%s: SPI_getbinval() failed", __func__);
 
-                lucene_delete(&lucene, DatumGetInt32(id));
+                lucene_indexer_delete(&lucene, DatumGetInt32(id));
             }
         }
 
@@ -486,14 +482,14 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
 
         for(int p = 0; p < subindexCount; p++)
         {
-            lucene_add_index(&lucene, subindexPath[p]);
-            lucene_delete_directory(subindexPath[p]);
+            lucene_indexer_add_index(&lucene, subindexPath[p]);
+            lucene_indexer_delete_directory(subindexPath[p]);
         }
 
         if(optimize)
-            lucene_optimize(&lucene);
+            lucene_indexer_optimize(&lucene);
 
-        lucene_commit(&lucene);
+        lucene_indexer_commit(&lucene);
 
 #if USE_MOLECULE_INDEX
         sachem_generate_molecule_index(indexNumber, false);
@@ -501,7 +497,7 @@ Datum lucene_sync_data(PG_FUNCTION_ARGS)
     }
     PG_CATCH();
     {
-        lucene_rollback(&lucene);
+        lucene_indexer_rollback(&lucene);
 
         PG_RE_THROW();
     }
@@ -573,7 +569,7 @@ Datum lucene_cleanup(PG_FUNCTION_ARGS)
                 elog(NOTICE, "delete lucene index '%s'", ep->d_name);
 
                 char *luceneIndexPath = get_file_path(ep->d_name);
-                lucene_delete_directory(luceneIndexPath);
+                lucene_indexer_delete_directory(luceneIndexPath);
             }
 #if USE_MOLECULE_INDEX
             else if(!strncmp(ep->d_name, MOLECULE_INDEX_PREFIX, sizeof(MOLECULE_INDEX_PREFIX) - 1))

@@ -1,19 +1,24 @@
 package cz.iocb.sachem.lucene;
 
+import static cz.iocb.sachem.lucene.Settings.idFieldName;
+import static cz.iocb.sachem.lucene.Settings.indexType;
+import static cz.iocb.sachem.lucene.Settings.lazyInitialization;
+import static cz.iocb.sachem.lucene.Settings.simSizeFieldName;
+import static cz.iocb.sachem.lucene.Settings.simfpFieldName;
+import static cz.iocb.sachem.lucene.Settings.subfpFieldName;
+import static cz.iocb.sachem.lucene.Settings.useIdTable;
+import static cz.iocb.sachem.lucene.Settings.useSizeTable;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.IntPoint;
 import org.apache.lucene.document.StoredField;
-import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.index.TieredMergePolicy;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.BooleanQuery.Builder;
@@ -30,180 +35,19 @@ import org.apache.lucene.store.FSDirectory;
 
 public class Lucene
 {
-    private static enum IndexType
-    {
-        TEXT, POINTS
-    };
-
-
-    private static final IndexType indexType = IndexType.TEXT;
-    private static final boolean useIdTable = true;
-    private static final boolean useSizeTable = true;
-    private static final boolean lazyInitialization = true;
-
-    private static final String idFieldName = "id";
-    private static final String subfpFieldName = "subfp";
-    private static final String simfpFieldName = "simfp";
-    private static final String simSizeFieldName = "simsz";
-
     private Directory folder;
     private IndexSearcher searcher;
-    private IndexWriter indexer;
     private int[] idTable;
     private int[] sizeTable;
     private final FingerprintTokenizer tokenizer = new FingerprintTokenizer();
 
 
-    public void setFolder(String path) throws IOException
+    public synchronized void setFolder(String pathName) throws IOException
     {
-        folder = FSDirectory.open(Paths.get(path));
-        searcher = null;
+        close();
 
-        if(useIdTable)
-            idTable = null;
-
-        if(useSizeTable)
-            sizeTable = null;
-    }
-
-
-    public void begin() throws IOException
-    {
-        TieredMergePolicy policy = new TieredMergePolicy();
-        policy.setMaxMergeAtOnceExplicit(Integer.MAX_VALUE);
-        policy.setMaxMergedSegmentMB(1024 * 1024);
-
-        FingerprintAnalyzer analyzer = new FingerprintAnalyzer();
-        IndexWriterConfig config = new IndexWriterConfig(analyzer);
-        config.setMergePolicy(policy);
-        config.setSimilarity(new BooleanSimilarity());
-        indexer = new IndexWriter(folder, config);
-    }
-
-
-    public void add(int id, int[] subfp, int[] simfp) throws IOException
-    {
-        Document document = new Document();
-        document.add(new IntPoint(idFieldName, id));
-        document.add(new StoredField(idFieldName, id));
-        document.add(new StoredField(simSizeFieldName, simfp.length));
-
-        if(indexType == IndexType.TEXT)
-        {
-            document.add(new TextField(subfpFieldName, new FingerprintReader(subfp)));
-            document.add(new TextField(simfpFieldName, new FingerprintReader(simfp)));
-        }
-        else
-        {
-            for(int bit : subfp)
-                document.add(new IntPoint(subfpFieldName, bit));
-
-            for(int bit : simfp)
-                document.add(new IntPoint(simfpFieldName, bit));
-        }
-
-        indexer.addDocument(document);
-    }
-
-
-    public void addIndex(String path) throws IOException
-    {
-        Directory subFolder = FSDirectory.open(Paths.get(path));
-        indexer.addIndexes(subFolder);
-    }
-
-
-    public void delete(int id) throws IOException
-    {
-        indexer.deleteDocuments(IntPoint.newExactQuery(idFieldName, id));
-    }
-
-
-    public void optimize() throws IOException
-    {
-        indexer.forceMerge(1);
-    }
-
-
-    public void commit() throws IOException
-    {
-        indexer.commit();
-        indexer.close();
-    }
-
-
-    public void rollback() throws IOException
-    {
-        indexer.rollback();
-        indexer.close();
-    }
-
-
-    public long[] subsearch(int fp[], int maxMoleculeId) throws IOException
-    {
-        if(searcher == null)
-            initSearcher();
-
-
-        if(fp.length == 0)
-        {
-            BitSetCollector collector = new BitSetCollector(this, maxMoleculeId);
-            searcher.search(new ConstantScoreQuery(new MatchAllDocsQuery()), collector);
-            return collector.getBitSet().toLongArray();
-        }
-
-
-        Builder builder = new BooleanQuery.Builder();
-
-        if(indexType == IndexType.TEXT)
-        {
-            for(int bit : fp)
-                builder.add(new TermQuery(new Term(subfpFieldName, tokenizer.bitAsString(bit))),
-                        BooleanClause.Occur.MUST);
-        }
-        else
-        {
-            for(int bit : fp)
-                builder.add(IntPoint.newExactQuery(subfpFieldName, bit), BooleanClause.Occur.MUST);
-        }
-
-        BitSetCollector collector = new BitSetCollector(this, maxMoleculeId);
-        searcher.search(new ConstantScoreQuery(builder.build()), collector);
-
-        return collector.getBitSet().toLongArray();
-    }
-
-
-    ScoreHit[] simsearch(int fp[], int top, float cutoff) throws IOException
-    {
-        if(searcher == null)
-            initSearcher();
-
-
-        Builder builder = new BooleanQuery.Builder();
-
-        if(indexType == IndexType.TEXT)
-        {
-            for(int bit : fp)
-                builder.add(new TermQuery(new Term(simfpFieldName, tokenizer.bitAsString(bit))),
-                        BooleanClause.Occur.SHOULD);
-        }
-        else
-        {
-            for(int bit : fp)
-                builder.add(IntPoint.newExactQuery(simfpFieldName, bit), BooleanClause.Occur.SHOULD);
-        }
-
-
-        SimilarDocCollector collector = new SimilarDocCollector(this, fp.length, top, cutoff);
-        searcher.search(builder.build(), collector);
-
-        return collector.getDocs();
-    }
-
-
-    protected void initSearcher() throws IOException
-    {
+        Path path = Paths.get(pathName);
+        folder = FSDirectory.open(path);
         IndexReader reader = DirectoryReader.open(folder);
         searcher = new IndexSearcher(reader);
         searcher.setSimilarity(new BooleanSimilarity());
@@ -273,6 +117,81 @@ public class Lucene
                     }
                 });
             }
+        }
+    }
+
+
+    public synchronized long[] subsearch(int fp[], int maxMoleculeId) throws IOException
+    {
+        if(fp.length == 0)
+        {
+            BitSetCollector collector = new BitSetCollector(this, maxMoleculeId);
+            searcher.search(new ConstantScoreQuery(new MatchAllDocsQuery()), collector);
+            return collector.getBitSet().toLongArray();
+        }
+
+
+        Builder builder = new BooleanQuery.Builder();
+
+        if(indexType == IndexType.TEXT)
+        {
+            for(int bit : fp)
+                builder.add(new TermQuery(new Term(subfpFieldName, tokenizer.bitAsString(bit))),
+                        BooleanClause.Occur.MUST);
+        }
+        else
+        {
+            for(int bit : fp)
+                builder.add(IntPoint.newExactQuery(subfpFieldName, bit), BooleanClause.Occur.MUST);
+        }
+
+        BitSetCollector collector = new BitSetCollector(this, maxMoleculeId);
+        searcher.search(new ConstantScoreQuery(builder.build()), collector);
+
+        return collector.getBitSet().toLongArray();
+    }
+
+
+    public synchronized ScoreHit[] simsearch(int fp[], int top, float cutoff) throws IOException
+    {
+        Builder builder = new BooleanQuery.Builder();
+
+        if(indexType == IndexType.TEXT)
+        {
+            for(int bit : fp)
+                builder.add(new TermQuery(new Term(simfpFieldName, tokenizer.bitAsString(bit))),
+                        BooleanClause.Occur.SHOULD);
+        }
+        else
+        {
+            for(int bit : fp)
+                builder.add(IntPoint.newExactQuery(simfpFieldName, bit), BooleanClause.Occur.SHOULD);
+        }
+
+
+        SimilarDocCollector collector = new SimilarDocCollector(this, fp.length, top, cutoff);
+        searcher.search(builder.build(), collector);
+
+        return collector.getDocs();
+    }
+
+
+    protected void close() throws IOException
+    {
+        try
+        {
+            if(searcher != null)
+                searcher.getIndexReader().close();
+
+            if(folder != null)
+                folder.close();
+        }
+        finally
+        {
+            searcher = null;
+            folder = null;
+            idTable = null;
+            sizeTable = null;
         }
     }
 

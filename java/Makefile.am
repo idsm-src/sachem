@@ -37,8 +37,10 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/lucene/FingerprintAnalyzer.java \
     src/cz/iocb/sachem/lucene/FingerprintReader.java \
     src/cz/iocb/sachem/lucene/FingerprintTokenizer.java \
+    src/cz/iocb/sachem/lucene/Indexer.java \
     src/cz/iocb/sachem/lucene/Lucene.java \
     src/cz/iocb/sachem/lucene/ScoreHit.java \
+    src/cz/iocb/sachem/lucene/Settings.java \
     src/cz/iocb/sachem/lucene/SimilarDocCollector.java \
     src/cz/iocb/sachem/search/LucyLoader.java \
     src/cz/iocb/sachem/search/EcdkLoader.java \
