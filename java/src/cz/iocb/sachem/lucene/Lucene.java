@@ -8,9 +8,15 @@ import static cz.iocb.sachem.lucene.Settings.simfpFieldName;
 import static cz.iocb.sachem.lucene.Settings.subfpFieldName;
 import static cz.iocb.sachem.lucene.Settings.useIdTable;
 import static cz.iocb.sachem.lucene.Settings.useSizeTable;
+import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
+import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
 import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.IntPoint;
 import org.apache.lucene.document.StoredField;
@@ -37,6 +43,7 @@ public class Lucene
 {
     private Directory folder;
     private IndexSearcher searcher;
+    private Thread watcher;
     private int[] idTable;
     private int[] sizeTable;
     private final FingerprintTokenizer tokenizer = new FingerprintTokenizer();
@@ -118,6 +125,55 @@ public class Lucene
                 });
             }
         }
+
+
+        watcher = new Thread()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    IndexSearcher searcher = Lucene.this.searcher;
+
+                    WatchService service = FileSystems.getDefault().newWatchService();
+                    path.getParent().register(service, ENTRY_DELETE);
+
+                    while(true)
+                    {
+                        WatchKey key = service.take();
+
+                        for(WatchEvent<?> event : key.pollEvents())
+                        {
+                            if(event.kind() != OVERFLOW && event.context().equals(path.getFileName()))
+                            {
+                                synchronized(Lucene.this)
+                                {
+                                    if(searcher == Lucene.this.searcher)
+                                        close();
+                                }
+
+                                return;
+                            }
+                        }
+
+                        if(!key.reset())
+                            break;
+                    }
+                }
+                catch(IOException e)
+                {
+                    e.printStackTrace();
+                }
+                catch(InterruptedException e)
+                {
+                    return;
+                }
+            }
+        };
+
+        watcher.setDaemon(true);
+        watcher.start();
     }
 
 
@@ -183,12 +239,16 @@ public class Lucene
             if(searcher != null)
                 searcher.getIndexReader().close();
 
+            if(watcher != null)
+                watcher.interrupt();
+
             if(folder != null)
                 folder.close();
         }
         finally
         {
             searcher = null;
+            watcher = null;
             folder = null;
             idTable = null;
             sizeTable = null;
