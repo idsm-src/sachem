@@ -13,6 +13,7 @@ import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.SerialMergeScheduler;
 import org.apache.lucene.index.TieredMergePolicy;
 import org.apache.lucene.search.similarities.BooleanSimilarity;
 import org.apache.lucene.store.Directory;
@@ -40,6 +41,7 @@ public class Indexer
             IndexWriterConfig config = new IndexWriterConfig(analyzer);
             config.setMergePolicy(policy);
             config.setSimilarity(new BooleanSimilarity());
+            config.setMergeScheduler(new SerialMergeScheduler());
 
             indexer = new IndexWriter(folder, config);
         }
