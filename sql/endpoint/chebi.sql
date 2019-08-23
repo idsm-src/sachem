@@ -2,14 +2,14 @@ create function compound(id in integer) returns varchar language sql as
 $$
   select 'http://purl.obolibrary.org/obo/CHEBI_' || id;
 $$
-immutable;
+immutable parallel safe;
 
 
 create function compound_inverse(iri in varchar) returns integer language sql as
 $$
-  select regexp_replace(iri, '^http://purl.obolibrary.org/obo/CHEBI_', '')::integer;
+  select substring(iri, 38)::integer;
 $$
-immutable;
+immutable parallel safe;
 
 --------------------------------------------------------------------------------
 
@@ -17,11 +17,11 @@ create function compound_molfile(id in integer) returns varchar language sql as
 $$
   select 'http://purl.obolibrary.org/obo/CHEBI_' || id || '_Molfile';
 $$
-immutable;
+immutable parallel safe;
 
 
 create function compound_molfile_inverse(iri in varchar) returns integer language sql as
 $$
-  select regexp_replace(iri, '^http://purl.obolibrary.org/obo/CHEBI_([0-9]+)_Molfile$', '\1')::integer;
+  select substring(iri, 38, octet_length(iri) - 45)::integer;
 $$
-immutable;
+immutable parallel safe;

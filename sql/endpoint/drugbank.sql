@@ -1,27 +1,27 @@
 create function compound(id in integer) returns varchar language sql as
 $$
-  select 'http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB' || right(concat('00000', id), 5);
+  select 'http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB' || lpad(id::text, 5, '0');
 $$
-immutable;
+immutable parallel safe;
 
 
 create function compound_inverse(iri in varchar) returns integer language sql as
 $$
-  select regexp_replace(iri, '^http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB', '')::integer;
+  select substring(iri, 70)::integer;
 $$
-immutable;
+immutable parallel safe;
 
 --------------------------------------------------------------------------------
 
 create function compound_molfile(id in integer) returns varchar language sql as
 $$
-  select 'http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB' || id || '_Molfile';
+  select 'http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB' || lpad(id::text, 5, '0') || '_Molfile';
 $$
-immutable;
+immutable parallel safe;
 
 
 create function compound_molfile_inverse(iri in varchar) returns integer language sql as
 $$
-  select regexp_replace(iri, '^http://wifo5-04.informatik.uni-mannheim.de/drugbank/resource/drugs/DB([0-9]+)_Molfile$', '\1')::integer;
+  select substring(iri, 70, 5)::integer;
 $$
-immutable;
+immutable parallel safe;
