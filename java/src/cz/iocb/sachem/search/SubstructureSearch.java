@@ -39,9 +39,9 @@ import cz.iocb.sachem.tautomers.InchiTautomerGenerator;
 
 public abstract class SubstructureSearch
 {
-    public static class QueryData
+    public static class QueryData<ItemType extends QueryDataItem>
     {
-        QueryDataItem[] items;
+        ItemType[] items;
         String message;
     }
 
@@ -53,9 +53,9 @@ public abstract class SubstructureSearch
     }
 
 
-    public static QueryData getQueryData(byte[] queryArray, int type, boolean implicitHydrogens, boolean tautomers)
-            throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException,
-            InChIException
+    public static QueryData<? extends QueryDataItem> getQueryData(byte[] queryArray, int type,
+            boolean implicitHydrogens, boolean tautomers) throws CDKException, IOException, TimeoutException,
+            CloneNotSupportedException, CombinationCountException, InChIException
     {
         String query = new String(queryArray, StandardCharsets.ISO_8859_1);
 
@@ -105,7 +105,7 @@ public abstract class SubstructureSearch
         }
 
 
-        QueryData data = new QueryData();
+        QueryData<QueryDataItem> data = new QueryData<QueryDataItem>();
         data.items = items;
         data.message = message;
 

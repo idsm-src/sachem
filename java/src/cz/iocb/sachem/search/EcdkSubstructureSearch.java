@@ -50,9 +50,9 @@ public abstract class EcdkSubstructureSearch extends SubstructureSearch
     };
 
 
-    public static QueryData getQueryData(byte[] queryArray, int type, boolean implicitHydrogens, boolean tautomers)
-            throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException,
-            InChIException
+    public static QueryData<? extends EcdkQueryDataItem> getQueryData(byte[] queryArray, int type,
+            boolean implicitHydrogens, boolean tautomers) throws CDKException, IOException, TimeoutException,
+            CloneNotSupportedException, CombinationCountException, InChIException
     {
         String query = new String(queryArray, StandardCharsets.ISO_8859_1);
 
@@ -133,7 +133,7 @@ public abstract class EcdkSubstructureSearch extends SubstructureSearch
         }
 
 
-        QueryData data = new QueryData();
+        QueryData<EcdkQueryDataItem> data = new QueryData<EcdkQueryDataItem>();
         data.items = items;
         data.message = message;
 
