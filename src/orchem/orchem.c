@@ -52,7 +52,7 @@ void orchem_java_init(void)
     orchemSubstructureSearchClass = (*env)->FindClass(env, "cz/iocb/sachem/search/OrchemSubstructureSearch");
     java_check_exception(__func__);
 
-    orchemSubstructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/sachem/search/OrchemSubstructureSearch$OrchemQueryData");
+    orchemSubstructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/sachem/search/SubstructureSearch$QueryData");
     java_check_exception(__func__);
 
     itemsField = (*env)->GetFieldID(env, orchemSubstructureQueryDataClass, "items", "[Lcz/iocb/sachem/search/SubstructureSearch$QueryDataItem;");

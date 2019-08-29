@@ -52,7 +52,7 @@ void ecdk_java_init(void)
     ecdkSubstructureSearchClass = (*env)->FindClass(env, "cz/iocb/sachem/search/EcdkSubstructureSearch");
     java_check_exception(__func__);
 
-    ecdkSubstructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/sachem/search/EcdkSubstructureSearch$EcdkQueryData");
+    ecdkSubstructureQueryDataClass = (*env)->FindClass(env, "cz/iocb/sachem/search/SubstructureSearch$QueryData");
     java_check_exception(__func__);
 
     itemsField = (*env)->GetFieldID(env, ecdkSubstructureQueryDataClass, "items", "[Lcz/iocb/sachem/search/SubstructureSearch$QueryDataItem;");
