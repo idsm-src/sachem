@@ -532,7 +532,7 @@ Datum orchem_substructure_search(PG_FUNCTION_ARGS)
 
             info->tableRowPosition++;
 
-            if(!bitset_get(&info->resultMask, seqid))
+            if(bitset_get(&info->resultMask, seqid))
             {
 #if USE_MOLECULE_INDEX
                 uint8_t *molecule = moleculeData + offsetData[seqid] + sizeof(int32_t);
