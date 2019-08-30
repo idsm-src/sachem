@@ -83,9 +83,13 @@ public class MoleculeCreator
         {
             readMolecule = mdlReader.read(new AtomContainer());
         }
+        catch(CDKException e)
+        {
+            throw e;
+        }
         catch(Exception e)
         {
-            throw new CDKException("invalid molile");
+            throw new CDKException("cannot parse molfile: " + e.getMessage());
         }
         finally
         {
