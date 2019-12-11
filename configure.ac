@@ -35,50 +35,5 @@ dnl check for JDK8
 AX_JDK8
 
 
-dnl process third party libraries
-AC_MSG_NOTICE([third party libraries])
-if test ! -e build; then
-    mkdir build
-fi
-
-
-dnl process clownfish
-AC_MSG_NOTICE([apache-clownfish])
-if test ! -e build/clownfish ; then
-    cp -r $srcdir/lib/clownfish build
-    chmod -R u+w build/clownfish
-fi
-
-cd build/clownfish/runtime/c
-./configure || exit $?
-find ../.. -name Makefile -exec sed -i 's|-O2|-O2 -march=native|' '{}' ';'
-CLOWNFISH_CPPFLAGS="-DCFISH_USE_SHORT_NAMES"
-CLOWNFISH_LDFLAGS="-L$(pwd)"
-cd -
-
-AC_SUBST([CLOWNFISH_CPPFLAGS])
-AC_SUBST([CLOWNFISH_LDFLAGS])
-
-
-dnl process lucy
-AC_MSG_NOTICE([apache-lucy])
-if test ! -e build/lucy ; then
-    cp -r $srcdir/lib/lucy build
-    chmod -R u+w build/lucy
-fi
-
-cd build/lucy/c
-./configure || exit $?
-sed -i 's|cfc|../../clownfish/compiler/c/cfc --include=../../clownfish/runtime/c/autogen/share/clownfish/include|' Makefile
-sed -i 's|-l clownfish|-L ../../clownfish/runtime/c -l clownfish|' Makefile
-find .. -name Makefile -exec sed -i 's|-O2|-O2 -march=native|' '{}' ';'
-LUCY_CPPFLAGS="-DLUCY_USE_SHORT_NAMES -I$(pwd)/autogen/include"
-LUCY_LDFLAGS="-L$(pwd)"
-cd -
-
-AC_SUBST([LUCY_CPPFLAGS])
-AC_SUBST([LUCY_LDFLAGS])
-
-
-AC_CONFIG_FILES(Makefile src/Makefile java/Makefile lib/Makefile extension/Makefile script/Makefile)
+AC_CONFIG_FILES(Makefile src/Makefile java/Makefile extension/Makefile script/Makefile)
 AC_OUTPUT

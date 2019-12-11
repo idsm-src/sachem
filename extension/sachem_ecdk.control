@@ -1,5 +1,0 @@
-# sachem_ecdk extension
-comment = 'Sachem/eCDK chemical cartridge'
-default_version = '0.1'
-module_pathname = '$libdir/libsachem'
-relocatable = true

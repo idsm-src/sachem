@@ -3,9 +3,8 @@ pglib_LTLIBRARIES = libsachem.la
 
 libsachem_la_CFLAGS = -std=gnu99 -O3 -march=native -flto -minline-stringops-dynamically -Wall -g
 libsachem_la_CXXFLAGS = -std=c++11 -O3 -march=native -flto -minline-stringops-dynamically -Wall -g
-libsachem_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(JDK8_CPPFLAGS) $(CLOWNFISH_CPPFLAGS) $(LUCY_CPPFLAGS) -DBINDIR=\"$(bindir)\" -DJARDIR=\"$(datadir)/$(PACKAGE)/jar\"
-libsachem_la_LDFLAGS = $(JDK8_LDFLAGS) $(CLOWNFISH_LDFLAGS) $(LUCY_LDFLAGS) -Wl,-rpath,$(POSTGRESQL_LIBDIR)
-libsachem_la_LIBADD = -llucy -lclownfish
+libsachem_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(JDK8_CPPFLAGS) -DBINDIR=\"$(bindir)\" -DJARDIR=\"$(datadir)/$(PACKAGE)/jar\"
+libsachem_la_LDFLAGS = $(JDK8_LDFLAGS) -Wl,-rpath,$(POSTGRESQL_LIBDIR)
 
 libsachem_la_SOURCES = \
 		isomorphism.c \
@@ -21,23 +20,12 @@ libsachem_la_SOURCES = \
 	    fingerprints/SGFingerprint.cpp \
         java/java.c \
         java/parse.c \
-        ecdk/ecdk.c \
-        ecdk/simsearch.c \
-        ecdk/subsearch.c \
-        ecdk/sync.c \
         lucene/indexer.c \
         lucene/lucene.c \
         lucene/search.c \
         lucene/simsearch.c \
         lucene/subsearch.c \
-        lucene/sync.c \
-        lucy/lucy.c \
-        lucy/subsearch.c \
-        lucy/sync.c \
-        orchem/orchem.c \
-        orchem/simsearch.c \
-        orchem/subsearch.c \
-        orchem/sync.c
+        lucene/sync.c
 
 EXTRA_DIST = \
         bitset.h \
@@ -59,13 +47,7 @@ EXTRA_DIST = \
 	    fingerprints/SubstructureMatch.hpp \
         java/java.h \
         java/parse.h \
-        ecdk/common.h \
-        ecdk/ecdk.h \
         lucene/common.h \
         lucene/indexer.h \
         lucene/lucene.h \
-        lucene/search.h \
-        lucy/common.h \
-        lucy/lucy.h \
-        orchem/common.h \
-        orchem/orchem.h
+        lucene/search.h

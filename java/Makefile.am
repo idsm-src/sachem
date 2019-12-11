@@ -19,13 +19,6 @@ EXTRA_DIST = \
     lib/jdbc-postgresql.jar \
     lib/lucene-core-7.2.1.jar \
     lib/lucene-queries-7.2.1.jar \
-    src/cz/iocb/sachem/fingerprint/bitpos/BitPosApi.java \
-    src/cz/iocb/sachem/fingerprint/bitpos/BitPositions.java \
-    src/cz/iocb/sachem/fingerprint/bitpos/ExtendedBitPositions.java \
-    src/cz/iocb/sachem/fingerprint/bitpos/Neighbour.java \
-    src/cz/iocb/sachem/fingerprint/ExtendedFingerprinter.java \
-    src/cz/iocb/sachem/fingerprint/OrchemExtendedFingerprinter.java \
-    src/cz/iocb/sachem/fingerprint/OrchemFingerprinter.java \
     src/cz/iocb/sachem/isomorphism/IsomorphismSort.java \
     src/cz/iocb/sachem/load/ConfigurationProperties.java \
     src/cz/iocb/sachem/load/CompoundLoader.java \
@@ -43,18 +36,11 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/lucene/Settings.java \
     src/cz/iocb/sachem/lucene/SimilarDocCollector.java \
     src/cz/iocb/sachem/search/LucyLoader.java \
-    src/cz/iocb/sachem/search/EcdkLoader.java \
-    src/cz/iocb/sachem/search/EcdkSimilaritySearch.java \
-    src/cz/iocb/sachem/search/EcdkSubstructureSearch.java \
-    src/cz/iocb/sachem/search/OrchemLoader.java \
-    src/cz/iocb/sachem/search/OrchemSimilaritySearch.java \
-    src/cz/iocb/sachem/search/OrchemSubstructureSearch.java \
     src/cz/iocb/sachem/search/SachemMoleculeBuilder.java \
     src/cz/iocb/sachem/search/SimilaritySearch.java \
     src/cz/iocb/sachem/search/SubstructureSearch.java \
     src/cz/iocb/sachem/search/QueryFormat.java \
     src/cz/iocb/sachem/shared/AtomicNumbers.java \
-    src/cz/iocb/sachem/shared/MoleculeCounts.java \
     src/cz/iocb/sachem/shared/MoleculeCreator.java \
     src/cz/iocb/sachem/tautomers/CombinationCountException.java \
     src/cz/iocb/sachem/tautomers/InChI.java \
