@@ -292,50 +292,20 @@ static inline bool vf2state_atom_matches(const VF2State *const restrict vf2state
     int8_t queryAtomNumber = molecule_get_atom_number(vf2state->query, queryAtom);
     int8_t targetAtomNumber = molecule_get_atom_number(vf2state->target, targetAtom);
 
-    if(unlikely(queryAtomNumber == targetAtomNumber))
+    if(queryAtomNumber == UNKNOWN_ATOM_NUMBER || targetAtomNumber == UNKNOWN_ATOM_NUMBER)
+        return false;
+    else if(queryAtomNumber == targetAtomNumber || queryAtomNumber == R_ATOM_NUMBER)
         return true;
-
-    if(unlikely(molecule_is_pseudo_atom(vf2state->query, queryAtom)))
-    {
-        switch(queryAtomNumber)
-        {
-            case Q_ATOM_NUMBER:
-                return targetAtomNumber != C_ATOM_NUMBER && targetAtomNumber != H_ATOM_NUMBER;
-
-            case M_ATOM_NUMBER:
-                return molecule_is_metal(vf2state->target, targetAtom) ||
-                        (molecule_is_pseudo_atom(vf2state->target, targetAtom) && targetAtomNumber != X_ATOM_NUMBER);
-
-            case X_ATOM_NUMBER:
-                return molecule_is_halogen(vf2state->target, targetAtom) ||
-                        (molecule_is_pseudo_atom(vf2state->target, targetAtom) && targetAtomNumber != M_ATOM_NUMBER);
-
-            default:
-                return true;
-        }
-    }
-
-    if(unlikely(molecule_is_pseudo_atom(vf2state->target, targetAtom)))
-    {
-        switch(targetAtomNumber)
-        {
-            case Q_ATOM_NUMBER:
-                return queryAtomNumber != C_ATOM_NUMBER && queryAtomNumber != H_ATOM_NUMBER;
-
-            case M_ATOM_NUMBER:
-                return molecule_is_metal(vf2state->query, queryAtom) ||
-                        (molecule_is_pseudo_atom(vf2state->query, queryAtom) && queryAtomNumber != X_ATOM_NUMBER);
-
-            case X_ATOM_NUMBER:
-                return molecule_is_halogen(vf2state->query, queryAtom) ||
-                        (molecule_is_pseudo_atom(vf2state->query, queryAtom) && queryAtomNumber != M_ATOM_NUMBER);
-
-            default:
-                return true;
-        }
-    }
-
-    return false;
+    else if(molecule_is_pseudo_atom(vf2state->target, targetAtom))
+        return queryAtomNumber == Q_ATOM_NUMBER && (targetAtomNumber == M_ATOM_NUMBER || targetAtomNumber == X_ATOM_NUMBER);
+    else if(queryAtomNumber == Q_ATOM_NUMBER)
+        return targetAtomNumber != C_ATOM_NUMBER && targetAtomNumber != H_ATOM_NUMBER;
+    else if(queryAtomNumber == M_ATOM_NUMBER)
+        return molecule_is_metal(vf2state->target, targetAtom);
+    else if(queryAtomNumber == X_ATOM_NUMBER)
+        return molecule_is_halogen(vf2state->target, targetAtom);
+    else
+        return false;
 }
 
 
@@ -350,13 +320,8 @@ static inline bool vf2state_bond_matches(const VF2State *const restrict vf2state
     uint8_t queryBondType = molecule_get_bond_type(vf2state->query, queryBond);
     uint8_t targetbondType = molecule_get_bond_type(vf2state->target, targetbond);
 
-    if(likely(queryBondType <= BOND_AROMATIC && targetbondType <= BOND_AROMATIC))
-        return queryBondType == targetbondType;
 
-    if(queryBondType > BOND_AROMATIC && targetbondType > BOND_AROMATIC)
-        return true;
-
-    if(queryBondType == BOND_ANY)
+    if(queryBondType == targetbondType || queryBondType == BOND_ANY)
         return true;
     else if(queryBondType == BOND_SINGLE_OR_DOUBLE)
         return targetbondType == BOND_SINGLE || targetbondType == BOND_DOUBLE;
@@ -364,17 +329,8 @@ static inline bool vf2state_bond_matches(const VF2State *const restrict vf2state
         return targetbondType == BOND_SINGLE || targetbondType == BOND_AROMATIC;
     else if(queryBondType == BOND_DOUBLE_OR_AROMATIC)
         return targetbondType == BOND_DOUBLE || targetbondType == BOND_AROMATIC;
-
-    if(targetbondType == BOND_ANY)
-        return true;
-    else if(targetbondType == BOND_SINGLE_OR_DOUBLE)
-        return queryBondType == BOND_SINGLE || queryBondType == BOND_DOUBLE;
-    else if(targetbondType == BOND_SINGLE_OR_AROMATIC)
-        return queryBondType == BOND_SINGLE || queryBondType == BOND_AROMATIC;
-    else if(targetbondType == BOND_DOUBLE_OR_AROMATIC)
-        return queryBondType == BOND_DOUBLE || queryBondType == BOND_AROMATIC;
-
-    return false;
+    else
+        return false;
 }
 
 

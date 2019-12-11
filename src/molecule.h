@@ -6,6 +6,8 @@
 #include <limits.h>
 #include "sachem.h"
 
+#define UNKNOWN_ATOM_NUMBER     ((int8_t) -'?')
+#define R_ATOM_NUMBER           ((int8_t) -'R')
 #define Q_ATOM_NUMBER           ((int8_t) -'Q')
 #define M_ATOM_NUMBER           ((int8_t) -'M')
 #define X_ATOM_NUMBER           ((int8_t) -'X')
