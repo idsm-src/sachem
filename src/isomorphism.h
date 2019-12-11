@@ -346,7 +346,7 @@ static inline bool vf2state_bond_matches(const VF2State *const restrict vf2state
     BondIdx queryBond = molecule_get_bond(vf2state->query, qIdx1, qIdx2);
     BondIdx targetbond = molecule_get_bond(vf2state->target, tIdx1, tIdx2);
 
-    if(likely(targetbond < 0))
+    if(likely(queryBond < 0 || targetbond < 0))
         return false;
 
     uint8_t queryBondType = molecule_get_bond_type(vf2state->query, queryBond);
