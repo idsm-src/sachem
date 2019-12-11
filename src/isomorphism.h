@@ -306,11 +306,11 @@ static inline bool vf2state_atom_matches(const VF2State *const restrict vf2state
 
             case M_ATOM_NUMBER:
                 return molecule_is_metal(vf2state->target, targetAtom) ||
-                        (molecule_is_pseudo_atom(vf2state->target, targetAtom) && targetAtom != X_ATOM_NUMBER);
+                        (molecule_is_pseudo_atom(vf2state->target, targetAtom) && targetAtomNumber != X_ATOM_NUMBER);
 
             case X_ATOM_NUMBER:
                 return molecule_is_halogen(vf2state->target, targetAtom) ||
-                        (molecule_is_pseudo_atom(vf2state->target, targetAtom) && targetAtom != M_ATOM_NUMBER);
+                        (molecule_is_pseudo_atom(vf2state->target, targetAtom) && targetAtomNumber != M_ATOM_NUMBER);
 
             default:
                 return true;
@@ -326,11 +326,11 @@ static inline bool vf2state_atom_matches(const VF2State *const restrict vf2state
 
             case M_ATOM_NUMBER:
                 return molecule_is_metal(vf2state->query, queryAtom) ||
-                        (molecule_is_pseudo_atom(vf2state->query, queryAtom) && queryAtom != X_ATOM_NUMBER);
+                        (molecule_is_pseudo_atom(vf2state->query, queryAtom) && queryAtomNumber != X_ATOM_NUMBER);
 
             case X_ATOM_NUMBER:
                 return molecule_is_halogen(vf2state->query, queryAtom) ||
-                        (molecule_is_pseudo_atom(vf2state->query, queryAtom) && queryAtom != M_ATOM_NUMBER);
+                        (molecule_is_pseudo_atom(vf2state->query, queryAtom) && queryAtomNumber != M_ATOM_NUMBER);
 
             default:
                 return true;
