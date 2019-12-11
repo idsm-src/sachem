@@ -38,9 +38,7 @@
 #define USE_VF2_TIMEOUT              1
 
 #define UNDEFINED_CORE              -1
-#define MASKED_TARGET               -1
 #define is_core_defined(value)      ((value) >= 0)
-#define is_target_masked(value)     ((value) < 0)
 
 
 typedef enum
