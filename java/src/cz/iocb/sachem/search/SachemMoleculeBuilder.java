@@ -254,14 +254,29 @@ public class SachemMoleculeBuilder
             if(atom instanceof IPseudoAtom)
             {
                 String label = ((IPseudoAtom) atom).getLabel();
-                assert label.length() == 0 || label.length() > 1 || label.charAt(0) >= 0 && label.charAt(0) < 128;
 
-                if(label.length() == 1)
+                if(label.length() == 1 && label.charAt(0) >= 'A' && label.charAt(0) <= 'Z')
                     stream.write(-label.charAt(0));
-                else if(label.matches("R[1-9#]?"))
-                    stream.write(-'R');
+                else if(label.matches("R[1-9#]?") || label.equals("*"))
+                    stream.write(AtomicNumbers.R);
+                else if(label.equals("G*") || label.equals("G\\"))
+                    stream.write(AtomicNumbers.G);
+                else if(label.equals("Ps"))
+                    stream.write(AtomicNumbers.POSITRONIUM);
+                else if(label.equals("e"))
+                    stream.write(AtomicNumbers.ELECTRON);
+                else if(label.equals("hv"))
+                    stream.write(AtomicNumbers.PHOTON);
+                else if(label.equals("Mu"))
+                    stream.write(AtomicNumbers.MUONIUM);
+                else if(label.equals("ACP"))
+                    stream.write(AtomicNumbers.ACP);
+                else if(label.equals("Enz"))
+                    stream.write(AtomicNumbers.ENZYME);
+                else if(label.equals(""))
+                    stream.write(AtomicNumbers.EMPTY);
                 else
-                    stream.write(-'?');
+                    stream.write(AtomicNumbers.UNKNOWN);
             }
             else
             {
