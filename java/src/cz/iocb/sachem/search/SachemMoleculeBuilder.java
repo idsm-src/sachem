@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Jakub Galgonek   galgonek@uochb.cas.cz
+ * Copyright (C) 2015-2019 Jakub Galgonek   galgonek@uochb.cas.cz
  * Copyright (C) 2008-2009 Mark Rijnbeek    markr@ebi.ac.uk
  *
  * This program is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General
@@ -57,7 +57,7 @@ public class SachemMoleculeBuilder
         private BondType(int value)
         {
             this.value = value;
-        };
+        }
 
         public int getValue()
         {
@@ -75,7 +75,7 @@ public class SachemMoleculeBuilder
         private SpecialRecordType(int value)
         {
             this.value = value;
-        };
+        }
 
         public int getValue()
         {
@@ -93,7 +93,7 @@ public class SachemMoleculeBuilder
         private TetrahedralStereoType(int value)
         {
             this.value = value;
-        };
+        }
 
         public int getValue()
         {
@@ -111,7 +111,7 @@ public class SachemMoleculeBuilder
         private BondStereoType(int value)
         {
             this.value = value;
-        };
+        }
 
         public int getValue()
         {
@@ -281,14 +281,34 @@ public class SachemMoleculeBuilder
 
         for(IBond b : molecule.bonds())
         {
-            IAtom a1 = b.getAtom(0);
-            IAtom a2 = b.getAtom(1);
-
             int a1idx = molecule.indexOf(b.getAtom(0));
             int a2idx = molecule.indexOf(b.getAtom(1));
             assert a1idx != a2idx;
 
-            if((a1idx < heavyAtomCount || molecule.getConnectedBondsCount(a1) > 1)
+            if(a1idx < heavyAtomCount && a2idx < heavyAtomCount)
+            {
+                b.setProperty(BOND_NUMBER, bondNumber++);
+
+                stream.write(a1idx % 256);
+                stream.write(a1idx / 256 << 4 | a2idx / 256);
+                stream.write(a2idx % 256);
+                stream.write(getBondType(b).getValue());
+            }
+        }
+
+
+        /* write special bond number */
+        for(IBond b : molecule.bonds())
+        {
+            IAtom a1 = b.getAtom(0);
+            IAtom a2 = b.getAtom(1);
+
+            int a1idx = molecule.indexOf(a1);
+            int a2idx = molecule.indexOf(a2);
+            assert a1idx != a2idx;
+
+            if((a1idx >= heavyAtomCount || a2idx >= heavyAtomCount)
+                    && (a1idx < heavyAtomCount || molecule.getConnectedBondsCount(a1) > 1)
                     && (a2idx < heavyAtomCount || molecule.getConnectedBondsCount(a2) > 1))
             {
                 b.setProperty(BOND_NUMBER, bondNumber++);
