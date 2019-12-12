@@ -1,6 +1,6 @@
 bin_SCRIPTS = inchi/inchi-1
 
-jar_DATA = lib/cdk-2.1.1.jar sachem.jar lib/commons-net-3.6.jar lib/jdbc-postgresql.jar lib/lucene-core-7.2.1.jar lib/lucene-queries-7.2.1.jar
+jar_DATA = lib/cdk-2.1.1.jar sachem.jar lib/commons-net-3.6.jar lib/jdbc-postgresql.jar lib/lucene-core-8.2.0.jar
 jardir = $(datadir)/$(PACKAGE)/jar
 
 sachem.jar: force-build
@@ -17,8 +17,7 @@ EXTRA_DIST = \
     lib/cdk-2.1.1.jar \
     lib/commons-net-3.6.jar \
     lib/jdbc-postgresql.jar \
-    lib/lucene-core-7.2.1.jar \
-    lib/lucene-queries-7.2.1.jar \
+    lib/lucene-core-8.2.0.jar \
     src/cz/iocb/sachem/isomorphism/IsomorphismSort.java \
     src/cz/iocb/sachem/load/ConfigurationProperties.java \
     src/cz/iocb/sachem/load/CompoundLoader.java \

@@ -5,7 +5,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.search.Scorer;
+import org.apache.lucene.search.Scorable;
+import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.SimpleCollector;
 import org.apache.lucene.util.PriorityQueue;
 
@@ -19,7 +20,7 @@ public class SimilarDocCollector extends SimpleCollector
     private final int querySize;
     private final int top;
     private final float cutoff;
-    private Scorer scorer;
+    private Scorable scorer;
     private int docBase;
 
 
@@ -88,16 +89,16 @@ public class SimilarDocCollector extends SimpleCollector
 
 
     @Override
-    public void setScorer(Scorer scorer) throws IOException
+    public void setScorer(Scorable scorer) throws IOException
     {
         this.scorer = scorer;
     }
 
 
     @Override
-    public boolean needsScores()
+    public ScoreMode scoreMode()
     {
-        return true;
+        return ScoreMode.COMPLETE;
     }
 
 

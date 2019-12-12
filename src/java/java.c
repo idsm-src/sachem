@@ -55,8 +55,7 @@ void java_init(void)
             .options = (JavaVMOption []) {
                 (JavaVMOption) { .optionString = "-Djava.class.path=" JARDIR "/sachem.jar:"
                                                                       JARDIR "/cdk-2.1.1.jar:"
-                                                                      JARDIR "/lucene-core-7.2.1.jar:"
-                                                                      JARDIR "/lucene-queries-7.2.1.jar" },
+                                                                      JARDIR "/lucene-core-8.2.0.jar:" },
                 (JavaVMOption) { .optionString = "-Dinchi.path=" BINDIR "/inchi-1"}
             },
             .ignoreUnrecognized = JNI_FALSE

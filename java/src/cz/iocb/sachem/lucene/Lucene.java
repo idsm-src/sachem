@@ -31,6 +31,7 @@ import org.apache.lucene.search.BooleanQuery.Builder;
 import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.MatchAllDocsQuery;
+import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.SimpleCollector;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.similarities.BooleanSimilarity;
@@ -118,9 +119,9 @@ public class Lucene
                     }
 
                     @Override
-                    public boolean needsScores()
+                    public ScoreMode scoreMode()
                     {
-                        return false;
+                        return ScoreMode.COMPLETE_NO_SCORES;
                     }
                 });
             }

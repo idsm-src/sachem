@@ -3,6 +3,7 @@ package cz.iocb.sachem.lucene;
 import java.io.IOException;
 import java.util.BitSet;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.SimpleCollector;
 
 
@@ -36,9 +37,9 @@ public class BitSetCollector extends SimpleCollector
 
 
     @Override
-    public boolean needsScores()
+    public ScoreMode scoreMode()
     {
-        return false;
+        return ScoreMode.COMPLETE_NO_SCORES;
     }
 
 
