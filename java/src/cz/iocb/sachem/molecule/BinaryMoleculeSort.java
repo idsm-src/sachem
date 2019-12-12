@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Jakub Galgonek   galgonek@uochb.cas.cz
+ * Copyright (C) 2015-2019 Jakub Galgonek   galgonek@uochb.cas.cz
  * Copyright (C) 2009-2009 Mark Rijnbeek    markr@ebi.ac.uk
  *
  * This program is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General
@@ -12,7 +12,7 @@
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
  * details.
  */
-package cz.iocb.sachem.isomorphism;
+package cz.iocb.sachem.molecule;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,38 +24,14 @@ import java.util.TreeMap;
 import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IBond;
-import cz.iocb.sachem.shared.AtomicNumbers;
 
 
 
-/**
- * Facilitates sort before doing an isomorphic comparison.
- */
-public class IsomorphismSort
+public class BinaryMoleculeSort
 {
-    /**
-     * Returns a sorted array of {@link IAtom} for a given input {@link IAtomContainer}. The sort is based on:
-     * <ul>
-     * <li>the frequency of atom symbols</li>
-     * <li>the connectivity of the atoms</li>
-     * </ul>
-     *
-     * This type of sort benefits algorithms like VF2, sorting the query container before a subgraph match. The
-     * algorithm will then start with atoms that are quite likely hardest to match.
-     *
-     * Example usage:
-     *
-     * <pre>
-     * IAtom[] sortedAtoms = cz.iocb.sachem.isomorphism.IsomorphismSort.atomsByFrequency(queryMolecule);
-     * queryMolecule.setAtoms(sortedAtoms);
-     * </pre>
-     *
-     * @param iac input {@link IAtomContainer}
-     * @return a sorted array of atoms for that {@link IAtomContainer}
-     */
     public static IAtom[] atomsByFrequency(IAtomContainer iac)
     {
-        // Create a map with (key,value) being (atom symbol, overall count)
+        // create a map with (key,value) being (atom symbol, overall count)
         Map<Integer, Integer> elementCounts = new TreeMap<Integer, Integer>();
 
         for(IAtom atom : iac.atoms())
@@ -68,13 +44,13 @@ public class IsomorphismSort
                 elementCounts.put(atom.getAtomicNumber(), ++count);
         }
 
-        // Create a map with (key,value) being (IAtom, number of bond IAtom occurs in)
+        // create a map with (key,value) being (IAtom, number of bond IAtom occurs in)
         Map<IAtom, Integer> bondParticipationCount = new HashMap<IAtom, Integer>();
 
         for(IBond bond : iac.bonds())
         {
-            if(bond.getAtom(0).getAtomicNumber() == AtomicNumbers.H
-                    || bond.getAtom(1).getAtomicNumber() == AtomicNumbers.H)
+            if(bond.getAtom(0).getAtomicNumber() == Molecule.AtomType.H
+                    || bond.getAtom(1).getAtomicNumber() == Molecule.AtomType.H)
                 continue;
 
             for(IAtom atomInBond : bond.atoms())
@@ -86,14 +62,14 @@ public class IsomorphismSort
             }
         }
 
-        // Mind the atoms not in any bond
+        // mind the atoms not in any bond
         for(IAtom atom : iac.atoms())
         {
             if(!bondParticipationCount.containsKey(atom))
                 bondParticipationCount.put(atom, 0);
         }
 
-        // We now have to maps that will be used to sort the incoming atom container
+        // we now have to maps that will be used to sort the incoming atom container
         List<AtomForIsomorphismSort> atomList = new ArrayList<AtomForIsomorphismSort>();
 
         for(IAtom atom : iac.atoms())
@@ -105,7 +81,7 @@ public class IsomorphismSort
 
         Collections.sort(atomList, new AtomForIsomorphismSortComparator());
 
-        // Create an output atom array based on the sorted list
+        // create an output atom array based on the sorted list
         IAtom[] iAtomArray = new IAtom[iac.getAtomCount()];
         int iacSortedIdx = 0;
 
@@ -119,10 +95,6 @@ public class IsomorphismSort
     }
 
 
-    /**
-     * Beans helper class for sorting. It holds the values to sort, and has comparator class
-     * {@link AtomForIsomorphismSortComparator} to determine the right sort order for these.
-     */
     private static class AtomForIsomorphismSort
     {
         IAtom iatom;
@@ -138,26 +110,22 @@ public class IsomorphismSort
     }
 
 
-    /**
-     * Comparator for the sort. The sort is based primary on the elements with lowest count first, and secondary on the
-     * atoms that are most highly connected first.
-     */
     private static class AtomForIsomorphismSortComparator implements Comparator<AtomForIsomorphismSort>
     {
         @Override
         public int compare(AtomForIsomorphismSort e1, AtomForIsomorphismSort e2)
         {
-            if(e1.iatom.getAtomicNumber() == AtomicNumbers.H && e2.iatom.getAtomicNumber() != AtomicNumbers.H)
+            if(e1.iatom.getAtomicNumber() == Molecule.AtomType.H && e2.iatom.getAtomicNumber() != Molecule.AtomType.H)
                 return 1;
 
-            if(e1.iatom.getAtomicNumber() != AtomicNumbers.H && e2.iatom.getAtomicNumber() == AtomicNumbers.H)
+            if(e1.iatom.getAtomicNumber() != Molecule.AtomType.H && e2.iatom.getAtomicNumber() == Molecule.AtomType.H)
                 return -1;
 
 
-            if(e1.iatom.getAtomicNumber() == AtomicNumbers.C && e2.iatom.getAtomicNumber() != AtomicNumbers.C)
+            if(e1.iatom.getAtomicNumber() == Molecule.AtomType.C && e2.iatom.getAtomicNumber() != Molecule.AtomType.C)
                 return 1;
 
-            if(e1.iatom.getAtomicNumber() != AtomicNumbers.C && e2.iatom.getAtomicNumber() == AtomicNumbers.C)
+            if(e1.iatom.getAtomicNumber() != Molecule.AtomType.C && e2.iatom.getAtomicNumber() == Molecule.AtomType.C)
                 return -1;
 
 

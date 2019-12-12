@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Jakub Galgonek   galgonek@uochb.cas.cz
+ * Copyright (C) 2015-2019 Jakub Galgonek   galgonek@uochb.cas.cz
  *
  * This program is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General
  * Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option)
@@ -13,15 +13,19 @@
  */
 package cz.iocb.sachem.tautomers;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.openscience.cdk.exception.CDKException;
+import org.openscience.cdk.inchi.InChIGenerator;
+import org.openscience.cdk.inchi.InChIGeneratorFactory;
+import org.openscience.cdk.interfaces.IAtomContainer;
+import net.sf.jniinchi.INCHI_OPTION;
 
 
 
@@ -62,52 +66,54 @@ public class InChI
     }
 
 
-    static private final ProcessBuilder pb;
+    static private final List<INCHI_OPTION> options;
 
-    private String key = null;
     private String aux = null;
     private String value = null;
 
 
     static
     {
-        String path = System.getProperty("inchi.path");
-        pb = new ProcessBuilder(path, "-STDIO", "-Key", "-NoLabels", "-W0", "-SUU", "-RecMet");
+        options = new ArrayList<INCHI_OPTION>();
+        options.add(INCHI_OPTION.SUU);
+        options.add(INCHI_OPTION.RecMet);
     }
 
 
-    public InChI(String molfile) throws InChIException, IOException
+    public InChI(IAtomContainer molecule) throws CDKException
     {
-        Process p = pb.start();
-        BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        BufferedReader error = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-        BufferedWriter output = new BufferedWriter(new OutputStreamWriter(p.getOutputStream()));
-
-        output.write(molfile);
-        output.close();
-
-        value = input.readLine();
-        aux = input.readLine();
-        key = input.readLine();
-
-        // workaround
-        if(value != null && value.contains("/r"))
+        try
         {
-            value = "InChI=1/" + value.substring(value.indexOf("/r") + 2);
-            aux = "AuxInfo=1/" + aux.substring(aux.indexOf("/R:") + 4);
+            InChIGenerator generator = AccessController.doPrivileged((PrivilegedExceptionAction<InChIGenerator>) () -> {
+                return InChIGeneratorFactory.getInstance().getInChIGenerator(molecule, options);
+            });
+
+            value = generator.getInchi();
+            aux = generator.getAuxInfo();
+
+            // workaround
+            if(value != null && value.contains("/r"))
+            {
+                value = "InChI=1/" + value.substring(value.indexOf("/r") + 2);
+                aux = "AuxInfo=1/" + aux.substring(aux.indexOf("/R:") + 4);
+            }
+
+            if(value == null || aux == null)
+            {
+                if(generator.getMessage() != null)
+                    throw new InChIException("cannot generate InChI: " + generator.getMessage());
+
+                throw new InChIException("cannot generate InChI");
+            }
         }
-
-        if(value == null)
+        catch(PrivilegedActionException e)
         {
-            for(String line = error.readLine(); line != null; line = error.readLine())
-                if(line.startsWith("Error"))
-                    throw new InChIException("cannot generate InChI: " + line);
-
+            throw(CDKException) e.getException();
+        }
+        catch(IllegalArgumentException e)
+        {
             throw new InChIException("cannot generate InChI");
         }
-
-        input.close();
-        error.close();
     }
 
 
@@ -207,12 +213,6 @@ public class InChI
         }
 
         return fragments;
-    }
-
-
-    public String getKey()
-    {
-        return key;
     }
 
 

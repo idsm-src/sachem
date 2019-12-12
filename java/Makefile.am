@@ -1,5 +1,3 @@
-bin_SCRIPTS = inchi/inchi-1
-
 jar_DATA = \
 	sachem.jar \
     lib/beam-core-1.3.3.jar \
@@ -36,7 +34,6 @@ clean-local:
 
 EXTRA_DIST = \
 	build.xml \
-	inchi/inchi-1 \
     lib/beam-core-1.3.3.jar \
     lib/cdk-atomtype-2.3.jar \
     lib/cdk-core-2.3.jar \
@@ -58,12 +55,11 @@ EXTRA_DIST = \
     lib/log4j-1.2.17.jar \
     lib/lucene-core-8.2.0.jar \
     lib/vecmath-1.5.2.jar \
-    src/cz/iocb/sachem/isomorphism/IsomorphismSort.java \
-    src/cz/iocb/sachem/load/ConfigurationProperties.java \
     src/cz/iocb/sachem/load/CompoundLoader.java \
     src/cz/iocb/sachem/load/CompoundUpdater.java \
-    src/cz/iocb/sachem/load/GeneralCompoundLoader.java \
+    src/cz/iocb/sachem/load/ConfigurationProperties.java \
     src/cz/iocb/sachem/load/DrugbankCompoundUpdater.java \
+    src/cz/iocb/sachem/load/GeneralCompoundLoader.java \
     src/cz/iocb/sachem/load/PubChemCompoundUpdater.java \
     src/cz/iocb/sachem/lucene/BitSetCollector.java \
     src/cz/iocb/sachem/lucene/FingerprintAnalyzer.java \
@@ -74,14 +70,18 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/lucene/ScoreHit.java \
     src/cz/iocb/sachem/lucene/Settings.java \
     src/cz/iocb/sachem/lucene/SimilarDocCollector.java \
+    src/cz/iocb/sachem/molecule/AromaticityMode.java \
+    src/cz/iocb/sachem/molecule/BinaryMoleculeBuilder.java \
+    src/cz/iocb/sachem/molecule/BinaryMolecule.java \
+    src/cz/iocb/sachem/molecule/BinaryMoleculeSort.java \
+    src/cz/iocb/sachem/molecule/MoleculeCreator.java \
+    src/cz/iocb/sachem/molecule/Molecule.java \
+    src/cz/iocb/sachem/molecule/TautomerMode.java \
     src/cz/iocb/sachem/search/LucyLoader.java \
-    src/cz/iocb/sachem/search/SachemMoleculeBuilder.java \
+    src/cz/iocb/sachem/search/QueryFormat.java \
     src/cz/iocb/sachem/search/SimilaritySearch.java \
     src/cz/iocb/sachem/search/SubstructureSearch.java \
-    src/cz/iocb/sachem/search/QueryFormat.java \
-    src/cz/iocb/sachem/shared/AtomicNumbers.java \
-    src/cz/iocb/sachem/shared/MoleculeCreator.java \
     src/cz/iocb/sachem/tautomers/CombinationCountException.java \
-    src/cz/iocb/sachem/tautomers/InChI.java \
     src/cz/iocb/sachem/tautomers/InChIException.java \
+    src/cz/iocb/sachem/tautomers/InChI.java \
     src/cz/iocb/sachem/tautomers/InchiTautomerGenerator.java

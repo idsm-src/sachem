@@ -12,7 +12,7 @@
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
  * details.
  */
-package cz.iocb.sachem.search;
+package cz.iocb.sachem.molecule;
 
 import java.io.ByteArrayOutputStream;
 import java.util.List;
@@ -27,101 +27,24 @@ import org.openscience.cdk.interfaces.IStereoElement;
 import org.openscience.cdk.interfaces.ITetrahedralChirality.Stereo;
 import org.openscience.cdk.isomorphism.matchers.QueryBond;
 import org.openscience.cdk.stereo.DoubleBondStereochemistry;
+import org.openscience.cdk.stereo.ExtendedCisTrans;
 import org.openscience.cdk.stereo.ExtendedTetrahedral;
 import org.openscience.cdk.stereo.Stereocenters;
 import org.openscience.cdk.stereo.Stereocenters.Type;
 import org.openscience.cdk.stereo.TetrahedralChirality;
-import cz.iocb.sachem.shared.AtomicNumbers;
+import cz.iocb.sachem.molecule.BinaryMolecule.SpecialRecordType;
+import cz.iocb.sachem.molecule.Molecule.AtomType;
+import cz.iocb.sachem.molecule.Molecule.BondStereo;
+import cz.iocb.sachem.molecule.Molecule.BondType;
+import cz.iocb.sachem.molecule.Molecule.TetrahedralStereo;
 
 
 
-public class SachemMoleculeBuilder
+public class BinaryMoleculeBuilder
 {
-    public static enum BondType
-    {
-        NONE(0),
-        SINGLE(1),
-        DOUBLE(2),
-        TRIPLE(3),
-        QUADRUPLE(4),
-        QUINTUPLE(5),
-        SEXTUPLE(6),
-        AROMATIC(11),
-        SINGLE_OR_DOUBLE(12),
-        SINGLE_OR_AROMATIC(13),
-        DOUBLE_OR_AROMATIC(14),
-        ANY(15);
-
-        private int value;
-
-        private BondType(int value)
-        {
-            this.value = value;
-        }
-
-        public int getValue()
-        {
-            return value;
-        }
-    }
-
-
-    static enum SpecialRecordType
-    {
-        CHARGE(0), ISOTOPE(1), TETRAHEDRAL_STEREO(2), BOND_STEREO(3),;
-
-        private int value;
-
-        private SpecialRecordType(int value)
-        {
-            this.value = value;
-        }
-
-        public int getValue()
-        {
-            return value;
-        }
-    }
-
-
-    static enum TetrahedralStereoType
-    {
-        NONE(0), CLOCKWISE(1), ANTI_CLOCKWISE(2), UNDEFINED(3);
-
-        private int value;
-
-        private TetrahedralStereoType(int value)
-        {
-            this.value = value;
-        }
-
-        public int getValue()
-        {
-            return value;
-        }
-    }
-
-
-    static enum BondStereoType
-    {
-        NONE(0), OPPOSITE(1), TOGETHER(2), UNDEFINED(3);
-
-        private int value;
-
-        private BondStereoType(int value)
-        {
-            this.value = value;
-        }
-
-        public int getValue()
-        {
-            return value;
-        }
-    }
-
-
     public static String STEREO_PROPERTY = "STEREO";
     public static String IGNORE_STEREO = "IGNORE";
+
     private static String BOND_NUMBER = "BOND_NUMBER";
     private static int[] validReorder = { 0x1234, 0x1423, 0x1342, 0x2314, 0x2431, 0x2143, 0x3124, 0x3412, 0x3241,
             0x4213, 0x4321, 0x4132 };
@@ -129,10 +52,10 @@ public class SachemMoleculeBuilder
     private IAtomContainer molecule;
     private Stereocenters centers;
     @SuppressWarnings("rawtypes") private IStereoElement[] tetrahedralChirality;
-    private DoubleBondStereochemistry[] doubleBondStereo;
+    @SuppressWarnings("rawtypes") private IStereoElement[] doubleBondStereo;
 
 
-    public SachemMoleculeBuilder(IAtomContainer molecule) throws CDKException
+    public BinaryMoleculeBuilder(IAtomContainer molecule) throws CDKException
     {
         this.molecule = molecule;
 
@@ -163,7 +86,7 @@ public class SachemMoleculeBuilder
         }
 
 
-        doubleBondStereo = new DoubleBondStereochemistry[molecule.getBondCount()];
+        doubleBondStereo = new IStereoElement[molecule.getBondCount()];
 
         for(@SuppressWarnings("rawtypes")
         IStereoElement element : molecule.stereoElements())
@@ -171,7 +94,12 @@ public class SachemMoleculeBuilder
             if(element instanceof DoubleBondStereochemistry)
             {
                 DoubleBondStereochemistry e = (DoubleBondStereochemistry) element;
-                doubleBondStereo[molecule.indexOf(e.getStereoBond())] = e;
+                doubleBondStereo[molecule.indexOf(e.getStereoBond())] = element;
+            }
+            else if(element instanceof ExtendedCisTrans)
+            {
+                ExtendedCisTrans e = (ExtendedCisTrans) element;
+                doubleBondStereo[molecule.indexOf(e.getFocus())] = element;
             }
         }
     }
@@ -189,9 +117,9 @@ public class SachemMoleculeBuilder
         {
             if(a instanceof IPseudoAtom)
                 xAtomCount++;
-            else if(a.getAtomicNumber() == AtomicNumbers.H)
+            else if(a.getAtomicNumber() == Molecule.AtomType.H)
                 hAtomCount++;
-            else if(a.getAtomicNumber() == AtomicNumbers.C)
+            else if(a.getAtomicNumber() == Molecule.AtomType.C)
                 cAtomCount++;
             else
                 xAtomCount++;
@@ -211,7 +139,7 @@ public class SachemMoleculeBuilder
             boolean hBond = false;
 
             for(IAtom a : b.atoms())
-                if(a.getAtomicNumber() == AtomicNumbers.H && molecule.getConnectedBondsCount(a) == 1)
+                if(a.getAtomicNumber() == Molecule.AtomType.H && molecule.getConnectedBondsCount(a) == 1)
                     hBond = true;
 
             if(!hBond)
@@ -223,7 +151,7 @@ public class SachemMoleculeBuilder
                 specialCount++;
 
         for(int idx = 0; idx < molecule.getBondCount(); idx++)
-            if(isDoubleBondStereochemistry(idx))
+            if(isDoubleBondStereochemistry(idx) || isExtendedCisTrans(idx))
                 specialCount++;
 
 
@@ -258,30 +186,30 @@ public class SachemMoleculeBuilder
                 if(label.length() == 1 && label.charAt(0) >= 'A' && label.charAt(0) <= 'Z')
                     stream.write(-label.charAt(0));
                 else if(label.matches("R[1-9#]?") || label.equals("*"))
-                    stream.write(AtomicNumbers.R);
+                    stream.write(AtomType.R);
                 else if(label.equals("G*") || label.equals("G\\"))
-                    stream.write(AtomicNumbers.G);
+                    stream.write(AtomType.G);
                 else if(label.equals("Ps"))
-                    stream.write(AtomicNumbers.POSITRONIUM);
+                    stream.write(AtomType.POSITRONIUM);
                 else if(label.equals("e"))
-                    stream.write(AtomicNumbers.ELECTRON);
+                    stream.write(AtomType.ELECTRON);
                 else if(label.equals("hv"))
-                    stream.write(AtomicNumbers.PHOTON);
+                    stream.write(AtomType.PHOTON);
                 else if(label.equals("Mu"))
-                    stream.write(AtomicNumbers.MUONIUM);
+                    stream.write(AtomType.MUONIUM);
                 else if(label.equals("ACP"))
-                    stream.write(AtomicNumbers.ACP);
+                    stream.write(AtomType.ACP);
                 else if(label.equals("Enz"))
-                    stream.write(AtomicNumbers.ENZYME);
+                    stream.write(AtomType.ENZYME);
                 else if(label.equals(""))
-                    stream.write(AtomicNumbers.EMPTY);
+                    stream.write(AtomType.EMPTY);
                 else
-                    stream.write(AtomicNumbers.UNKNOWN);
+                    stream.write(AtomType.UNKNOWN);
             }
             else
             {
                 int num = molecule.getAtom(i).getAtomicNumber();
-                assert num != AtomicNumbers.C && num != AtomicNumbers.H;
+                assert num != Molecule.AtomType.C && num != Molecule.AtomType.H;
 
                 assert num > 0 && num < 128;
 
@@ -307,7 +235,7 @@ public class SachemMoleculeBuilder
                 stream.write(a1idx % 256);
                 stream.write(a1idx / 256 << 4 | a2idx / 256);
                 stream.write(a2idx % 256);
-                stream.write(getBondType(b).getValue());
+                stream.write(getBondType(b));
             }
         }
 
@@ -331,7 +259,7 @@ public class SachemMoleculeBuilder
                 stream.write(a1idx % 256);
                 stream.write(a1idx / 256 << 4 | a2idx / 256);
                 stream.write(a2idx % 256);
-                stream.write(getBondType(b).getValue());
+                stream.write(getBondType(b));
             }
         }
 
@@ -348,7 +276,8 @@ public class SachemMoleculeBuilder
                 IAtom other = list.get(0).getOther(atom);
                 int idx = molecule.indexOf(other);
 
-                if(other.getAtomicNumber() == AtomicNumbers.H && i > idx && molecule.getConnectedBondsCount(other) == 1)
+                if(other.getAtomicNumber() == Molecule.AtomType.H && i > idx
+                        && molecule.getConnectedBondsCount(other) == 1)
                 {
                     // empty record
                     stream.write(0);
@@ -356,7 +285,7 @@ public class SachemMoleculeBuilder
                 }
                 else
                 {
-                    stream.write(getBondType(molecule.getBond(atom, other)).getValue() << 4 | idx / 256);
+                    stream.write(getBondType(molecule.getBond(atom, other)) << 4 | idx / 256);
                     stream.write(idx % 256);
                 }
             }
@@ -381,7 +310,7 @@ public class SachemMoleculeBuilder
 
                 for(int h = 0; h < atom.getImplicitHydrogenCount(); h++)
                 {
-                    stream.write(BondType.SINGLE.getValue() << 4 | idx / 256);
+                    stream.write(BondType.SINGLE << 4 | idx / 256);
                     stream.write(idx % 256);
                 }
             }
@@ -395,7 +324,7 @@ public class SachemMoleculeBuilder
             {
                 int idx = molecule.indexOf(a);
 
-                stream.write(SpecialRecordType.CHARGE.getValue() << 4 | idx / 256);
+                stream.write(SpecialRecordType.CHARGE << 4 | idx / 256);
                 stream.write(idx % 256);
                 stream.write(a.getFormalCharge());
             }
@@ -412,7 +341,7 @@ public class SachemMoleculeBuilder
 
                 int idx = molecule.indexOf(a);
 
-                stream.write(SpecialRecordType.ISOTOPE.getValue() << 4 | idx / 256);
+                stream.write(SpecialRecordType.ISOTOPE << 4 | idx / 256);
                 stream.write(idx % 256);
                 stream.write(mass);
             }
@@ -424,19 +353,19 @@ public class SachemMoleculeBuilder
         {
             if(isTetrahedralChirality(idx) || isExtendedTetrahedral(idx))
             {
-                TetrahedralStereoType flag = TetrahedralStereoType.UNDEFINED;
+                byte flag = TetrahedralStereo.UNDEFINED;
 
                 if(tetrahedralChirality[idx] != null)
                 {
                     if(tetrahedralChirality[idx] instanceof TetrahedralChirality)
-                        flag = getChiralityValue((TetrahedralChirality) tetrahedralChirality[idx]);
+                        flag = getTetrahedralChiralityType((TetrahedralChirality) tetrahedralChirality[idx]);
                     else
-                        flag = getExtendedChiralityValue((ExtendedTetrahedral) tetrahedralChirality[idx]);
+                        flag = getExtendedTetrahedralType((ExtendedTetrahedral) tetrahedralChirality[idx]);
                 }
 
-                stream.write(SpecialRecordType.TETRAHEDRAL_STEREO.getValue() << 4 | idx / 256);
+                stream.write(SpecialRecordType.TETRAHEDRAL_STEREO << 4 | idx / 256);
                 stream.write(idx % 256);
-                stream.write(flag.getValue());
+                stream.write(flag);
             }
         }
 
@@ -447,17 +376,22 @@ public class SachemMoleculeBuilder
             IBond bond = molecule.getBond(idx);
             assert bond.getAtomCount() == 2;
 
-            if(isDoubleBondStereochemistry(idx))
+            if(isDoubleBondStereochemistry(idx) || isExtendedCisTrans(idx))
             {
-                BondStereoType flag = BondStereoType.UNDEFINED;
+                byte flag = BondStereo.UNDEFINED;
 
                 if(doubleBondStereo[idx] != null)
-                    flag = getDoubleBondStereoType(doubleBondStereo[idx]);
+                {
+                    if(doubleBondStereo[idx] instanceof DoubleBondStereochemistry)
+                        flag = getDoubleBondStereochemistryType((DoubleBondStereochemistry) doubleBondStereo[idx]);
+                    else
+                        flag = getExtendedCisTransType((ExtendedCisTrans) doubleBondStereo[idx]);
+                }
 
                 int index = bond.getProperty(BOND_NUMBER);
-                stream.write(SpecialRecordType.BOND_STEREO.getValue() << 4 | index / 256);
+                stream.write(SpecialRecordType.BOND_STEREO << 4 | index / 256);
                 stream.write(index % 256);
-                stream.write(flag.getValue());
+                stream.write(flag);
             }
         }
 
@@ -469,7 +403,7 @@ public class SachemMoleculeBuilder
     }
 
 
-    public static BondType getBondType(IBond bond) throws CDKException
+    public static byte getBondType(IBond bond) throws CDKException
     {
         if(bond.isAromatic())
             return BondType.AROMATIC;
@@ -518,7 +452,7 @@ public class SachemMoleculeBuilder
         if(focus.getProperty(STEREO_PROPERTY) == IGNORE_STEREO)
             return false;
 
-        if(tetrahedralChirality[index] != null)
+        if(tetrahedralChirality[index] instanceof TetrahedralChirality)
             return true;
 
         if(centers == null)
@@ -541,7 +475,7 @@ public class SachemMoleculeBuilder
         if(focus.getProperty(STEREO_PROPERTY) == IGNORE_STEREO)
             return false;
 
-        if(tetrahedralChirality[index] != null)
+        if(tetrahedralChirality[index] instanceof ExtendedTetrahedral)
             return true;
 
         if(centers == null)
@@ -649,7 +583,7 @@ public class SachemMoleculeBuilder
         if(bond.isAromatic())
             return false;
 
-        if(doubleBondStereo[index] != null)
+        if(doubleBondStereo[index] instanceof DoubleBondStereochemistry)
             return true;
 
         if(centers == null)
@@ -670,7 +604,99 @@ public class SachemMoleculeBuilder
     }
 
 
-    private TetrahedralStereoType getChiralityValue(TetrahedralChirality chirality)
+    private boolean isExtendedCisTrans(int index)
+    {
+        IBond bond = molecule.getBond(index);
+
+        if(bond.getProperty(STEREO_PROPERTY) == IGNORE_STEREO)
+            return false;
+
+        if(bond.getOrder() != Order.DOUBLE || bond.isAromatic())
+            return false;
+
+        if(doubleBondStereo[index] instanceof ExtendedCisTrans)
+            return true;
+
+        if(centers == null)
+            return false;
+
+
+        /* find "left" terninal */
+        IAtom leftPrevious = bond.getAtom(0);
+        IAtom leftTerminal = bond.getAtom(1);
+        int leftLength = 0;
+
+        if(!centers.isStereocenter(molecule.indexOf(leftTerminal)))
+            return false;
+
+        while(true)
+        {
+            if(centers.elementType(molecule.indexOf(leftTerminal)) != Type.Bicoordinate)
+                break;
+
+            List<IAtom> neighbors = molecule.getConnectedAtomsList(leftTerminal);
+            neighbors.remove(leftPrevious);
+
+            if(neighbors.size() != 1)
+                break;
+
+            IAtom candidate = neighbors.get(0);
+
+            if(molecule.getBond(leftTerminal, candidate).getOrder() != Order.DOUBLE)
+                break;
+
+            if(!centers.isStereocenter(molecule.indexOf(candidate)))
+                break;
+
+            leftPrevious = leftTerminal;
+            leftTerminal = neighbors.get(0);
+            leftLength++;
+        }
+
+        if(leftLength == 0 || centers.elementType(molecule.indexOf(leftTerminal)) != Type.Tricoordinate)
+            return false;
+
+
+        /* find "right" terninal */
+        IAtom rightPrevious = bond.getAtom(1);
+        IAtom rightTerminal = bond.getAtom(0);
+        int rightLength = 0;
+
+        if(!centers.isStereocenter(molecule.indexOf(rightTerminal)))
+            return false;
+
+        while(true)
+        {
+            if(centers.elementType(molecule.indexOf(rightTerminal)) != Type.Bicoordinate)
+                break;
+
+            List<IAtom> neighbors = molecule.getConnectedAtomsList(rightTerminal);
+            neighbors.remove(rightPrevious);
+
+            if(neighbors.size() != 1)
+                break;
+
+            IAtom candidate = neighbors.get(0);
+
+            if(molecule.getBond(rightTerminal, candidate).getOrder() != Order.DOUBLE)
+                break;
+
+            if(!centers.isStereocenter(molecule.indexOf(candidate)))
+                break;
+
+            rightPrevious = rightTerminal;
+            rightTerminal = neighbors.get(0);
+            rightLength++;
+        }
+
+        if(rightLength == 0 || centers.elementType(molecule.indexOf(rightTerminal)) != Type.Tricoordinate)
+            return false;
+
+        return leftLength == rightLength;
+    }
+
+
+    private byte getTetrahedralChiralityType(TetrahedralChirality chirality)
     {
         IAtom center = chirality.getChiralAtom();
         IAtom[] ligands = chirality.getLigands();
@@ -707,13 +733,13 @@ public class SachemMoleculeBuilder
                 reverse = false;
 
         if(reverse)
-            return stereo == Stereo.CLOCKWISE ? TetrahedralStereoType.ANTI_CLOCKWISE : TetrahedralStereoType.CLOCKWISE;
+            return stereo == Stereo.CLOCKWISE ? TetrahedralStereo.ANTI_CLOCKWISE : TetrahedralStereo.CLOCKWISE;
         else
-            return stereo == Stereo.CLOCKWISE ? TetrahedralStereoType.CLOCKWISE : TetrahedralStereoType.ANTI_CLOCKWISE;
+            return stereo == Stereo.CLOCKWISE ? TetrahedralStereo.CLOCKWISE : TetrahedralStereo.ANTI_CLOCKWISE;
     }
 
 
-    private TetrahedralStereoType getExtendedChiralityValue(ExtendedTetrahedral chirality)
+    private byte getExtendedTetrahedralType(ExtendedTetrahedral chirality)
     {
         IAtom[] terminals = chirality.findTerminalAtoms(molecule);
         IAtom[] ligands = chirality.peripherals();
@@ -739,13 +765,13 @@ public class SachemMoleculeBuilder
             reverse = !reverse;
 
         if(reverse)
-            return stereo == Stereo.CLOCKWISE ? TetrahedralStereoType.ANTI_CLOCKWISE : TetrahedralStereoType.CLOCKWISE;
+            return stereo == Stereo.CLOCKWISE ? TetrahedralStereo.ANTI_CLOCKWISE : TetrahedralStereo.CLOCKWISE;
         else
-            return stereo == Stereo.CLOCKWISE ? TetrahedralStereoType.CLOCKWISE : TetrahedralStereoType.ANTI_CLOCKWISE;
+            return stereo == Stereo.CLOCKWISE ? TetrahedralStereo.CLOCKWISE : TetrahedralStereo.ANTI_CLOCKWISE;
     }
 
 
-    private BondStereoType getDoubleBondStereoType(DoubleBondStereochemistry stereo)
+    private byte getDoubleBondStereochemistryType(DoubleBondStereochemistry stereo)
     {
         IBond bond = stereo.getStereoBond();
         IBond[] bonds = stereo.getBonds();
@@ -783,8 +809,65 @@ public class SachemMoleculeBuilder
             reverse = !reverse;
 
         if(reverse)
-            return conformation == Conformation.TOGETHER ? BondStereoType.OPPOSITE : BondStereoType.TOGETHER;
+            return conformation == Conformation.TOGETHER ? BondStereo.OPPOSITE : BondStereo.TOGETHER;
         else
-            return conformation == Conformation.TOGETHER ? BondStereoType.TOGETHER : BondStereoType.OPPOSITE;
+            return conformation == Conformation.TOGETHER ? BondStereo.TOGETHER : BondStereo.OPPOSITE;
+    }
+
+
+    private byte getExtendedCisTransType(ExtendedCisTrans stereo)
+    {
+        List<IBond> carriers = stereo.getCarriers();
+        int conformation = stereo.getConfigOrder();
+
+
+        int[] ligands = new int[4];
+
+        for(int i = 0; i < 2; i++)
+        {
+            IBond bond = stereo.getFocus();
+            IAtom terminal = bond.getAtom(i);
+
+            while(true)
+            {
+                List<IBond> bonds = molecule.getConnectedBondsList(terminal);
+
+                if(bonds.size() != 2)
+                    break;
+
+                IBond next = bonds.get(0) == bond ? bonds.get(1) : bonds.get(0);
+
+                if(next.getOrder() != IBond.Order.DOUBLE)
+                    break;
+
+                terminal = next.getOther(terminal);
+                bond = next;
+            }
+
+            IBond carrier = carriers.get(0).contains(terminal) ? carriers.get(0) : carriers.get(1);
+            IBond cocarier = null;
+
+            for(IBond b : molecule.getConnectedBondsList(terminal))
+                if(b != carrier && b != bond)
+                    cocarier = b;
+
+            ligands[2 * i] = molecule.indexOf(carrier.getOther(terminal));
+            ligands[2 * i + 1] = cocarier != null ? molecule.indexOf(cocarier.getOther(terminal)) : Integer.MAX_VALUE;
+        }
+
+
+        boolean reverse = false;
+
+        if(ligands[0] > ligands[1])
+            reverse = !reverse;
+
+        if(ligands[2] > ligands[3])
+            reverse = !reverse;
+
+
+        if(reverse)
+            return conformation == IStereoElement.TOGETHER ? BondStereo.OPPOSITE : BondStereo.TOGETHER;
+        else
+            return conformation == IStereoElement.TOGETHER ? BondStereo.TOGETHER : BondStereo.OPPOSITE;
     }
 }

@@ -14,11 +14,8 @@
  */
 package cz.iocb.sachem.search;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -26,14 +23,12 @@ import org.openscience.cdk.CDKConstants;
 import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
-import org.openscience.cdk.io.RGroupQueryReader;
-import org.openscience.cdk.isomorphism.matchers.RGroupQuery;
-import org.openscience.cdk.silent.SilentChemObjectBuilder;
-import cz.iocb.sachem.isomorphism.IsomorphismSort;
-import cz.iocb.sachem.shared.MoleculeCreator;
+import cz.iocb.sachem.molecule.AromaticityMode;
+import cz.iocb.sachem.molecule.BinaryMoleculeBuilder;
+import cz.iocb.sachem.molecule.MoleculeCreator;
+import cz.iocb.sachem.molecule.TautomerMode;
 import cz.iocb.sachem.tautomers.CombinationCountException;
 import cz.iocb.sachem.tautomers.InChIException;
-import cz.iocb.sachem.tautomers.InchiTautomerGenerator;
 
 
 
@@ -59,16 +54,17 @@ public abstract class SubstructureSearch
     {
         String query = new String(queryArray, StandardCharsets.ISO_8859_1);
 
-        List<IAtomContainer> queryMolecules;
+        List<IAtomContainer> queryMolecules = null;
         String message = null;
 
         try
         {
-            queryMolecules = translateUserQuery(query, type, tautomers);
+            queryMolecules = MoleculeCreator.translateQuery(query, AromaticityMode.PRESERVE,
+                    tautomers ? TautomerMode.INCHI : TautomerMode.IGNORE);
         }
         catch(CombinationCountException | InChIException | TimeoutException e)
         {
-            queryMolecules = translateUserQuery(query, type, false);
+            queryMolecules = MoleculeCreator.translateQuery(query, AromaticityMode.PRESERVE, TautomerMode.IGNORE);
             message = "cannot generate tautomers: " + e.getMessage();
         }
         catch(CDKException e)
@@ -83,10 +79,7 @@ public abstract class SubstructureSearch
         {
             IAtomContainer queryMolecule = queryMolecules.get(idx);
 
-            IAtom[] sortedAtoms = IsomorphismSort.atomsByFrequency(queryMolecule);
-            queryMolecule.setAtoms(sortedAtoms);
-
-            SachemMoleculeBuilder builder = new SachemMoleculeBuilder(queryMolecule);
+            BinaryMoleculeBuilder builder = new BinaryMoleculeBuilder(queryMolecule);
             byte[] moleculeBytes = builder.asBytes(implicitHydrogens);
 
             boolean[] restH = new boolean[queryMolecule.getAtomCount()];
@@ -110,103 +103,5 @@ public abstract class SubstructureSearch
         data.message = message;
 
         return data;
-    }
-
-
-    /**
-     * Translates a user query (such as for example a Smiles string "O=S=O") into a CDK atomcontainer.
-     *
-     * However, if the query is an RGFile (a special case of a MOL file), there can be any number of queries generated
-     * (valid substitutes of the R-Group)
-     *
-     * @param userQuery mdl or smiles clob
-     * @param queryType SMILES or MOL
-     * @param tautomers Y/N indicating to query for tautomers
-     * @return user query represented as CDK atom container
-     * @throws CDKException
-     * @throws IOException
-     * @throws CombinationCountException
-     * @throws CloneNotSupportedException
-     * @throws TimeoutException
-     * @throws InChIException
-     */
-    protected static List<IAtomContainer> translateUserQuery(String query, int queryTypeIdx, boolean tautomers)
-            throws CDKException, IOException, TimeoutException, CloneNotSupportedException, CombinationCountException,
-            InChIException
-    {
-        QueryFormat queryType = QueryFormat.values()[queryTypeIdx];
-        List<IAtomContainer> userQueries = null;
-
-        if(queryType == QueryFormat.UNSPECIFIED)
-            queryType = QueryFormat.detect(query);
-
-
-        if(queryType == QueryFormat.RGROUP)
-        {
-            InputStream ins = new ByteArrayInputStream(query.getBytes());
-
-            try(RGroupQueryReader reader = new RGroupQueryReader(ins))
-            {
-                RGroupQuery rGroupQuery = reader.read(new RGroupQuery(SilentChemObjectBuilder.getInstance()));
-                userQueries = rGroupQuery.getAllConfigurations();
-            }
-
-            if(tautomers)
-            {
-                List<IAtomContainer> queries = new ArrayList<IAtomContainer>();
-
-                for(IAtomContainer molecule : userQueries)
-                {
-                    String molfile = MoleculeCreator.getMolfileFromMolecule(molecule);
-                    InchiTautomerGenerator tautomerGenerator = new InchiTautomerGenerator();
-                    queries.addAll(tautomerGenerator.getTautomers(molfile));
-                }
-
-                userQueries = queries;
-            }
-        }
-        else if(queryType == QueryFormat.MOLFILE)
-        {
-            if(!tautomers)
-            {
-                IAtomContainer readMolecule = MoleculeCreator.getMoleculeFromMolfile(query);
-
-                userQueries = new ArrayList<IAtomContainer>();
-                userQueries.add(readMolecule);
-            }
-            else
-            {
-                InchiTautomerGenerator tautomerGenerator = new InchiTautomerGenerator();
-                userQueries = tautomerGenerator.getTautomers(query);
-            }
-        }
-        else if(queryType == QueryFormat.SMILES)
-        {
-            IAtomContainer molecule = MoleculeCreator.getMoleculeFromSmiles(query);
-
-            if(!tautomers)
-            {
-                userQueries = new ArrayList<IAtomContainer>();
-                userQueries.add(molecule);
-            }
-            else
-            {
-                String molfile = MoleculeCreator.getMolfileFromMolecule(molecule);
-                InchiTautomerGenerator tautomerGenerator = new InchiTautomerGenerator();
-                userQueries = tautomerGenerator.getTautomers(molfile);
-            }
-        }
-        else
-        {
-            userQueries = new ArrayList<IAtomContainer>(0);
-        }
-
-
-        if(userQueries != null)
-            for(IAtomContainer molecule : userQueries)
-                MoleculeCreator.configureMolecule(molecule);
-
-
-        return userQueries;
     }
 }

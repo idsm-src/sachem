@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2018 Jakub Galgonek   galgonek@uochb.cas.cz
+ * Copyright (C) 2015-2019 Jakub Galgonek   galgonek@uochb.cas.cz
  * Copyright (C) 2011-2011 Mark Rijnbeek    markr@ebi.ac.uk
  *
  * Contact: cdk-devel@lists.sourceforge.net
@@ -36,10 +36,8 @@ import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IBond;
 import org.openscience.cdk.silent.AtomContainer;
-import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
-import cz.iocb.sachem.search.SachemMoleculeBuilder;
-import cz.iocb.sachem.shared.AtomicNumbers;
-import cz.iocb.sachem.shared.MoleculeCreator;
+import cz.iocb.sachem.molecule.BinaryMoleculeBuilder;
+import cz.iocb.sachem.molecule.Molecule;
 import cz.iocb.sachem.tautomers.InChI.Fragment;
 
 
@@ -67,7 +65,7 @@ public class InchiTautomerGenerator
     public InchiTautomerGenerator(long tautomerCombinationLimit, long hydrogenCombinationLimit, long timeLimit)
     {
         this.tautomerCombinationLimit = tautomerCombinationLimit;
-        this.hydrogenCombinationLimit = BigInteger.valueOf(((Long) hydrogenCombinationLimit).longValue());;
+        this.hydrogenCombinationLimit = BigInteger.valueOf(((Long) hydrogenCombinationLimit).longValue());
         this.timeLimit = timeLimit;
     }
 
@@ -90,17 +88,13 @@ public class InchiTautomerGenerator
      * @throws TimeoutException
      * @throws InChIException
      */
-    public List<IAtomContainer> getTautomers(String kekuleMDL) throws CDKException, IOException, TimeoutException,
-            CloneNotSupportedException, CombinationCountException, InChIException
+    public List<IAtomContainer> getTautomers(IAtomContainer molecule) throws CDKException, IOException,
+            TimeoutException, CloneNotSupportedException, CombinationCountException, InChIException
     {
-        //Process the molecule based on the molfile input file
-        IAtomContainer molecule = MoleculeCreator.getMoleculeFromMolfile(kekuleMDL);
-        AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(molecule);
-
-
         List<IAtomContainer> tautomers = new ArrayList<IAtomContainer>();
+        molecule = molecule.clone();
 
-        InChI inchi = new InChI(kekuleMDL);
+        InChI inchi = new InChI(molecule);
         assignAtomLabel(molecule, inchi.getAuxInfo());
 
         List<IAtom> remainingAtoms = new LinkedList<IAtom>();
@@ -114,10 +108,10 @@ public class InchiTautomerGenerator
             IAtom a0 = b.getAtom(0);
             IAtom a1 = b.getAtom(1);
 
-            if(a0.getID() != null && a1.getAtomicNumber() == AtomicNumbers.H)
+            if(a0.getID() != null && a1.getAtomicNumber() == Molecule.AtomType.H)
                 remainingAtoms.remove(a1);
 
-            if(a1.getID() != null && a0.getAtomicNumber() == AtomicNumbers.H)
+            if(a1.getID() != null && a0.getAtomicNumber() == Molecule.AtomType.H)
                 remainingAtoms.remove(a0);
         }
 
@@ -264,10 +258,6 @@ public class InchiTautomerGenerator
 
         tautomers = constructTautomers(inputMolecule, mobileHydrogens, valency);
 
-        // add aromaticity ...
-        for(IAtomContainer t : tautomers)
-            MoleculeCreator.configureAromaticity(t);
-
         // remove duplicates
         return removeDuplicatesSimple(tautomers);
     }
@@ -309,13 +299,13 @@ public class InchiTautomerGenerator
             IAtom atom0 = bond.getAtom(0);
             IAtom atom1 = bond.getAtom(1);
 
-            if(atom0.getAtomicNumber() == AtomicNumbers.H && atom1.getID() != null && atom0.getID() == null)
+            if(atom0.getAtomicNumber() == Molecule.AtomType.H && atom1.getID() != null && atom0.getID() == null)
             {
                 atoms.add(atom0);
                 atom0.setID(prefix + ":" + ++id);
             }
 
-            if(atom1.getAtomicNumber() == AtomicNumbers.H && atom0.getID() != null && atom1.getID() == null)
+            if(atom1.getAtomicNumber() == Molecule.AtomType.H && atom0.getID() != null && atom1.getID() == null)
             {
                 atoms.add(atom1);
                 atom1.setID(prefix + ":" + ++id);
@@ -376,7 +366,7 @@ public class InchiTautomerGenerator
 
         for(IAtom atom : inputMolecule.atoms())
             if(!chiralAtoms.contains(atom))
-                atom.setProperty(SachemMoleculeBuilder.STEREO_PROPERTY, SachemMoleculeBuilder.IGNORE_STEREO);
+                atom.setProperty(BinaryMoleculeBuilder.STEREO_PROPERTY, BinaryMoleculeBuilder.IGNORE_STEREO);
 
 
         ArrayList<IBond> stereoBonds = new ArrayList<IBond>();
@@ -397,7 +387,7 @@ public class InchiTautomerGenerator
 
         for(IBond bond : inputMolecule.bonds())
             if(!stereoBonds.contains(bond))
-                bond.setProperty(SachemMoleculeBuilder.STEREO_PROPERTY, SachemMoleculeBuilder.IGNORE_STEREO);
+                bond.setProperty(BinaryMoleculeBuilder.STEREO_PROPERTY, BinaryMoleculeBuilder.IGNORE_STEREO);
 
 
         return inputMolecule;

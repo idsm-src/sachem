@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2017 Jakub Galgonek   galgonek@uochb.cas.cz
+ * Copyright (C) 2015-2019 Jakub Galgonek   galgonek@uochb.cas.cz
  *
  * This program is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General
  * Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option)
@@ -13,10 +13,12 @@
  */
 package cz.iocb.sachem.tautomers;
 
+import org.openscience.cdk.exception.CDKException;
+
 
 
 @SuppressWarnings("serial")
-public class CombinationCountException extends Exception
+public class CombinationCountException extends CDKException
 {
     public CombinationCountException(String message)
     {

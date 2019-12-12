@@ -3,8 +3,9 @@ package cz.iocb.sachem.search;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.openscience.cdk.interfaces.IAtomContainer;
-import cz.iocb.sachem.isomorphism.IsomorphismSort;
-import cz.iocb.sachem.shared.MoleculeCreator;
+import cz.iocb.sachem.molecule.AromaticityMode;
+import cz.iocb.sachem.molecule.BinaryMoleculeBuilder;
+import cz.iocb.sachem.molecule.MoleculeCreator;
 
 
 
@@ -39,13 +40,9 @@ public class LucyLoader
                         try
                         {
                             String molfile = new String(molfilesArray[i], StandardCharsets.ISO_8859_1);
-
-                            IAtomContainer readMolecule = MoleculeCreator.getMoleculeFromMolfile(molfile);
-                            MoleculeCreator.configureMolecule(readMolecule);
-
-                            // calculate molecule binary representation
-                            readMolecule.setAtoms(IsomorphismSort.atomsByFrequency(readMolecule));
-                            SachemMoleculeBuilder builder = new SachemMoleculeBuilder(readMolecule);
+                            IAtomContainer readMolecule = MoleculeCreator.getMoleculeFromMolfile(molfile,
+                                    AromaticityMode.DETECT);
+                            BinaryMoleculeBuilder builder = new BinaryMoleculeBuilder(readMolecule);
                             item.molecule = builder.asBytes(true);
                         }
                         catch(Throwable e)
