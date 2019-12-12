@@ -7,7 +7,7 @@ import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IBond;
 import org.openscience.cdk.interfaces.IPseudoAtom;
-import org.openscience.cdk.isomorphism.matchers.CTFileQueryBond;
+import org.openscience.cdk.isomorphism.matchers.QueryBond;
 import cz.iocb.sachem.isomorphism.IsomorphismSort;
 import cz.iocb.sachem.shared.MoleculeCreator;
 
@@ -85,7 +85,7 @@ public class LucyLoader
                 return false;
 
         for(IBond bond : molecule.bonds())
-            if(bond instanceof CTFileQueryBond && !bond.isAromatic())
+            if(bond instanceof QueryBond && !bond.isAromatic())
                 return false;
 
         return true;

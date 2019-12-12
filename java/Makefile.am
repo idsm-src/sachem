@@ -1,6 +1,29 @@
 bin_SCRIPTS = inchi/inchi-1
 
-jar_DATA = lib/cdk-2.1.1.jar sachem.jar lib/commons-net-3.6.jar lib/jdbc-postgresql.jar lib/lucene-core-8.2.0.jar
+jar_DATA = \
+	sachem.jar \
+    lib/beam-core-1.3.3.jar \
+    lib/cdk-atomtype-2.3.jar \
+    lib/cdk-core-2.3.jar \
+    lib/cdk-ctab-2.3.jar \
+    lib/cdk-inchi-2.3.jar \
+    lib/cdk-interfaces-2.3.jar \
+    lib/cdk-ioformats-2.3.jar \
+    lib/cdk-isomorphism-2.3.jar \
+    lib/cdk-silent-2.3.jar \
+    lib/cdk-smiles-2.3.jar \
+    lib/cdk-standard-2.3.jar \
+    lib/cdk-valencycheck-2.3.jar \
+    lib/commons-net-3.6.jar \
+    lib/guava-28.1-jre.jar \
+    lib/jdbc-postgresql.jar \
+    lib/jnati-core-0.4.jar \
+    lib/jnati-deploy-0.4.jar \
+    lib/jni-inchi-0.8.jar \
+    lib/log4j-1.2.17.jar \
+    lib/lucene-core-8.2.0.jar \
+    lib/vecmath-1.5.2.jar
+
 jardir = $(datadir)/$(PACKAGE)/jar
 
 sachem.jar: force-build
@@ -14,10 +37,27 @@ clean-local:
 EXTRA_DIST = \
 	build.xml \
 	inchi/inchi-1 \
-    lib/cdk-2.1.1.jar \
+    lib/beam-core-1.3.3.jar \
+    lib/cdk-atomtype-2.3.jar \
+    lib/cdk-core-2.3.jar \
+    lib/cdk-ctab-2.3.jar \
+    lib/cdk-inchi-2.3.jar \
+    lib/cdk-interfaces-2.3.jar \
+    lib/cdk-ioformats-2.3.jar \
+    lib/cdk-isomorphism-2.3.jar \
+    lib/cdk-silent-2.3.jar \
+    lib/cdk-smiles-2.3.jar \
+    lib/cdk-standard-2.3.jar \
+    lib/cdk-valencycheck-2.3.jar \
     lib/commons-net-3.6.jar \
+    lib/guava-28.1-jre.jar \
     lib/jdbc-postgresql.jar \
+    lib/jnati-core-0.4.jar \
+    lib/jnati-deploy-0.4.jar \
+    lib/jni-inchi-0.8.jar \
+    lib/log4j-1.2.17.jar \
     lib/lucene-core-8.2.0.jar \
+    lib/vecmath-1.5.2.jar \
     src/cz/iocb/sachem/isomorphism/IsomorphismSort.java \
     src/cz/iocb/sachem/load/ConfigurationProperties.java \
     src/cz/iocb/sachem/load/CompoundLoader.java \

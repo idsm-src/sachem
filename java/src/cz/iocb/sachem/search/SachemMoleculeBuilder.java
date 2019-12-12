@@ -25,7 +25,7 @@ import org.openscience.cdk.interfaces.IDoubleBondStereochemistry.Conformation;
 import org.openscience.cdk.interfaces.IPseudoAtom;
 import org.openscience.cdk.interfaces.IStereoElement;
 import org.openscience.cdk.interfaces.ITetrahedralChirality.Stereo;
-import org.openscience.cdk.isomorphism.matchers.CTFileQueryBond;
+import org.openscience.cdk.isomorphism.matchers.QueryBond;
 import org.openscience.cdk.stereo.DoubleBondStereochemistry;
 import org.openscience.cdk.stereo.ExtendedTetrahedral;
 import org.openscience.cdk.stereo.Stereocenters;
@@ -474,6 +474,21 @@ public class SachemMoleculeBuilder
         if(bond.isAromatic())
             return BondType.AROMATIC;
 
+        if(bond instanceof QueryBond)
+        {
+            switch(((QueryBond) bond).getExpression().type())
+            {
+                case SINGLE_OR_DOUBLE:
+                    return BondType.SINGLE_OR_DOUBLE;
+                case SINGLE_OR_AROMATIC:
+                    return BondType.SINGLE_OR_AROMATIC;
+                case DOUBLE_OR_AROMATIC:
+                    return BondType.DOUBLE_OR_AROMATIC;
+                default:
+                    return BondType.ANY;
+            }
+        }
+
         switch(bond.getOrder())
         {
             case SINGLE:
@@ -489,32 +504,7 @@ public class SachemMoleculeBuilder
             case SEXTUPLE:
                 return BondType.SEXTUPLE;
             case UNSET:
-                if(bond instanceof CTFileQueryBond)
-                {
-                    switch(((CTFileQueryBond) bond).getType())
-                    {
-                        case SINGLE:
-                            return BondType.SINGLE;
-                        case DOUBLE:
-                            return BondType.DOUBLE;
-                        case TRIPLE:
-                            return BondType.TRIPLE;
-                        case AROMATIC:
-                            return BondType.AROMATIC;
-                        case SINGLE_OR_DOUBLE:
-                            return BondType.SINGLE_OR_DOUBLE;
-                        case SINGLE_OR_AROMATIC:
-                            return BondType.SINGLE_OR_AROMATIC;
-                        case DOUBLE_OR_AROMATIC:
-                            return BondType.DOUBLE_OR_AROMATIC;
-                        case ANY:
-                            return BondType.ANY;
-                    }
-                }
-                else
-                {
-                    return BondType.ANY;
-                }
+                return BondType.ANY;
         }
 
         throw new CDKException("unknown bond type");

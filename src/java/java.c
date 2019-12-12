@@ -54,8 +54,25 @@ void java_init(void)
             .nOptions = 2,
             .options = (JavaVMOption []) {
                 (JavaVMOption) { .optionString = "-Djava.class.path=" JARDIR "/sachem.jar:"
-                                                                      JARDIR "/cdk-2.1.1.jar:"
-                                                                      JARDIR "/lucene-core-8.2.0.jar:" },
+                                                                      JARDIR "/beam-core-1.3.3.jar:"
+                                                                      JARDIR "/cdk-atomtype-2.3.jar:"
+                                                                      JARDIR "/cdk-core-2.3.jar:"
+                                                                      JARDIR "/cdk-ctab-2.3.jar:"
+                                                                      JARDIR "/cdk-inchi-2.3.jar:"
+                                                                      JARDIR "/cdk-interfaces-2.3.jar:"
+                                                                      JARDIR "/cdk-ioformats-2.3.jar:"
+                                                                      JARDIR "/cdk-isomorphism-2.3.jar:"
+                                                                      JARDIR "/cdk-silent-2.3.jar:"
+                                                                      JARDIR "/cdk-smiles-2.3.jar:"
+                                                                      JARDIR "/cdk-standard-2.3.jar:"
+                                                                      JARDIR "/cdk-valencycheck-2.3.jar:"
+                                                                      JARDIR "/guava-28.1-jre.jar:"
+                                                                      JARDIR "/jnati-core-0.4.jar:"
+                                                                      JARDIR "/jnati-deploy-0.4.jar:"
+                                                                      JARDIR "/jni-inchi-0.8.jar:"
+                                                                      JARDIR "/log4j-1.2.17.jar:"
+                                                                      JARDIR "/lucene-core-8.2.0.jar:"
+                                                                      JARDIR "/vecmath-1.5.2.jar" },
                 (JavaVMOption) { .optionString = "-Dinchi.path=" BINDIR "/inchi-1"}
             },
             .ignoreUnrecognized = JNI_FALSE
