@@ -163,6 +163,30 @@ static inline bool is_extended_tetrahedral_centre(const Molecule *const restrict
 }
 
 
+static inline bool is_extended_cis_trans(const Molecule *const restrict molecule, BondIdx centre)
+{
+    for(int i = 0; i < 2; i++)
+    {
+        AtomIdx end = molecule_bond_atoms(molecule, centre)[i];
+        MolSize listSize = molecule_get_bonded_atom_list_size(molecule, end);
+
+        if(listSize != 2)
+            return false;
+
+        for(int i = 0; i < listSize; i++)
+        {
+            AtomIdx ligand = molecule_get_bonded_atom_list(molecule, end)[i];
+            BondIdx bond = molecule_get_bond(molecule, end, ligand);
+
+            if(molecule_get_bond_type(molecule, bond) != BOND_DOUBLE)
+                return false;
+        }
+    }
+
+    return true;
+}
+
+
 static inline void vf2state_init(VF2State *const restrict vf2state, const Molecule *const restrict query,
         GraphMode graphMode, ChargeMode chargeMode, IsotopeMode isotopeMode, StereoMode stereoMode)
 {
@@ -612,52 +636,133 @@ static inline bool vf2state_is_stereo_valid(const VF2State *const restrict vf2st
                 continue;
 
 
-            AtomIdx *bondedAtomList0 = molecule_get_bonded_atom_list(query, queryBondAtoms[0]);
-            MolSize bondedAtomListSize0 = molecule_get_bonded_atom_list_size(query, queryBondAtoms[0]);
+            if(is_extended_cis_trans(query, queryBondIdx))
+            {
+                AtomIdx queryTerminalAtoms[2];
+                AtomIdx queryPreTerminalAtoms[2];
+                AtomIdx queryAtoms[4];
+                int listSize = 0;
 
-            AtomIdx *bondedAtomList1 = molecule_get_bonded_atom_list(query, queryBondAtoms[1]);
-            MolSize bondedAtomListSize1 = molecule_get_bonded_atom_list_size(query, queryBondAtoms[1]);
-
-            if(bondedAtomListSize0 < 2 || bondedAtomListSize1 < 2)
-                continue;
-
-
-            AtomIdx queryAtoms[4];
-
-            int idx = 0;
-
-            for(int i = 0; i < bondedAtomListSize0; i++)
-                if(bondedAtomList0[i] != queryBondAtoms[1])
-                    queryAtoms[idx++] = bondedAtomList0[i];
-
-            if(bondedAtomListSize0 == 2)
-                queryAtoms[idx++] = MAX_ATOM_IDX;
+                for(int i = 0; i < 2; i++)
+                {
+                    AtomIdx atom = molecule_bond_atoms(query, queryBondIdx)[i];
+                    AtomIdx bonded = molecule_get_other_bond_atom(query, queryBondIdx, atom);
 
 
-            for(int i = 0; i < bondedAtomListSize1; i++)
-                if(bondedAtomList1[i] != queryBondAtoms[0])
-                    queryAtoms[idx++] = bondedAtomList1[i];
+                    while(true)
+                    {
+                        AtomIdx *newList = molecule_get_bonded_atom_list(query, bonded);
+                        MolSize newListSize = molecule_get_bonded_atom_list_size(query, bonded);
 
-            if(bondedAtomListSize1 == 2)
-                queryAtoms[idx] = MAX_ATOM_IDX;
+                        if(newListSize == 3)
+                        {
+                            queryTerminalAtoms[i] = bonded;
+                            queryPreTerminalAtoms[i] = atom;
 
-            sort_bond_atoms(queryAtoms);
+                            for(int j = 0; j < 3; j++)
+                                if(newList[j] != atom)
+                                    queryAtoms[listSize++] = newList[j];
+
+                            break;
+                        }
+                        else if(newListSize == 2)
+                        {
+                            AtomIdx next = molecule_get_opposite_atom(query, bonded, atom);
+
+                            if(molecule_get_bond_type(query, molecule_get_bond(query, bonded, next)) != BOND_DOUBLE)
+                            {
+                                queryTerminalAtoms[i] = bonded;
+                                queryPreTerminalAtoms[i] = atom;
+                                queryAtoms[listSize++] = next;
+                                queryAtoms[listSize++] = MAX_ATOM_IDX;
+                                break;
+                            }
+
+                            atom = bonded;
+                            bonded = next;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                if(listSize < 4)
+                    continue;
+
+                sort_bond_atoms(queryAtoms);
 
 
-            AtomIdx targetAtoms[4] = { -1, -1, -1, -1 };
+                AtomIdx targetTerminalAtom0 = vf2state->queryCore[queryTerminalAtoms[0]];
+                AtomIdx targetTerminalAtom1 = vf2state->queryCore[queryTerminalAtoms[1]];
+                AtomIdx targetPreTerminalAtom0 = vf2state->queryCore[queryPreTerminalAtoms[0]];
+                AtomIdx targetPreTerminalAtom1 = vf2state->queryCore[queryPreTerminalAtoms[1]];
 
-            for(int i = 0; i < 4; i++)
-                if(queryAtoms[i] != MAX_ATOM_IDX)
-                    targetAtoms[i] = vf2state->queryCore[queryAtoms[i]];
+                AtomIdx targetAtoms[4] = { -1, -1, -1, -1 };
 
-            if(queryAtoms[1] == MAX_ATOM_IDX)
-                targetAtoms[1] = molecule_get_last_stereo_bond_ligand(target, targetBondAtom0, targetBondAtom1, targetAtoms[0]);
+                for(int i = 0; i < 4; i++)
+                    if(queryAtoms[i] != MAX_ATOM_IDX)
+                        targetAtoms[i] = vf2state->queryCore[queryAtoms[i]];
 
-            if(queryAtoms[3] == MAX_ATOM_IDX)
-                targetAtoms[3] = molecule_get_last_stereo_bond_ligand(target, targetBondAtom1, targetBondAtom0, targetAtoms[2]);
+                if(queryAtoms[1] == MAX_ATOM_IDX)
+                    targetAtoms[1] = molecule_get_last_stereo_bond_ligand(target, targetTerminalAtom0, targetPreTerminalAtom0, targetAtoms[0]);
 
-            if(normalize_bond_stereo(targetAtoms, targetStereo) != queryStereo)
-                return false;
+                if(queryAtoms[3] == MAX_ATOM_IDX)
+                    targetAtoms[3] = molecule_get_last_stereo_bond_ligand(target, targetTerminalAtom1, targetPreTerminalAtom1, targetAtoms[2]);
+
+                if(normalize_bond_stereo(targetAtoms, targetStereo) != queryStereo)
+                    return false;
+            }
+            else
+            {
+                AtomIdx *bondedAtomList0 = molecule_get_bonded_atom_list(query, queryBondAtoms[0]);
+                MolSize bondedAtomListSize0 = molecule_get_bonded_atom_list_size(query, queryBondAtoms[0]);
+
+                AtomIdx *bondedAtomList1 = molecule_get_bonded_atom_list(query, queryBondAtoms[1]);
+                MolSize bondedAtomListSize1 = molecule_get_bonded_atom_list_size(query, queryBondAtoms[1]);
+
+                if(bondedAtomListSize0 < 2 || bondedAtomListSize1 < 2)
+                    continue;
+
+
+                AtomIdx queryAtoms[4];
+
+                int idx = 0;
+
+                for(int i = 0; i < bondedAtomListSize0; i++)
+                    if(bondedAtomList0[i] != queryBondAtoms[1])
+                        queryAtoms[idx++] = bondedAtomList0[i];
+
+                if(bondedAtomListSize0 == 2)
+                    queryAtoms[idx++] = MAX_ATOM_IDX;
+
+
+                for(int i = 0; i < bondedAtomListSize1; i++)
+                    if(bondedAtomList1[i] != queryBondAtoms[0])
+                        queryAtoms[idx++] = bondedAtomList1[i];
+
+                if(bondedAtomListSize1 == 2)
+                    queryAtoms[idx] = MAX_ATOM_IDX;
+
+                sort_bond_atoms(queryAtoms);
+
+
+                AtomIdx targetAtoms[4] = { -1, -1, -1, -1 };
+
+                for(int i = 0; i < 4; i++)
+                    if(queryAtoms[i] != MAX_ATOM_IDX)
+                        targetAtoms[i] = vf2state->queryCore[queryAtoms[i]];
+
+                if(queryAtoms[1] == MAX_ATOM_IDX)
+                    targetAtoms[1] = molecule_get_last_stereo_bond_ligand(target, targetBondAtom0, targetBondAtom1, targetAtoms[0]);
+
+                if(queryAtoms[3] == MAX_ATOM_IDX)
+                    targetAtoms[3] = molecule_get_last_stereo_bond_ligand(target, targetBondAtom1, targetBondAtom0, targetAtoms[2]);
+
+                if(normalize_bond_stereo(targetAtoms, targetStereo) != queryStereo)
+                    return false;
+            }
         }
     }
 
