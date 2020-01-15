@@ -5,13 +5,17 @@
 #include <fmgr.h>
 #include <utils/builtins.h>
 #include <miscadmin.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 
-#ifdef __cplusplus
-#define restrict
-#endif
+
+#define INDEX_PREFIX_NAME       "lucene"
+#define COMPOUNDS_TABLE         "sachem.compounds"
+#define MOLECULE_ERRORS_TABLE   "sachem.sachem_molecule_errors"
+#define AUDIT_TABLE             "sachem.sachem_compound_audit"
+#define INDEX_TABLE             "sachem.sachem_index"
+
 
 #if PG_VERSION_NUM < 100000
 #define likely(x)       __builtin_expect(!!(x), 1)
@@ -27,27 +31,6 @@
 
 #define PG_MEMCONTEXT_BEGIN(context)    do { MemoryContext old = MemoryContextSwitchTo(context)
 #define PG_MEMCONTEXT_END()             MemoryContextSwitchTo(old);} while(0)
-
-
-#define SAFE_CPP_BEGIN                                                                              \
-    bool badAlloc = false;                                                                          \
-    try                                                                                             \
-    {
-
-
-#define SAFE_CPP_END                                                                                \
-    }                                                                                               \
-    catch(std::bad_alloc &e)                                                                        \
-    {                                                                                               \
-        badAlloc = true;                                                                            \
-    }                                                                                               \
-    catch(...)                                                                                      \
-    {                                                                                               \
-    }                                                                                               \
-    if(badAlloc)                                                                                    \
-        ereport(ERROR, (errcode(ERRCODE_OUT_OF_MEMORY), errmsg("out of memory")));                  \
-    else                                                                                            \
-        elog(ERROR, "%s: unexpected exception", __func__);
 
 
 static inline void create_base_directory(void)
@@ -75,40 +58,24 @@ static inline void create_base_directory(void)
 }
 
 
-static inline char *get_index_name(const char *prefix, const char *suffix, int indexNumber)
+static inline char *get_index_name(const char *prefix, int indexNumber)
 {
-    char *indexPath = (char *) palloc(strlen(prefix) + strlen(suffix) + 24);
-    sprintf(indexPath, "%s-%i%s", prefix, indexNumber, suffix);
+    char *indexPath = (char *) palloc(strlen(prefix) + 24);
+    sprintf(indexPath, "%s-%i", prefix, indexNumber);
 
     return indexPath;
 }
 
 
-static inline char *get_index_path(const char *prefix, const char *suffix, int indexNumber)
+static inline char *get_index_path(const char *prefix, int indexNumber)
 {
     Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
     size_t basePathLength = strlen(DataDir);
     size_t databaseLength = strlen(database->data);
     size_t prefixLength = strlen(prefix);
-    size_t suffixLength = strlen(suffix);
 
-    char *indexPath = (char *) palloc(basePathLength + databaseLength + prefixLength + suffixLength + 24);
-    sprintf(indexPath, "%s/%s/%s-%i%s", DataDir, database->data, prefix, indexNumber, suffix);
-
-    return indexPath;
-}
-
-
-static inline char *get_subindex_path(const char *prefix, const char *suffix, int indexNumber, int subNumber)
-{
-    Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
-    size_t basePathLength = strlen(DataDir);
-    size_t databaseLength = strlen(database->data);
-    size_t prefixLength = strlen(prefix);
-    size_t suffixLength = strlen(suffix);
-
-    char *indexPath = (char *) palloc(basePathLength + databaseLength + prefixLength + suffixLength + 64);
-    sprintf(indexPath, "%s/%s/%s-%i.%i%s", DataDir, database->data, prefix, indexNumber, subNumber, suffix);
+    char *indexPath = (char *) palloc(basePathLength + databaseLength + prefixLength + 24);
+    sprintf(indexPath, "%s/%s/%s-%i", DataDir, database->data, prefix, indexNumber);
 
     return indexPath;
 }

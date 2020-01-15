@@ -34,6 +34,7 @@ clean-local:
 
 EXTRA_DIST = \
 	build.xml \
+	patterns.bin \
     lib/beam-core-1.3.3.jar \
     lib/cdk-atomtype-2.3.jar \
     lib/cdk-core-2.3.jar \
@@ -55,32 +56,38 @@ EXTRA_DIST = \
     lib/log4j-1.2.17.jar \
     lib/lucene-core-8.2.0.jar \
     lib/vecmath-1.5.2.jar \
+    src/cz/iocb/sachem/fingerprint/AtomFingerprint.java \
+    src/cz/iocb/sachem/fingerprint/CRNGFingerprint.java \
+    src/cz/iocb/sachem/fingerprint/Fingerprint.java \
+    src/cz/iocb/sachem/fingerprint/IOCBFingerprint.java \
+    src/cz/iocb/sachem/fingerprint/RCFingerprint.java \
+    src/cz/iocb/sachem/fingerprint/SGFingerprint.java \
     src/cz/iocb/sachem/load/CompoundLoader.java \
     src/cz/iocb/sachem/load/CompoundUpdater.java \
     src/cz/iocb/sachem/load/ConfigurationProperties.java \
     src/cz/iocb/sachem/load/DrugbankCompoundUpdater.java \
     src/cz/iocb/sachem/load/GeneralCompoundLoader.java \
     src/cz/iocb/sachem/load/PubChemCompoundUpdater.java \
-    src/cz/iocb/sachem/lucene/BitSetCollector.java \
-    src/cz/iocb/sachem/lucene/FingerprintAnalyzer.java \
-    src/cz/iocb/sachem/lucene/FingerprintReader.java \
-    src/cz/iocb/sachem/lucene/FingerprintTokenizer.java \
+    src/cz/iocb/sachem/lucene/FingerprintBitMapping.java \
+    src/cz/iocb/sachem/lucene/FingerprintTokenStream.java \
     src/cz/iocb/sachem/lucene/Indexer.java \
-    src/cz/iocb/sachem/lucene/Lucene.java \
-    src/cz/iocb/sachem/lucene/ScoreHit.java \
+    src/cz/iocb/sachem/lucene/SearcherHandler.java \
+    src/cz/iocb/sachem/lucene/Searcher.java \
     src/cz/iocb/sachem/lucene/Settings.java \
-    src/cz/iocb/sachem/lucene/SimilarDocCollector.java \
+    src/cz/iocb/sachem/lucene/SimilarStructureQuery.java \
+    src/cz/iocb/sachem/lucene/SubstructureQuery.java \
     src/cz/iocb/sachem/molecule/AromaticityMode.java \
     src/cz/iocb/sachem/molecule/BinaryMoleculeBuilder.java \
     src/cz/iocb/sachem/molecule/BinaryMolecule.java \
     src/cz/iocb/sachem/molecule/BinaryMoleculeSort.java \
+    src/cz/iocb/sachem/molecule/ChargeMode.java \
+    src/cz/iocb/sachem/molecule/Isomorphism.java \
+    src/cz/iocb/sachem/molecule/IsotopeMode.java \
     src/cz/iocb/sachem/molecule/MoleculeCreator.java \
     src/cz/iocb/sachem/molecule/Molecule.java \
+    src/cz/iocb/sachem/molecule/SearchMode.java \
+    src/cz/iocb/sachem/molecule/StereoMode.java \
     src/cz/iocb/sachem/molecule/TautomerMode.java \
-    src/cz/iocb/sachem/search/LucyLoader.java \
-    src/cz/iocb/sachem/search/QueryFormat.java \
-    src/cz/iocb/sachem/search/SimilaritySearch.java \
-    src/cz/iocb/sachem/search/SubstructureSearch.java \
     src/cz/iocb/sachem/tautomers/CombinationCountException.java \
     src/cz/iocb/sachem/tautomers/InChIException.java \
     src/cz/iocb/sachem/tautomers/InChI.java \

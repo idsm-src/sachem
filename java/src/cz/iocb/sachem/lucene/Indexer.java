@@ -1,12 +1,12 @@
 package cz.iocb.sachem.lucene;
 
-import static cz.iocb.sachem.lucene.Settings.idFieldName;
-import static cz.iocb.sachem.lucene.Settings.indexType;
-import static cz.iocb.sachem.lucene.Settings.simSizeFieldName;
-import static cz.iocb.sachem.lucene.Settings.simfpFieldName;
-import static cz.iocb.sachem.lucene.Settings.subfpFieldName;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import org.apache.lucene.document.BinaryDocValuesField;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.IntPoint;
 import org.apache.lucene.document.StoredField;
@@ -16,15 +16,39 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.SerialMergeScheduler;
 import org.apache.lucene.index.TieredMergePolicy;
 import org.apache.lucene.search.similarities.BooleanSimilarity;
-import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.BytesRef;
+import org.openscience.cdk.interfaces.IAtomContainer;
+import cz.iocb.sachem.fingerprint.IOCBFingerprint;
+import cz.iocb.sachem.molecule.AromaticityMode;
+import cz.iocb.sachem.molecule.BinaryMolecule;
+import cz.iocb.sachem.molecule.BinaryMoleculeBuilder;
+import cz.iocb.sachem.molecule.MoleculeCreator;
 
 
 
 public class Indexer
 {
+    private static class IndexItem
+    {
+        private int id;
+        private byte[] molecule;
+
+        private IndexItem(int id, byte[] molecule)
+        {
+            this.id = id;
+            this.molecule = molecule;
+        }
+    }
+
+
     private FSDirectory folder;
     private IndexWriter indexer;
+
+    private Thread[] threads;
+    private ArrayBlockingQueue<IndexItem> queue;
+
+    private Throwable exception;
 
 
     public void begin(String path) throws IOException
@@ -37,57 +61,95 @@ public class Indexer
             policy.setMaxMergeAtOnceExplicit(Integer.MAX_VALUE);
             policy.setMaxMergedSegmentMB(1024 * 1024);
 
-            FingerprintAnalyzer analyzer = new FingerprintAnalyzer();
-            IndexWriterConfig config = new IndexWriterConfig(analyzer);
+            IndexWriterConfig config = new IndexWriterConfig(null);
             config.setMergePolicy(policy);
             config.setSimilarity(new BooleanSimilarity());
             config.setMergeScheduler(new SerialMergeScheduler());
 
+            final int cores = Runtime.getRuntime().availableProcessors();
             indexer = new IndexWriter(folder, config);
+            queue = new ArrayBlockingQueue<IndexItem>(4 * cores);
+            threads = new Thread[cores];
+
+            for(int i = 0; i < cores; i++)
+            {
+                Thread thread = new Thread()
+                {
+                    @Override
+                    public void run()
+                    {
+                        while(true)
+                        {
+                            try
+                            {
+                                IndexItem item = queue.take();
+
+                                if(item.molecule == null)
+                                    return;
+
+                                if(exception != null)
+                                    continue;
+
+                                Document document = createDocument(item.id, item.molecule);
+
+                                synchronized(indexer)
+                                {
+                                    indexer.addDocument(document);
+                                }
+                            }
+                            catch(Throwable e)
+                            {
+                                synchronized(Indexer.this)
+                                {
+                                    if(exception != null)
+                                        exception = e;
+                                }
+                            }
+                        }
+                    }
+                };
+
+                thread.start();
+
+                threads[i] = thread;
+            }
         }
         catch(Throwable e)
         {
+            stopThreads();
+
             folder.close();
             throw e;
         }
     }
 
 
-    public void add(int id, int[] subfp, int[] simfp) throws IOException
+    public String add(int id, byte[] molfile) throws IOException, InterruptedException
     {
-        Document document = new Document();
-        document.add(new IntPoint(idFieldName, id));
-        document.add(new StoredField(idFieldName, id));
-        document.add(new StoredField(simSizeFieldName, simfp.length));
+        if(exception != null)
+            throw new IOException(exception);
 
-        if(indexType == IndexType.TEXT)
+        try
         {
-            document.add(new TextField(subfpFieldName, new FingerprintReader(subfp)));
-            document.add(new TextField(simfpFieldName, new FingerprintReader(simfp)));
+            IAtomContainer container = MoleculeCreator.getMoleculeFromMolfile(new String(molfile),
+                    AromaticityMode.AUTO);
+            BinaryMoleculeBuilder builder = new BinaryMoleculeBuilder(container);
+
+            byte[] binary = builder.asBytes(true);
+            queue.put(new IndexItem(id, binary));
         }
-        else
+        catch(Exception e)
         {
-            for(int bit : subfp)
-                document.add(new IntPoint(subfpFieldName, bit));
-
-            for(int bit : simfp)
-                document.add(new IntPoint(simfpFieldName, bit));
+            return e.getMessage();
         }
 
-        indexer.addDocument(document);
-    }
-
-
-    public void addIndex(String path) throws IOException
-    {
-        Directory subFolder = FSDirectory.open(Paths.get(path));
-        indexer.addIndexes(subFolder);
+        return null;
     }
 
 
     public void delete(int id) throws IOException
     {
-        indexer.deleteDocuments(IntPoint.newExactQuery(idFieldName, id));
+        indexer.deleteDocuments(IntPoint.newExactQuery(Settings.idFieldName, id));
     }
 
 
@@ -99,6 +161,11 @@ public class Indexer
 
     public void commit() throws IOException
     {
+        if(exception != null)
+            throw new IOException(exception);
+
+        stopThreads();
+
         indexer.commit();
         indexer.close();
         folder.close();
@@ -107,8 +174,84 @@ public class Indexer
 
     public void rollback() throws IOException
     {
+        stopThreads();
+
         indexer.rollback();
         indexer.close();
         folder.close();
+    }
+
+
+    private void stopThreads()
+    {
+        try
+        {
+            if(threads == null)
+                return;
+
+            for(int i = 0; i < threads.length; i++)
+                queue.put(new IndexItem(Integer.MIN_VALUE, null));
+
+            for(int i = 0; i < threads.length; i++)
+                threads[i].join();
+        }
+        catch(InterruptedException e)
+        {
+        }
+    }
+
+
+    private static Document createDocument(int id, byte[] binary)
+    {
+        Document document = new Document();
+        document.add(new IntPoint(Settings.idFieldName, id));
+        document.add(new StoredField(Settings.idFieldName, id));
+
+        BinaryMolecule molecule = new BinaryMolecule(binary);
+
+
+        /* substructure index */
+        Set<Integer> subFp = IOCBFingerprint.getSubstructureFingerprint(molecule);
+
+        document.add(new StoredField(Settings.substructureFieldName, binary));
+        document.add(new BinaryDocValuesField(Settings.substructureFieldName, new BytesRef(binary)));
+        document.add(new IntPoint(Settings.substructureFieldName, subFp.size()));
+        document.add(new TextField(Settings.substructureFieldName, new FingerprintTokenStream(subFp)));
+
+
+        /* similarity index */
+        List<List<Integer>> simFp = IOCBFingerprint.getSimilarityFingerprint(molecule, Settings.maximumSimilarityDepth);
+
+        byte[] array = new byte[simFp.stream().map(i -> i.size() + 1).reduce(0, Integer::sum) * Integer.BYTES];
+
+        for(int pos = 0, i = 0; i < simFp.size(); i++)
+        {
+            for(int b = 0; b < Integer.BYTES; b++)
+                array[pos++] = (byte) (simFp.get(i).size() >> (8 * b));
+
+            for(int bit : simFp.get(i))
+                for(int b = 0; b < Integer.BYTES; b++)
+                    array[pos++] = (byte) (bit >> (8 * b));
+        }
+
+
+        Set<Integer> bits = new HashSet<Integer>();
+
+        for(List<Integer> seg : simFp)
+            bits.addAll(seg);
+
+
+        document.add(new TextField(Settings.similarityFieldName, new FingerprintTokenStream(bits)));
+        document.add(new StoredField(Settings.similarityFieldName, array));
+        document.add(new BinaryDocValuesField(Settings.similarityFieldName, new BytesRef(array)));
+
+        for(int size = 0, i = 0; i < simFp.size(); i++)
+        {
+            size += simFp.get(i).size();
+            document.add(new IntPoint(Settings.similarityFieldName, size));
+            size += SimilarStructureQuery.iterationSizeOffset;
+        }
+
+        return document;
     }
 }

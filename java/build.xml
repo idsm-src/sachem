@@ -13,6 +13,7 @@
       <src path="${src.dir}/src"/>
       <classpath refid="master-classpath"/>
     </javac>
+  	<copy file="${src.dir}/patterns.bin" todir="${build.dir}/classes"/>
   </target>
  
   <target name="clean">
@@ -22,6 +23,7 @@
       </fileset>
     </delete>
     <delete file="${build.dir}/sachem.jar"/>
+  	<delete file="${build.dir}/classes/patterns.bin"/>
   </target>
 
   <target name="build-jar" depends="build">

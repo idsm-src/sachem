@@ -1,5 +1,0 @@
-# sachem_lucene extension
-comment = 'Sachem/Lucene chemical cartridge'
-default_version = '0.1'
-module_pathname = '$libdir/libsachem'
-relocatable = true
