@@ -215,7 +215,12 @@ static void lucene_search_init(void)
         PG_MEMCONTEXT_BEGIN(TopMemoryContext);
         PG_TRY();
         {
+            #if PG_VERSION_NUM >= 120000
+            desc = CreateTemplateTupleDesc(2);
+            #else
             desc = CreateTemplateTupleDesc(2, false);
+            #endif
+
             TupleDescInitEntry(desc, (AttrNumber) 1, "compound", INT4OID, -1, 0);
             TupleDescInitEntry(desc, (AttrNumber) 2, "score", FLOAT4OID, -1, 0);
             desc = BlessTupleDesc(desc);

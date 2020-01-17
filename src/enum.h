@@ -2,6 +2,7 @@
 #define ENUM_H_
 
 #include <postgres.h>
+#include <catalog/pg_enum.h>
 #include <utils/syscache.h>
 #include <access/htup_details.h>
 #include "java.h"
@@ -27,7 +28,11 @@ static inline jobject ConvertEnumValue(EnumValue *table, Oid oid)
 
 static inline Oid LookupExplicitEnumType(const Oid spaceid, const char *name)
 {
+    #if PG_VERSION_NUM >= 120000
+    Oid typoid = GetSysCacheOid2(TYPENAMENSP, Anum_pg_type_oid, PointerGetDatum(name), ObjectIdGetDatum(spaceid));
+    #else
     Oid typoid = GetSysCacheOid2(TYPENAMENSP, PointerGetDatum(name), ObjectIdGetDatum(spaceid));
+    #endif
 
     if(!OidIsValid(typoid))
         elog(ERROR, "cannot find enum type '%s'", name);
@@ -43,7 +48,12 @@ static inline Oid LookupExplicitEnumValue(const Oid typoid, const char *name)
     if(!HeapTupleIsValid(tup))
         elog(ERROR, "cannot find enum value '%s'", name);
 
+    #if PG_VERSION_NUM >= 120000
+    Oid valueid = ((Form_pg_enum) GETSTRUCT(tup))->oid;
+    #else
     Oid valueid = HeapTupleGetOid(tup);
+    #endif
+
     ReleaseSysCache(tup);
 
     return valueid;
