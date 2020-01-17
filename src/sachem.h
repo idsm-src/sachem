@@ -10,13 +10,6 @@
 #include <sys/stat.h>
 
 
-#define INDEX_PREFIX_NAME       "lucene"
-#define COMPOUNDS_TABLE         "sachem.compounds"
-#define MOLECULE_ERRORS_TABLE   "sachem.sachem_molecule_errors"
-#define AUDIT_TABLE             "sachem.sachem_compound_audit"
-#define INDEX_TABLE             "sachem.sachem_index"
-
-
 #if PG_VERSION_NUM < 100000
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)
@@ -33,65 +26,89 @@
 #define PG_MEMCONTEXT_END()             MemoryContextSwitchTo(old);} while(0)
 
 
-static inline void create_base_directory(void)
+static inline Datum SPI_get_value(HeapTuple row, TupleDesc rowdesc, int colnumber)
+{
+    bool isNullFlag;
+
+    Datum result = SPI_getbinval(row, rowdesc, colnumber, &isNullFlag);
+
+    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
+        elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+
+    return result;
+}
+
+
+static inline void create_base_directory(char *indexName)
 {
     Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
 
     size_t basePathLength = strlen(DataDir);
     size_t databaseLength = strlen(database->data);
+    size_t indexNameLength = strlen(indexName);
 
-    char *path = (char *) palloc(basePathLength + databaseLength + 2);
+    char *fragment[] = { "sachem", database->data, indexName };
+    char *path = (char *) palloc(basePathLength + databaseLength + indexNameLength + 10);
     char *data = path;
 
     memcpy(data, DataDir, basePathLength);
     data += basePathLength;
 
-    *(data++) = '/';
+    for(int i = 0; i < 3; i++)
+    {
+        *(data++) = '/';
 
-    memcpy(data, database->data, databaseLength);
-    data += databaseLength;
+        size_t length = strlen(fragment[i]);
 
-    *data = '\0';
+        memcpy(data, fragment[i], length + 1);
+        data += length;
 
-    if(mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR) == -1 && errno != EEXIST)
-        elog(ERROR, "%s: mkdir() failed", __func__);
+        if(unlikely(mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR) == -1 && errno != EEXIST))
+            elog(ERROR, "%s: mkdir() failed", __func__);
+    }
 }
 
 
-static inline char *get_index_name(const char *prefix, int indexNumber)
+static inline bool is_index_name(const char *name)
 {
-    char *indexPath = (char *) palloc(strlen(prefix) + 24);
-    sprintf(indexPath, "%s-%i", prefix, indexNumber);
+    return !strncmp(name, "lucene-", 7);
+}
+
+
+static inline char *get_index_name(int indexNumber)
+{
+    char *indexPath = (char *) palloc(30);
+    sprintf(indexPath, "lucene-%i", indexNumber);
 
     return indexPath;
 }
 
 
-static inline char *get_index_path(const char *prefix, int indexNumber)
+static inline char *get_index_path(const char *indexName, int indexNumber)
 {
     Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
     size_t basePathLength = strlen(DataDir);
     size_t databaseLength = strlen(database->data);
-    size_t prefixLength = strlen(prefix);
+    size_t indexNameLength = strlen(indexName);
 
-    char *indexPath = (char *) palloc(basePathLength + databaseLength + prefixLength + 24);
-    sprintf(indexPath, "%s/%s/%s-%i", DataDir, database->data, prefix, indexNumber);
+    char *indexPath = (char *) palloc(basePathLength + databaseLength + indexNameLength + 38);
+    sprintf(indexPath, "%s/sachem/%s/%s/lucene-%i", DataDir, database->data, indexName, indexNumber);
 
     return indexPath;
 }
 
 
-static inline char *get_file_path(const char *name)
+static inline char *get_base_path(const char *indexName)
 {
     Name database = DatumGetName(DirectFunctionCall1(current_database, 0));
     size_t basePathLength = strlen(DataDir);
     size_t databaseLength = strlen(database->data);
-    size_t nameLength = strlen(name);
+    size_t indexNameLength = strlen(indexName);
 
-    char *filePath = (char *) palloc(basePathLength + databaseLength + nameLength + 3);
-    sprintf(filePath, "%s/%s/%s", DataDir, database->data, name);
+    char *path = (char *) palloc(basePathLength + databaseLength + indexNameLength + 10);
+    sprintf(path, "%s/sachem/%s/%s", DataDir, database->data, indexName);
 
-    return filePath;
+    return path;
 }
 
 #endif /* SACHEM_H_ */

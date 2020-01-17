@@ -12,7 +12,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Base64;
@@ -41,6 +40,7 @@ public class DrugbankCompoundUpdater
         String pgUserName = properties.getProperty("postgres.username");
         String pgPassword = properties.getProperty("postgres.password");
         String pgDatabase = properties.getProperty("postgres.database");
+        String index = properties.getProperty("sachem.index");
         boolean autoclean = properties.getBooleanProperty("sachem.autoclean");
 
         String httpServer = properties.getProperty("http.server");
@@ -59,9 +59,10 @@ public class DrugbankCompoundUpdater
         {
             if(autoclean)
             {
-                try(Statement statement = connection.createStatement())
+                try(PreparedStatement statement = connection.prepareStatement("select sachem.cleanup(?)"))
                 {
-                    statement.execute("select \"sachem_cleanup\"()");
+                    statement.setString(1, index);
+                    statement.execute();
                 }
             }
 
@@ -91,9 +92,12 @@ public class DrugbankCompoundUpdater
 
             String version = null;
 
-            try(Statement statement = connection.createStatement())
+            try(PreparedStatement statement = connection.prepareStatement("select version from sachem.compound_stats "
+                    + "where index = (select id from sachem.configuration where index_name = ?)"))
             {
-                try(ResultSet result = statement.executeQuery("select version from compound_stats where id = 0"))
+                statement.setString(1, index);
+
+                try(ResultSet result = statement.executeQuery())
                 {
                     if(result.next())
                         version = result.getString(1);
@@ -103,10 +107,11 @@ public class DrugbankCompoundUpdater
 
             if(versionTag.equals(version))
             {
-                try(PreparedStatement statement = connection
-                        .prepareStatement("update compound_stats set checkdate=? where id = 0"))
+                try(PreparedStatement statement = connection.prepareStatement("update sachem.compound_stats "
+                        + "set checkdate=? where index = (select id from sachem.configuration where index_name = ?)"))
                 {
                     statement.setTimestamp(1, new Timestamp(checkdate.getTime()));
+                    statement.setString(2, index);
                     statement.executeUpdate();
                 }
 
@@ -150,36 +155,42 @@ public class DrugbankCompoundUpdater
 
             try
             {
-                CompoundLoader loader = new CompoundLoader(connection, idTag, idPrefix);
+                CompoundLoader loader = new CompoundLoader(connection, index, idTag, idPrefix);
                 loader.loadDirectory(directory);
 
-                try(Statement statement = connection.createStatement())
+                try(PreparedStatement statement = connection.prepareStatement("delete from sachem.compound_sources "
+                        + "where index = (select id from sachem.configuration where index_name = ?)"))
                 {
-                    statement.execute("delete from compound_sources");
+                    statement.setString(1, index);
+                    statement.execute();
                 }
 
                 try(PreparedStatement statement = connection
-                        .prepareStatement("insert into compound_sources (name,size) values(?,?)"))
+                        .prepareStatement("insert into sachem.compound_sources (index, name, size) "
+                                + "values((select id from sachem.configuration where index_name = ?),?,?)"))
                 {
-                    statement.setString(1, fileName);
-                    statement.setLong(2, fileSize);
+                    statement.setString(1, index);
+                    statement.setString(2, fileName);
+                    statement.setLong(3, fileSize);
                     statement.addBatch();
 
                     statement.executeBatch();
                 }
 
-                try(Statement statement = connection.createStatement())
+                try(PreparedStatement statement = connection.prepareStatement("select sachem.sync_data(?)"))
                 {
-                    statement.execute("select \"sachem_sync_data\"()");
+                    statement.setString(1, index);
+                    statement.execute();
                 }
 
                 try(PreparedStatement statement = connection
-                        .prepareStatement("insert into compound_stats (id,version,size,checkdate) "
-                                + "values (0,?,(select count(*) from compounds),?) on conflict (id) do update set "
-                                + "version=EXCLUDED.version, size=EXCLUDED.size, checkdate=EXCLUDED.checkdate"))
+                        .prepareStatement("insert into sachem.compound_stats (index,version,checkdate) "
+                                + "values ((select id from sachem.configuration where index_name = ?),?,?) "
+                                + "on conflict (index) do update set version=EXCLUDED.version, checkdate=EXCLUDED.checkdate"))
                 {
-                    statement.setString(1, versionTag);
-                    statement.setTimestamp(2, new Timestamp(checkdate.getTime()));
+                    statement.setString(1, index);
+                    statement.setString(2, versionTag);
+                    statement.setTimestamp(3, new Timestamp(checkdate.getTime()));
                     statement.executeUpdate();
                 }
 

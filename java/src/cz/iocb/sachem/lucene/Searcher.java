@@ -9,9 +9,9 @@ import java.nio.file.Paths;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.util.HashMap;
 import java.util.concurrent.TimeoutException;
 import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.similarities.BooleanSimilarity;
@@ -29,19 +29,40 @@ import cz.iocb.sachem.molecule.TautomerMode;
 
 public class Searcher
 {
+    private static HashMap<String, Searcher> instances = new HashMap<String, Searcher>();
+
+    private Path path;
     private Directory folder;
     private IndexSearcher searcher;
     private Thread watcher;
 
 
-    public void setFolder(String pathName) throws IOException
+    public static Searcher get(String name)
     {
+        Searcher searcher = instances.get(name);
+
+        if(searcher == null)
+        {
+            searcher = new Searcher();
+            instances.put(name, searcher);
+        }
+
+        return searcher;
+    }
+
+
+    public void setFolder(String newPathName) throws IOException
+    {
+        Path newPath = Paths.get(newPathName);
+
+        if(newPath.equals(path))
+            return;
+
         close();
 
-        Path path = Paths.get(pathName);
-        folder = FSDirectory.open(path);
-        IndexReader reader = DirectoryReader.open(folder);
-        searcher = new IndexSearcher(reader);
+        path = newPath;
+        folder = FSDirectory.open(newPath);
+        searcher = new IndexSearcher(DirectoryReader.open(folder));
         searcher.setSimilarity(new BooleanSimilarity());
 
 
@@ -94,6 +115,12 @@ public class Searcher
     }
 
 
+    public int indexSize()
+    {
+        return searcher.getIndexReader().numDocs();
+    }
+
+
     public SearcherHandler subsearch(byte[] molecule, SearchMode graphMode, ChargeMode chargeMode,
             IsotopeMode isotopeMode, StereoMode stereoMode, AromaticityMode aromaticityMode, TautomerMode tautomerMode,
             int bufferSize) throws IOException, CDKException, TimeoutException
@@ -117,6 +144,8 @@ public class Searcher
 
     protected void close() throws IOException
     {
+        path = null;
+
         try
         {
             if(searcher != null)

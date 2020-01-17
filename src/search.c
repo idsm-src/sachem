@@ -34,15 +34,15 @@ static EnumValue stereoModeTable[2];
 static EnumValue aromaticityModeTable[3];
 static EnumValue tautomerModeTable[2];
 
+static jclass searcherClass;
+static jmethodID getMethod;
+static jmethodID indexSizeMethod;
 static jmethodID setFolderMethod;
 static jmethodID subsearchMethod;
 static jmethodID simsearchMethod;
 static jmethodID loadMethod;
 static jfieldID idsField;
 static jfieldID scoresField;
-
-static jobject lucene = NULL;
-static int indexId = -1;
 
 
 static void lucene_set_folder(jobject lucene, const char *path)
@@ -69,34 +69,26 @@ static void lucene_set_folder(jobject lucene, const char *path)
 }
 
 
-int lucene_search_update_snapshot(jobject lucene)
+static void lucene_search_update_snapshot(jobject lucene, VarChar *index)
 {
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
         elog(ERROR, "%s: SPI_connect() failed", __func__);
 
-    if(unlikely(SPI_execute_plan(snapshotQueryPlan, NULL, NULL, true, 0) != SPI_OK_SELECT))
+    bool isNullFlag;
+
+    if(unlikely(SPI_execute_plan(snapshotQueryPlan, (Datum[]) { PointerGetDatum(index) }, NULL, true, 0) != SPI_OK_SELECT))
         elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
     if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
         elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
-    bool isNullFlag;
-    int32_t dbIndexNumber = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
-
-    if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-        elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+    int version = DatumGetInt32(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
 
     SPI_finish();
 
 
-    if(unlikely(dbIndexNumber != indexId))
-    {
-        char *path = get_index_path(INDEX_PREFIX_NAME, dbIndexNumber);
-        lucene_set_folder(lucene, path);
-        indexId = dbIndexNumber;
-    }
-
-    return indexId;
+    char *path = get_index_path(text_to_cstring(index), version);
+    lucene_set_folder(lucene, path);
 }
 
 
@@ -249,7 +241,7 @@ static void lucene_search_init(void)
         if(unlikely(SPI_connect() != SPI_OK_CONNECT))
             elog(ERROR, "%s: SPI_connect() failed", __func__);
 
-        SPIPlanPtr plan = SPI_prepare("select id from " INDEX_TABLE, 0, NULL);
+        SPIPlanPtr plan = SPI_prepare("select version from sachem.configuration where index_name = $1", 1, (Oid[]) { VARCHAROID });
 
         if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
             elog(ERROR, "%s: SPI_keepplan() failed", __func__);
@@ -261,10 +253,13 @@ static void lucene_search_init(void)
 
 
     /* java init */
-    jclass searcherClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/Searcher");
+    searcherClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/Searcher");
     java_check_exception(__func__);
 
-    jmethodID constructor = (*env)->GetMethodID(env, searcherClass, "<init>", "()V");
+    getMethod = (*env)->GetStaticMethodID(env, searcherClass, "get", "(Ljava/lang/String;)Lcz/iocb/sachem/lucene/Searcher;");
+    java_check_exception(__func__);
+
+    indexSizeMethod = (*env)->GetMethodID(env, searcherClass, "indexSize", "()I");
     java_check_exception(__func__);
 
     setFolderMethod = (*env)->GetMethodID(env, searcherClass, "setFolder", "(Ljava/lang/String;)V");
@@ -290,17 +285,56 @@ static void lucene_search_init(void)
     java_check_exception(__func__);
 
 
-    lucene = (*env)->NewObject(env, searcherClass, constructor);
-    java_check_exception(__func__);
-
-
     initialized = true;
+}
+
+
+static jobject lucene_get(VarChar *index)
+{
+    lucene_search_init();
+
+    jobject name = NULL;
+    jobject instance = NULL;
+
+    PG_TRY();
+    {
+        name = (*env)->NewStringUTF(env, text_to_cstring(index));
+        java_check_exception(__func__);
+
+        instance = (*env)->CallStaticObjectMethod(env, searcherClass, getMethod, name);
+        java_check_exception(__func__);
+
+        JavaDeleteRef(name);
+    }
+    PG_CATCH();
+    {
+        JavaDeleteRef(name);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
+
+    return instance;
+}
+
+
+static void lucene_free(jobject lucene)
+{
+    JavaDeleteRef(lucene);
+}
+
+
+static int32 lucene_index_size(jobject lucene)
+{
+    int32 size = (*env)->CallIntMethod(env, lucene, indexSizeMethod);
+    java_check_exception(__func__);
+    return size;
 }
 
 
 static HeapTuple lucene_result_get_item(LuceneResult *result)
 {
-    if(result->possition == BUFFERSIZE && result->limit != 0)
+    if(unlikely(result->possition == BUFFERSIZE && result->limit != 0))
     {
         int limit = BUFFERSIZE;
 
@@ -325,7 +359,7 @@ static HeapTuple lucene_result_get_item(LuceneResult *result)
             array = (*env)->GetObjectField(env, result->handler, idsField);
             jint *ids = (*env)->GetPrimitiveArrayCritical(env, array, NULL);
 
-            if(ids == NULL)
+            if(unlikely(ids == NULL))
                 elog(ERROR, "out of memmory");
 
             memcpy(result->ids, ids, result->size * sizeof(int32));
@@ -337,7 +371,7 @@ static HeapTuple lucene_result_get_item(LuceneResult *result)
             array = (*env)->GetObjectField(env, result->handler, scoresField);
             jfloat *scores = (*env)->GetPrimitiveArrayCritical(env, array, NULL);
 
-            if(scores == NULL)
+            if(unlikely(scores == NULL))
                 elog(ERROR, "out of memmory");
 
             memcpy(result->scores, scores, result->size * sizeof(float4));
@@ -355,7 +389,7 @@ static HeapTuple lucene_result_get_item(LuceneResult *result)
     }
 
 
-    if(result->possition == result->size)
+    if(unlikely(result->possition == result->size))
         return NULL;
 
 
@@ -371,12 +405,13 @@ static HeapTuple lucene_result_get_item(LuceneResult *result)
 
 static void lucene_result_free(LuceneResult *result)
 {
-    if(result != NULL)
+    if(likely(result != NULL))
         JavaDeleteRef(result->handler);
 }
 
 
-static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid search, Oid charge, Oid isotope, Oid stereo, Oid aromaticity, Oid tautomers, int32 limit)
+static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid search, Oid charge, Oid isotope, Oid stereo,
+        Oid aromaticity, Oid tautomers, int32 limit)
 {
     LuceneResult *result = NULL;
     jbyteArray queryArray = NULL;
@@ -424,7 +459,8 @@ static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid search
 }
 
 
-static LuceneResult *lucene_simsearch(jobject lucene, VarChar *query, float4 threshold, int32 depth, Oid aromaticity, Oid tautomers, int32 limit)
+static LuceneResult *lucene_simsearch(jobject lucene, VarChar *query, float4 threshold, int32 depth, Oid aromaticity,
+        Oid tautomers, int32 limit)
 {
     LuceneResult *result = NULL;
     jbyteArray queryArray = NULL;
@@ -469,28 +505,67 @@ static LuceneResult *lucene_simsearch(jobject lucene, VarChar *query, float4 thr
 }
 
 
-PG_FUNCTION_INFO_V1(sachem_substructure_search);
-Datum sachem_substructure_search(PG_FUNCTION_ARGS)
+PG_FUNCTION_INFO_V1(index_size);
+Datum index_size(PG_FUNCTION_ARGS)
 {
-    if(SRF_IS_FIRSTCALL())
-    {
-        lucene_search_init();
-        lucene_search_update_snapshot(lucene);
+    VarChar *index = PG_GETARG_VARCHAR_P(0);
 
+    jobject lucene = lucene_get(index);
+    int32 size;
+
+    PG_TRY();
+    {
+        lucene_search_update_snapshot(lucene, index);
+        size = lucene_index_size(lucene);
+
+        lucene_free(lucene);
+    }
+    PG_CATCH();
+    {
+        lucene_free(lucene);
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
+
+    return size;
+}
+
+
+PG_FUNCTION_INFO_V1(substructure_search);
+Datum substructure_search(PG_FUNCTION_ARGS)
+{
+    if(unlikely(SRF_IS_FIRSTCALL()))
+    {
         FuncCallContext *funcctx = SRF_FIRSTCALL_INIT();
 
-        VarChar *query = PG_GETARG_VARCHAR_P(0);
-        Oid search = PG_GETARG_OID(1);
-        Oid charge = PG_GETARG_OID(2);
-        Oid isotope = PG_GETARG_OID(3);
-        Oid stereo = PG_GETARG_OID(4);
-        Oid aromaticity = PG_GETARG_OID(5);
-        Oid tautomers = PG_GETARG_OID(6);
-        int32 limit = PG_GETARG_INT32(7);
+        VarChar *index = PG_GETARG_VARCHAR_P(0);
+        VarChar *query = PG_GETARG_VARCHAR_P(1);
+        Oid search = PG_GETARG_OID(2);
+        Oid charge = PG_GETARG_OID(3);
+        Oid isotope = PG_GETARG_OID(4);
+        Oid stereo = PG_GETARG_OID(5);
+        Oid aromaticity = PG_GETARG_OID(6);
+        Oid tautomers = PG_GETARG_OID(7);
+        int32 limit = PG_GETARG_INT32(8);
 
-        PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
-        funcctx->user_fctx = lucene_subsearch(lucene, query, search, charge, isotope, stereo, aromaticity, tautomers, limit);
-        PG_MEMCONTEXT_END();
+        jobject lucene = lucene_get(index);
+
+        PG_TRY();
+        {
+            lucene_search_update_snapshot(lucene, index);
+
+            PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
+            funcctx->user_fctx = lucene_subsearch(lucene, query, search, charge, isotope, stereo, aromaticity, tautomers, limit);
+            PG_MEMCONTEXT_END();
+
+            lucene_free(lucene);
+        }
+        PG_CATCH();
+        {
+            lucene_free(lucene);
+            PG_RE_THROW();
+        }
+        PG_END_TRY();
     }
 
 
@@ -509,7 +584,7 @@ Datum sachem_substructure_search(PG_FUNCTION_ARGS)
     }
     PG_END_TRY();
 
-    if(HeapTupleIsValid(item))
+    if(likely(HeapTupleIsValid(item)))
         SRF_RETURN_NEXT(funcctx, HeapTupleGetDatum(item));
 
     lucene_result_free(result);
@@ -517,26 +592,39 @@ Datum sachem_substructure_search(PG_FUNCTION_ARGS)
 }
 
 
-PG_FUNCTION_INFO_V1(sachem_similarity_search);
-Datum sachem_similarity_search(PG_FUNCTION_ARGS)
+PG_FUNCTION_INFO_V1(similarity_search);
+Datum similarity_search(PG_FUNCTION_ARGS)
 {
-    if(SRF_IS_FIRSTCALL())
+    if(unlikely(SRF_IS_FIRSTCALL()))
     {
-        lucene_search_init();
-        lucene_search_update_snapshot(lucene);
-
         FuncCallContext *funcctx = SRF_FIRSTCALL_INIT();
 
-        VarChar *query = PG_GETARG_VARCHAR_P(0);
-        float4 threshold = PG_GETARG_FLOAT4(1);
-        int32 depth = PG_GETARG_INT32(2);
-        Oid aromaticity = PG_GETARG_OID(3);
-        Oid tautomers = PG_GETARG_OID(4);
-        int32 limit = PG_GETARG_INT32(5);
+        VarChar *index = PG_GETARG_VARCHAR_P(0);
+        VarChar *query = PG_GETARG_VARCHAR_P(1);
+        float4 threshold = PG_GETARG_FLOAT4(2);
+        int32 depth = PG_GETARG_INT32(3);
+        Oid aromaticity = PG_GETARG_OID(4);
+        Oid tautomers = PG_GETARG_OID(5);
+        int32 limit = PG_GETARG_INT32(6);
 
-        PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
-        funcctx->user_fctx = lucene_simsearch(lucene, query, threshold, depth, aromaticity, tautomers, limit);
-        PG_MEMCONTEXT_END();
+        jobject lucene = lucene_get(index);
+
+        PG_TRY();
+        {
+            lucene_search_update_snapshot(lucene, index);
+
+            PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
+            funcctx->user_fctx = lucene_simsearch(lucene, query, threshold, depth, aromaticity, tautomers, limit);
+            PG_MEMCONTEXT_END();
+
+            lucene_free(lucene);
+        }
+        PG_CATCH();
+        {
+            lucene_free(lucene);
+            PG_RE_THROW();
+        }
+        PG_END_TRY();
     }
 
 
@@ -555,7 +643,7 @@ Datum sachem_similarity_search(PG_FUNCTION_ARGS)
     }
     PG_END_TRY();
 
-    if(HeapTupleIsValid(item))
+    if(likely(HeapTupleIsValid(item)))
         SRF_RETURN_NEXT(funcctx, HeapTupleGetDatum(item));
 
     lucene_result_free(result);

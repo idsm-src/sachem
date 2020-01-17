@@ -6,7 +6,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -36,6 +35,7 @@ public class CompoundUpdater
         String pgUserName = properties.getProperty("postgres.username");
         String pgPassword = properties.getProperty("postgres.password");
         String pgDatabase = properties.getProperty("postgres.database");
+        String index = properties.getProperty("sachem.index");
         boolean autoclean = properties.getBooleanProperty("sachem.autoclean");
 
         String ftpServer = properties.getProperty("ftp.server");
@@ -62,9 +62,10 @@ public class CompoundUpdater
         {
             if(autoclean)
             {
-                try(Statement statement = connection.createStatement())
+                try(PreparedStatement statement = connection.prepareStatement("select sachem.cleanup(?)"))
                 {
-                    statement.execute("select \"sachem_cleanup\"()");
+                    statement.setString(1, index);
+                    statement.execute();
                 }
             }
 
@@ -73,8 +74,9 @@ public class CompoundUpdater
 
             try
             {
-                try(PreparedStatement statement = connection
-                        .prepareStatement("select id from compound_sources where name=? and size=? and timestamp=?"))
+                try(PreparedStatement statement = connection.prepareStatement("select true from sachem."
+                        + "compound_sources src, sachem.configuration conf where conf.id = src.index and "
+                        + "conf.index_name = ? and src.name=? and src.size=? and src.timestamp=?"))
                 {
                     ftpClient.connect(ftpServer, ftpPort);
                     ftpClient.login(ftpUserName, ftpPassword);
@@ -90,9 +92,10 @@ public class CompoundUpdater
                     {
                         if(!file.isDirectory() && file.getName().matches(filePattern))
                         {
-                            statement.setString(1, file.getName());
-                            statement.setLong(2, file.getSize());
-                            statement.setTimestamp(3, new Timestamp(file.getTimestamp().getTimeInMillis()));
+                            statement.setString(1, index);
+                            statement.setString(2, file.getName());
+                            statement.setLong(3, file.getSize());
+                            statement.setTimestamp(4, new Timestamp(file.getTimestamp().getTimeInMillis()));
 
                             sdfFiles.add(file);
 
@@ -130,10 +133,11 @@ public class CompoundUpdater
 
             if(!hasNewItem)
             {
-                try(PreparedStatement statement = connection
-                        .prepareStatement("update compound_stats set checkdate=? where id = 0"))
+                try(PreparedStatement statement = connection.prepareStatement("update sachem.compound_stats "
+                        + "set checkdate=? where index = (select id from sachem.configuration where index_name = ?)"))
                 {
                     statement.setTimestamp(1, new Timestamp(checkdate.getTime()));
+                    statement.setString(2, index);
                     statement.executeUpdate();
                 }
 
@@ -145,39 +149,45 @@ public class CompoundUpdater
 
             try
             {
-                CompoundLoader loader = new CompoundLoader(connection, idTag, idPrefix);
+                CompoundLoader loader = new CompoundLoader(connection, index, idTag, idPrefix);
                 loader.loadDirectory(directory);
 
-                try(Statement statement = connection.createStatement())
+                try(PreparedStatement statement = connection.prepareStatement("delete from sachem.compound_sources "
+                        + "where index = (select id from sachem.configuration where index_name = ?)"))
                 {
-                    statement.execute("delete from compound_sources");
+                    statement.setString(1, index);
+                    statement.execute();
                 }
 
                 try(PreparedStatement statement = connection
-                        .prepareStatement("insert into compound_sources (name, size, timestamp) values(?,?,?)"))
+                        .prepareStatement("insert into sachem.compound_sources (index, name, size, timestamp) "
+                                + "values((select id from sachem.configuration where index_name = ?),?,?,?)"))
                 {
                     for(FTPFile sdfFile : sdfFiles)
                     {
-                        statement.setString(1, sdfFile.getName());
-                        statement.setLong(2, sdfFile.getSize());
-                        statement.setTimestamp(3, new Timestamp(sdfFile.getTimestamp().getTimeInMillis()));
+                        statement.setString(1, index);
+                        statement.setString(2, sdfFile.getName());
+                        statement.setLong(3, sdfFile.getSize());
+                        statement.setTimestamp(4, new Timestamp(sdfFile.getTimestamp().getTimeInMillis()));
                         statement.addBatch();
                     }
 
                     statement.executeBatch();
                 }
 
-                try(Statement statement = connection.createStatement())
+                try(PreparedStatement statement = connection.prepareStatement("select sachem.sync_data(?)"))
                 {
-                    statement.execute("select \"sachem_sync_data\"()");
+                    statement.setString(1, index);
+                    statement.execute();
                 }
 
                 try(PreparedStatement statement = connection
-                        .prepareStatement("insert into compound_stats (id,size,checkdate) "
-                                + "values (0,(select count(*) from compounds),?) on conflict (id) do update set "
-                                + "size=EXCLUDED.size, checkdate=EXCLUDED.checkdate"))
+                        .prepareStatement("insert into sachem.compound_stats (index,checkdate) "
+                                + "values ((select id from sachem.configuration where index_name = ?),?) "
+                                + "on conflict (index) do update set checkdate=EXCLUDED.checkdate"))
                 {
-                    statement.setTimestamp(1, new Timestamp(checkdate.getTime()));
+                    statement.setString(1, index);
+                    statement.setTimestamp(2, new Timestamp(checkdate.getTime()));
                     statement.executeUpdate();
                 }
 

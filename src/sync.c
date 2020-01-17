@@ -1,6 +1,7 @@
 #include <postgres.h>
 #include <catalog/pg_type.h>
 #include <executor/spi.h>
+#include <utils/builtins.h>
 #include <unistd.h>
 #include "java.h"
 #include "sachem.h"
@@ -26,6 +27,7 @@ static void indexer_java_init()
         return;
 
     java_init();
+
 
     indexerClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/Indexer");
     java_check_exception(__func__);
@@ -115,7 +117,7 @@ static VarChar *indexer_add(jobject indexer, int32_t id, VarChar *molfile)
         message = (jstring)(*env)->CallObjectMethod(env, indexer, addMethod, (jint) id, molfileArray);
         java_check_exception(__func__);
 
-        if(message != NULL)
+        if(unlikely(message != NULL))
         {
             jsize length = (*env)->GetStringUTFLength(env, message);
 
@@ -124,7 +126,7 @@ static VarChar *indexer_add(jobject indexer, int32_t id, VarChar *molfile)
 
             const char *mstr = (*env)->GetStringUTFChars(env, message, NULL);
 
-            if(mstr == NULL)
+            if(unlikely(mstr == NULL))
                 elog(ERROR, "unknown jvm error");
 
             memcpy(VARDATA(result), mstr, length);
@@ -185,19 +187,19 @@ static void link_directory(const char *oldPath, const char *newPath)
 
     PG_TRY();
     {
-        if(mkdir(newPath, 0700) != 0)
+        if(unlikely(mkdir(newPath, 0700) != 0))
             elog(ERROR, "%s: mkdir() failed", __func__);
 
 
-        if(oldPath != NULL)
+        if(likely(oldPath != NULL))
         {
-            if((newdirfd = open(newPath, O_DIRECTORY)) == -1)
+            if(unlikely((newdirfd = open(newPath, O_DIRECTORY)) == -1))
                 elog(ERROR, "%s: open() failed", __func__);
 
-            if((olddirfd = open(oldPath, O_DIRECTORY)) == -1)
+            if(unlikely((olddirfd = open(oldPath, O_DIRECTORY)) == -1))
                 elog(ERROR, "%s: open() failed", __func__);
 
-            if((dp = fdopendir(olddirfd)) == NULL)
+            if(unlikely((dp = fdopendir(olddirfd)) == NULL))
                 elog(ERROR, "%s: fdopendir() failed", __func__);
 
 
@@ -205,10 +207,10 @@ static void link_directory(const char *oldPath, const char *newPath)
 
             while((ep = readdir(dp)))
             {
-                if(ep->d_name[0] == '.')
+                if(unlikely(ep->d_name[0] == '.'))
                     continue;
 
-                if(linkat(olddirfd, ep->d_name, newdirfd, ep->d_name, 0) != 0)
+                if(unlikely(linkat(olddirfd, ep->d_name, newdirfd, ep->d_name, 0) != 0))
                     elog(ERROR, "%s: linkat() failed", __func__);
             }
 
@@ -239,17 +241,17 @@ static void link_directory(const char *oldPath, const char *newPath)
 }
 
 
-static void delete_directory(const char *path)
+static void delete_directory(int parent, const char *path)
 {
     int dirfd = -1;
     DIR *dp = NULL;
 
     PG_TRY();
     {
-        if((dirfd = open(path, O_DIRECTORY)) == -1)
-            elog(ERROR, "%s: open() failed", __func__);
+        if(unlikely((dirfd = openat(parent, path, O_DIRECTORY)) == -1))
+            elog(ERROR, "%s: openat() failed", __func__);
 
-        if((dp = fdopendir(dirfd)) == NULL)
+        if(unlikely((dp = fdopendir(dirfd)) == NULL))
             elog(ERROR, "%s: fdopendir() failed", __func__);
 
 
@@ -257,10 +259,10 @@ static void delete_directory(const char *path)
 
         while((ep = readdir(dp)))
         {
-            if(ep->d_name[0] == '.')
+            if(unlikely(ep->d_name[0] == '.'))
                 continue;
 
-            if(unlinkat(dirfd, ep->d_name, 0) != 0)
+            if(unlikely(unlinkat(dirfd, ep->d_name, 0) != 0))
                 elog(ERROR, "%s: unlinkat() failed", __func__);
         }
 
@@ -270,7 +272,7 @@ static void delete_directory(const char *path)
         close(dirfd);
         dirfd = -1;
 
-        if(rmdir(path) != 0)
+        if(unlikely(rmdir(path) != 0))
            elog(ERROR, "%s: rmdir() failed", __func__);
     }
     PG_CATCH();
@@ -287,52 +289,53 @@ static void delete_directory(const char *path)
 }
 
 
-PG_FUNCTION_INFO_V1(sachem_sync_data);
-Datum sachem_sync_data(PG_FUNCTION_ARGS)
+PG_FUNCTION_INFO_V1(sync_data);
+Datum sync_data(PG_FUNCTION_ARGS)
 {
-    create_base_directory();
-
-    bool verbose = PG_GETARG_BOOL(0);
-    bool optimize = PG_GETARG_BOOL(1);
+    VarChar *index = PG_GETARG_VARCHAR_P(0);
+    bool verbose = PG_GETARG_BOOL(1);
+    bool optimize = PG_GETARG_BOOL(2);
 
 
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
         elog(ERROR, "%s: SPI_connect() failed", __func__);
 
-    bool isNullFlag;
+
+    /* load configuration */
+    if(unlikely(SPI_execute_with_args("select id, version, quote_ident(schema_name), quote_ident(table_name), "
+            "quote_ident(id_column), quote_ident(molfile_column) from sachem.configuration where index_name = $1", 1,
+            (Oid[]) { VARCHAROID }, (Datum[]) { PointerGetDatum(index) }, NULL, true, 1) != SPI_OK_SELECT))
+        elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
+
+    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 6))
+        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+    Datum indexId = SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1);
+    Datum version = SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 2);
+    char *schemaName = text_to_cstring(DatumGetVarCharP(SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 3)));
+    char *tableName = text_to_cstring(DatumGetVarCharP(SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 4)));
+    char *idColumn = text_to_cstring(DatumGetVarCharP(SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 5)));
+    char *molfileColumn = text_to_cstring(DatumGetVarCharP(SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 6)));
+    char *indexName = text_to_cstring(index);
 
 
     /* clone old index */
-    int indexNumber = 0;
-    char *oldIndexPath = NULL;
+    int oldIndexVersion = DatumGetInt32(version);
+    int indexVersion = oldIndexVersion + 1;
 
-    if(unlikely(SPI_exec("select id from " INDEX_TABLE, 0) != SPI_OK_SELECT))
-        elog(ERROR, "%s: SPI_exec() failed", __func__);
+    char *indexPath = get_index_path(indexName, indexVersion);
 
-    if(SPI_processed != 0)
-    {
-        if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-            elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+    if(unlikely(oldIndexVersion == 0))
+        create_base_directory(indexName);
+    else
+        link_directory(get_index_path(indexName, oldIndexVersion), indexPath);
 
-        Datum number = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
 
-        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE) || isNullFlag)
-            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-        oldIndexPath = get_index_path(INDEX_PREFIX_NAME, DatumGetInt32(number));
-        indexNumber = DatumGetInt32(number) + 1;
-    }
-
-    char *indexPath = get_index_path(INDEX_PREFIX_NAME, indexNumber);
-
-    link_directory(oldIndexPath, indexPath);
-
-    if(unlikely(SPI_exec("delete from " INDEX_TABLE, 0) != SPI_OK_DELETE))
-        elog(ERROR, "%s: SPI_exec() failed", __func__);
-
-    if(SPI_execute_with_args("insert into " INDEX_TABLE " (id) values ($1)", 1, (Oid[]) { INT4OID },
-            (Datum[]) {Int32GetDatum(indexNumber)}, NULL, false, 0) != SPI_OK_INSERT)
+    /* update version */
+    if(unlikely(SPI_execute_with_args("update sachem.configuration set version = $2 where id = $1;", 2,
+            (Oid[]) { INT4OID, INT4OID }, (Datum[]) { indexId, Int32GetDatum(indexVersion) }, NULL, false, 0) != SPI_OK_UPDATE))
         elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
+
 
 
     jobject indexer = indexer_init();
@@ -342,9 +345,9 @@ Datum sachem_sync_data(PG_FUNCTION_ARGS)
         indexer_begin(indexer, indexPath);
 
         /* delete unnecessary data */
-
-        Portal auditCursor = SPI_cursor_open_with_args(NULL, "select id from " AUDIT_TABLE " where not stored",
-                0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
+        Portal auditCursor = SPI_cursor_open_with_args(NULL,
+                "select id from sachem.compound_audit where not stored and index = $1",
+                1, (Oid[]) { INT4OID }, (Datum[]) { indexId }, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
         while(true)
         {
@@ -353,30 +356,23 @@ Datum sachem_sync_data(PG_FUNCTION_ARGS)
             if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
                 elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
 
-            if(SPI_processed == 0)
+            if(unlikely(SPI_processed == 0))
                 break;
 
             for(size_t i = 0; i < SPI_processed; i++)
-            {
-                HeapTuple tuple = SPI_tuptable->vals[i];
-
-                Datum id = SPI_getbinval(tuple, SPI_tuptable->tupdesc, 1, &isNullFlag);
-
-                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-                indexer_delete(indexer, DatumGetInt32(id));
-            }
+                indexer_delete(indexer, DatumGetInt32(SPI_get_value(SPI_tuptable->vals[i], SPI_tuptable->tupdesc, 1)));
         }
 
         SPI_cursor_close(auditCursor);
 
 
         /* convert new data */
+        char *query = (char *) palloc(110 + 2 * strlen(idColumn) + strlen(molfileColumn) + strlen(schemaName) + strlen(tableName));
+        sprintf(query, "select cmp.%s, cmp.%s from %s.%s cmp, sachem.compound_audit aud where cmp.%s = aud.id and "
+                "aud.stored and aud.index = $1", idColumn, molfileColumn, schemaName, tableName, idColumn);
 
-        Portal compoundCursor = SPI_cursor_open_with_args(NULL, "select cmp.id, cmp.molfile from " COMPOUNDS_TABLE " cmp, "
-                AUDIT_TABLE " aud where cmp.id = aud.id and aud.stored",
-                0, NULL, NULL, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
+        Portal compoundCursor = SPI_cursor_open_with_args(NULL, query, 1, (Oid[]) { INT4OID }, (Datum[]) { indexId },
+                NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
         uint64 count = 0;
 
@@ -387,7 +383,7 @@ Datum sachem_sync_data(PG_FUNCTION_ARGS)
             if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
                 elog(ERROR, "%s: SPI_cursor_fetch() failed", __func__);
 
-            if(SPI_processed == 0)
+            if(unlikely(SPI_processed == 0))
                 break;
 
             uint64 processed = SPI_processed;
@@ -395,31 +391,21 @@ Datum sachem_sync_data(PG_FUNCTION_ARGS)
 
             for(int i = 0; i < processed; i++)
             {
-                HeapTuple tuple = tuptable->vals[i];
-
-
-                Datum id = SPI_getbinval(tuple, tuptable->tupdesc, 1, &isNullFlag);
-
-                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-
-                Datum molfile = SPI_getbinval(tuple, tuptable->tupdesc, 2, &isNullFlag);
-
-                if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE || isNullFlag))
-                    elog(ERROR, "%s: SPI_getbinval() failed", __func__);
+                Datum id = SPI_get_value(tuptable->vals[i], tuptable->tupdesc, 1);
+                Datum molfile = SPI_get_value(tuptable->vals[i], tuptable->tupdesc, 2);
 
                 VarChar *message = indexer_add(indexer, DatumGetInt32(id), DatumGetVarCharP(molfile));
 
-                if(message != NULL)
+                if(unlikely(message != NULL))
                 {
                     char *notice = text_to_cstring(message);
                     elog(NOTICE, "%i: %s", DatumGetInt32(id), notice);
                     pfree(notice);
 
-                    if(SPI_execute_with_args("insert into " MOLECULE_ERRORS_TABLE " (compound, message) values ($1,$2)", 2,
-                            (Oid[]) { INT4OID, TEXTOID },
-                            (Datum[]) { id, PointerGetDatum(message) }, NULL, false, 0) != SPI_OK_INSERT)
+                    if(unlikely(SPI_execute_with_args(
+                            "insert into sachem.compound_errors (index, compound, message) values ($1,$2,$3)", 3,
+                            (Oid[]) { INT4OID, INT4OID, TEXTOID }, (Datum[]) { indexId, id, PointerGetDatum(message) },
+                            NULL, false, 0) != SPI_OK_INSERT))
                         elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
                     pfree(message);
@@ -436,8 +422,10 @@ Datum sachem_sync_data(PG_FUNCTION_ARGS)
 
         SPI_cursor_close(compoundCursor);
 
-        if(unlikely(SPI_exec("delete from " AUDIT_TABLE, 0) != SPI_OK_DELETE))
-            elog(ERROR, "%s: SPI_exec() failed", __func__);
+        if(unlikely(SPI_execute_with_args("delete from sachem.compound_audit where index = $1", 1, (Oid[]) { INT4OID },
+                (Datum[]) { indexId }, NULL, false, 0) != SPI_OK_DELETE))
+            elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
+
 
 
         if(optimize)
@@ -461,41 +449,38 @@ Datum sachem_sync_data(PG_FUNCTION_ARGS)
 }
 
 
-PG_FUNCTION_INFO_V1(sachem_cleanup);
-Datum sachem_cleanup(PG_FUNCTION_ARGS)
+PG_FUNCTION_INFO_V1(cleanup);
+Datum cleanup(PG_FUNCTION_ARGS)
 {
+    VarChar *index = PG_GETARG_VARCHAR_P(0);
+    char *indexName = text_to_cstring(index);
+
+
     if(unlikely(SPI_connect() != SPI_OK_CONNECT))
         elog(ERROR, "%s: SPI_connect() failed", __func__);
 
-    int indexNumber = -1;
+    int version = 0;
 
-    if(unlikely(SPI_exec("select id from " INDEX_TABLE, 0) != SPI_OK_SELECT))
-        elog(ERROR, "%s: SPI_exec() failed", __func__);
+    if(unlikely(SPI_execute_with_args("select version from sachem.configuration where index_name = $1",
+            1, (Oid[]) { VARCHAROID }, (Datum[]) { PointerGetDatum(index) }, NULL, true, 1) != SPI_OK_SELECT))
+        elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
-    if(SPI_processed != 0)
+    if(likely(SPI_processed != 0))
     {
-        if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
+        if(unlikely(SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
             elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
-        bool isNullFlag;
-        Datum number = SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag);
-
-        if(unlikely(SPI_result == SPI_ERROR_NOATTRIBUTE) || isNullFlag)
-            elog(ERROR, "%s: SPI_getbinval() failed", __func__);
-
-        indexNumber = DatumGetInt32(number);
+        version = DatumGetInt32(SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1));
     }
 
     SPI_finish();
 
 
-    char *luceneIndexName = get_index_name(INDEX_PREFIX_NAME, indexNumber);
-
-
+    char *luceneIndexName = get_index_name(version);
     int dirfd = -1;
     DIR *dp = NULL;
 
-    if((dirfd = open(get_file_path(""), O_DIRECTORY)) == -1 && errno != ENOENT)
+    if(unlikely((dirfd = open(get_base_path(indexName), O_DIRECTORY)) == -1 && errno != ENOENT))
         elog(ERROR, "%s: open() failed", __func__);
 
     if(dirfd == -1)
@@ -504,7 +489,7 @@ Datum sachem_cleanup(PG_FUNCTION_ARGS)
 
     PG_TRY();
     {
-        if((dp = fdopendir(dirfd)) == NULL)
+        if(unlikely((dp = fdopendir(dirfd)) == NULL))
             elog(ERROR, "%s: fdopendir() failed", __func__);
 
 
@@ -512,17 +497,15 @@ Datum sachem_cleanup(PG_FUNCTION_ARGS)
 
         while((ep = readdir(dp)))
         {
-            if(!strncmp(ep->d_name, INDEX_PREFIX_NAME, sizeof(INDEX_PREFIX_NAME) - 1))
+            if(likely(is_index_name(ep->d_name)))
             {
-                if(!strcmp(ep->d_name, luceneIndexName))
-                    continue;
-
-                elog(NOTICE, "delete lucene index '%s'", ep->d_name);
-
-                char *luceneIndexPath = get_file_path(ep->d_name);
-                delete_directory(luceneIndexPath);
+                if(unlikely(strcmp(ep->d_name, luceneIndexName)))
+                {
+                    elog(NOTICE, "delete lucene index '%s'", ep->d_name);
+                    delete_directory(dirfd, ep->d_name);
+                }
             }
-            else if(strcmp(ep->d_name, ".") && strcmp(ep->d_name, ".."))
+            else if(unlikely(strcmp(ep->d_name, ".") && strcmp(ep->d_name, "..")))
             {
                 elog(WARNING, "unknown content '%s'", ep->d_name);
             }

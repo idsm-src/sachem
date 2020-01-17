@@ -3,12 +3,14 @@ package cz.iocb.sachem.load;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,16 +25,42 @@ import java.util.zip.ZipInputStream;
 public class CompoundLoader
 {
     private static final int batchSize = 1000;
+
     private final Connection connection;
     private final String idTag;
     private final String idPrefix;
 
+    final String schema;
+    final String table;
+    final String idColumn;
+    final String molColumn;
 
-    public CompoundLoader(Connection connection, String idTag, String idPrefix)
+
+    public CompoundLoader(Connection connection, String index, String idTag, String idPrefix)
+            throws SQLException, IOException
     {
         this.connection = connection;
-        this.idTag = "> <" + idTag + ">";;
+        this.idTag = "> <" + idTag + ">";
         this.idPrefix = idPrefix;
+
+
+        try(PreparedStatement statement = connection
+                .prepareStatement("select quote_ident(schema_name), quote_ident(table_name), quote_ident(id_column), "
+                        + "quote_ident(molfile_column) from sachem.configuration where index_name = ?"))
+        {
+            statement.setString(1, index);
+
+            try(ResultSet result = statement.executeQuery())
+            {
+                if(!result.next())
+                    throw new IOException("cannot find index configuration");
+
+                this.schema = result.getString(1);
+                this.table = result.getString(2);
+                this.idColumn = result.getString(3);
+                this.molColumn = result.getString(4);
+            }
+        }
     }
 
 
@@ -42,9 +70,9 @@ public class CompoundLoader
         BufferedReader reader = new BufferedReader(decoder);
         String line;
 
-        try(PreparedStatement insertStatement = connection
-                .prepareStatement("insert into compounds (id, molfile) values (?,?) "
-                        + "on conflict (id) do update set molfile=EXCLUDED.molfile"))
+        try(PreparedStatement insertStatement = connection.prepareStatement(
+                "insert into " + schema + "." + table + "(" + idColumn + ", " + molColumn + ") values (?,?) "
+                        + "on conflict (" + idColumn + ") do update set " + molColumn + "=EXCLUDED." + molColumn))
         {
             int count = 0;
 
@@ -103,7 +131,7 @@ public class CompoundLoader
             {
                 return arg0.getName().compareTo(arg1.getName());
             }
-        });;
+        });
 
 
         List<Integer> oldIds = new ArrayList<Integer>();
@@ -112,7 +140,7 @@ public class CompoundLoader
         {
             try(Statement statement = connection.createStatement())
             {
-                try(ResultSet rs = statement.executeQuery("select id from compounds"))
+                try(ResultSet rs = statement.executeQuery("select " + idColumn + " from " + schema + "." + table))
                 {
                     while(rs.next())
                         oldIds.add(rs.getInt(1));
@@ -163,7 +191,8 @@ public class CompoundLoader
 
         if(removeOld)
         {
-            try(PreparedStatement deleteStatement = connection.prepareStatement("delete from compounds where id = ?"))
+            try(PreparedStatement deleteStatement = connection
+                    .prepareStatement("delete from " + schema + "." + table + " where " + idColumn + " = ?"))
             {
                 int count = 0;
 

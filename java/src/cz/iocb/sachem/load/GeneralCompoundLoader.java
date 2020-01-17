@@ -3,7 +3,7 @@ package cz.iocb.sachem.load;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.Statement;
+import java.sql.PreparedStatement;
 
 
 
@@ -25,6 +25,7 @@ public class GeneralCompoundLoader
         String pgUserName = properties.getProperty("postgres.username");
         String pgPassword = properties.getProperty("postgres.password");
         String pgDatabase = properties.getProperty("postgres.database");
+        String index = properties.getProperty("sachem.index");
 
         String idTag = properties.getProperty("sdf.idtag");
         String idPrefix = properties.getProperty("sdf.idprefix", "");
@@ -38,12 +39,13 @@ public class GeneralCompoundLoader
 
             try
             {
-                CompoundLoader loader = new CompoundLoader(connection, idTag, idPrefix);
+                CompoundLoader loader = new CompoundLoader(connection, index, idTag, idPrefix);
                 loader.loadDirectory(new File(args[1]));
 
-                try(Statement statement = connection.createStatement())
+                try(PreparedStatement statement = connection.prepareStatement("select sachem.sync_data(?)"))
                 {
-                    statement.execute("select \"sachem_sync_data\"()");
+                    statement.setString(1, index);
+                    statement.execute();
                 }
 
                 connection.commit();
