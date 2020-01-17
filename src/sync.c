@@ -3,6 +3,8 @@
 #include <executor/spi.h>
 #include <utils/builtins.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <dirent.h>
 #include "java.h"
 #include "sachem.h"
 

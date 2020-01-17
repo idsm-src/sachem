@@ -2,6 +2,7 @@
 #include <catalog/pg_type.h>
 #include <catalog/namespace.h>
 #include <executor/spi.h>
+#include <utils/memutils.h>
 #include <funcapi.h>
 #include "enum.h"
 #include "java.h"
