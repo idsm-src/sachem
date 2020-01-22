@@ -13,6 +13,24 @@
     } while(0)
 
 
+#define JavaDeleteIntegerArray(array, buffer, mode) \
+    do { \
+        if(likely(array != NULL && buffer != NULL)) (*env)->ReleaseIntArrayElements(env, array, buffer, mode); \
+        if(likely(array != NULL)) (*env)->DeleteLocalRef(env, array); \
+        array = NULL; \
+        buffer = NULL; \
+    } while(0)
+
+
+#define JavaDeleteFloatArray(array, buffer, mode) \
+    do { \
+        if(likely(array != NULL && buffer != NULL)) (*env)->ReleaseFloatArrayElements(env, array, buffer, mode); \
+        if(likely(array != NULL)) (*env)->DeleteLocalRef(env, array); \
+        array = NULL; \
+        buffer = NULL; \
+    } while(0)
+
+
 extern JNIEnv* env;
 
 

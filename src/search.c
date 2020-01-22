@@ -9,17 +9,16 @@
 #include "sachem.h"
 
 
-#define BUFFERSIZE 1000000
-
-
 typedef struct
 {
-    jobject handler;
-    int32 limit;
-    int32 size;
+    int32 length;
     int32 possition;
-    int32 ids[BUFFERSIZE];
-    float4 scores[BUFFERSIZE];
+
+    jarray idsArray;
+    jint *ids;
+
+    jarray scoresArray;
+    jfloat *scores;
 }
 LuceneResult;
 
@@ -41,7 +40,7 @@ static jmethodID indexSizeMethod;
 static jmethodID setFolderMethod;
 static jmethodID subsearchMethod;
 static jmethodID simsearchMethod;
-static jmethodID loadMethod;
+static jfieldID lengthField;
 static jfieldID idsField;
 static jfieldID scoresField;
 
@@ -271,23 +270,23 @@ static void lucene_search_init(void)
     setFolderMethod = (*env)->GetMethodID(env, searcherClass, "setFolder", "(Ljava/lang/String;)V");
     java_check_exception(__func__);
 
-    subsearchMethod = (*env)->GetMethodID(env, searcherClass, "subsearch", "([BLcz/iocb/sachem/molecule/SearchMode;Lcz/iocb/sachem/molecule/ChargeMode;Lcz/iocb/sachem/molecule/IsotopeMode;Lcz/iocb/sachem/molecule/StereoMode;Lcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;I)Lcz/iocb/sachem/lucene/SearcherHandler;");
+    subsearchMethod = (*env)->GetMethodID(env, searcherClass, "subsearch", "([BLcz/iocb/sachem/molecule/SearchMode;Lcz/iocb/sachem/molecule/ChargeMode;Lcz/iocb/sachem/molecule/IsotopeMode;Lcz/iocb/sachem/molecule/StereoMode;Lcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;I)Lcz/iocb/sachem/lucene/SearchResult;");
     java_check_exception(__func__);
 
-    simsearchMethod = (*env)->GetMethodID(env, searcherClass, "simsearch", "([BFILcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;I)Lcz/iocb/sachem/lucene/SearcherHandler;");
+    simsearchMethod = (*env)->GetMethodID(env, searcherClass, "simsearch", "([BFILcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;I)Lcz/iocb/sachem/lucene/SearchResult;");
     java_check_exception(__func__);
 
 
-    jclass handlerClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/SearcherHandler");
+    jclass resultClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/SearchResult");
     java_check_exception(__func__);
 
-    loadMethod = (*env)->GetMethodID(env, handlerClass, "load", "(I)I");
+    lengthField = (*env)->GetFieldID(env, resultClass, "length", "I");
     java_check_exception(__func__);
 
-    idsField = (*env)->GetFieldID(env, handlerClass, "ids", "[I");
+    idsField = (*env)->GetFieldID(env, resultClass, "ids", "[I");
     java_check_exception(__func__);
 
-    scoresField = (*env)->GetFieldID(env, handlerClass, "scores", "[F");
+    scoresField = (*env)->GetFieldID(env, resultClass, "scores", "[F");
     java_check_exception(__func__);
 
 
@@ -340,64 +339,8 @@ static int32 lucene_index_size(jobject lucene)
 
 static HeapTuple lucene_result_get_item(LuceneResult *result)
 {
-    if(unlikely(result->possition == BUFFERSIZE && result->limit != 0))
-    {
-        int limit = BUFFERSIZE;
-
-        if(result->limit > 0)
-        {
-            if(result->limit < BUFFERSIZE)
-                limit = result->limit;
-
-            result->limit -= limit;
-        }
-
-
-        result->possition = 0;
-        result->size = (*env)->CallIntMethod(env, result->handler, loadMethod, limit);
-        java_check_exception(__func__);
-
-
-        jarray array = NULL;
-
-        PG_TRY();
-        {
-            array = (*env)->GetObjectField(env, result->handler, idsField);
-            jint *ids = (*env)->GetPrimitiveArrayCritical(env, array, NULL);
-
-            if(unlikely(ids == NULL))
-                elog(ERROR, "out of memmory");
-
-            memcpy(result->ids, ids, result->size * sizeof(int32));
-
-            (*env)->ReleasePrimitiveArrayCritical(env, array, ids, JNI_ABORT);
-            JavaDeleteRef(array);
-
-
-            array = (*env)->GetObjectField(env, result->handler, scoresField);
-            jfloat *scores = (*env)->GetPrimitiveArrayCritical(env, array, NULL);
-
-            if(unlikely(scores == NULL))
-                elog(ERROR, "out of memmory");
-
-            memcpy(result->scores, scores, result->size * sizeof(float4));
-
-            (*env)->ReleasePrimitiveArrayCritical(env, array, scores, JNI_ABORT);
-            JavaDeleteRef(array);
-        }
-        PG_CATCH();
-        {
-            JavaDeleteRef(array);
-
-            PG_RE_THROW();
-        }
-        PG_END_TRY();
-    }
-
-
-    if(unlikely(result->possition == result->size))
+    if(unlikely(result->possition == result->length))
         return NULL;
-
 
     bool isnull[2] = {0, 0};
     Datum values[2] = {Int32GetDatum(result->ids[result->possition]), Float4GetDatum(result->scores[result->possition])};
@@ -412,7 +355,10 @@ static HeapTuple lucene_result_get_item(LuceneResult *result)
 static void lucene_result_free(LuceneResult *result)
 {
     if(likely(result != NULL))
-        JavaDeleteRef(result->handler);
+    {
+        JavaDeleteIntegerArray(result->idsArray, result->ids, JNI_ABORT);
+        JavaDeleteFloatArray(result->scoresArray, result->scores, JNI_ABORT);
+    }
 }
 
 
@@ -440,22 +386,29 @@ static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid search
                 ConvertEnumValue(isotopeModeTable, isotope),
                 ConvertEnumValue(stereoModeTable, stereo),
                 ConvertEnumValue(aromaticityModeTable,  aromaticity),
-                ConvertEnumValue(tautomerModeTable,  tautomers),
-                BUFFERSIZE);
+                ConvertEnumValue(tautomerModeTable,  tautomers));
         java_check_exception(__func__);
 
         JavaDeleteRef(queryArray);
 
-        result = palloc(sizeof(LuceneResult));
-        result->handler = handler;
-        result->limit = limit;
-        result->size = BUFFERSIZE;
-        result->possition = BUFFERSIZE;
+        result = palloc0(sizeof(LuceneResult));
+
+        result->idsArray = (*env)->GetObjectField(env, handler, idsField);
+        result->ids = (*env)->GetIntArrayElements(env, result->idsArray, NULL);
+
+        result->scoresArray = (*env)->GetObjectField(env, handler, scoresField);
+        result->scores = (*env)->GetFloatArrayElements(env, result->scoresArray, NULL);
+
+        result->length = (*env)->GetIntField(env, handler, lengthField);
+
+        if(result->ids == NULL || result->scores == NULL)
+            elog(ERROR, "out of memmory");;
     }
     PG_CATCH();
     {
         JavaDeleteRef(queryArray);
         JavaDeleteRef(handler);
+        lucene_result_free(result);
 
         PG_RE_THROW();
     }
@@ -483,25 +436,31 @@ static LuceneResult *lucene_simsearch(jobject lucene, VarChar *query, float4 thr
         (*env)->SetByteArrayRegion(env, queryArray, 0, length, (jbyte *) VARDATA(query));
         java_check_exception(__func__);
 
-
         handler = (*env)->CallObjectMethod(env, lucene, simsearchMethod, queryArray, threshold, depth,
                 ConvertEnumValue(aromaticityModeTable, aromaticity),
-                ConvertEnumValue(tautomerModeTable, tautomers),
-                BUFFERSIZE);
+                ConvertEnumValue(tautomerModeTable, tautomers));
         java_check_exception(__func__);
 
         JavaDeleteRef(queryArray);
 
-        result = palloc(sizeof(LuceneResult));
-        result->handler = handler;
-        result->limit = limit;
-        result->size = BUFFERSIZE;
-        result->possition = BUFFERSIZE;
+        result = palloc0(sizeof(LuceneResult));
+
+        result->idsArray = (*env)->GetObjectField(env, handler, idsField);
+        result->ids = (*env)->GetIntArrayElements(env, result->idsArray, NULL);
+
+        result->scoresArray = (*env)->GetObjectField(env, handler, scoresField);
+        result->scores = (*env)->GetFloatArrayElements(env, result->scoresArray, NULL);
+
+        result->length = (*env)->GetArrayLength(env, result->idsArray);
+
+        if(result->ids == NULL || result->scores == NULL)
+            elog(ERROR, "out of memmory");;
     }
     PG_CATCH();
     {
         JavaDeleteRef(queryArray);
         JavaDeleteRef(handler);
+        lucene_result_free(result);
 
         PG_RE_THROW();
     }

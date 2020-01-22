@@ -121,24 +121,28 @@ public class Searcher
     }
 
 
-    public SearcherHandler subsearch(byte[] molecule, SearchMode graphMode, ChargeMode chargeMode,
-            IsotopeMode isotopeMode, StereoMode stereoMode, AromaticityMode aromaticityMode, TautomerMode tautomerMode,
-            int bufferSize) throws IOException, CDKException, TimeoutException
+    public SearchResult subsearch(byte[] molecule, SearchMode graphMode, ChargeMode chargeMode, IsotopeMode isotopeMode,
+            StereoMode stereoMode, AromaticityMode aromaticityMode, TautomerMode tautomerMode, int bufferSize)
+            throws IOException, CDKException, TimeoutException
     {
         Query query = new SubstructureQuery(Settings.substructureFieldName, new String(molecule), graphMode, chargeMode,
                 isotopeMode, stereoMode, aromaticityMode, tautomerMode);
 
-        return new SearcherHandler(searcher, query, bufferSize);
+        ResultCollector collector = new ResultCollector();
+        searcher.search(query, collector);
+        return new SearchResult(collector.possition, collector.ids, collector.scores);
     }
 
 
-    public SearcherHandler simsearch(byte[] molecule, float threshold, int depth, AromaticityMode aromaticityMode,
+    public SearchResult simsearch(byte[] molecule, float threshold, int depth, AromaticityMode aromaticityMode,
             TautomerMode tautomerMode, int bufferSize) throws IOException, CDKException, TimeoutException
     {
         Query query = new SimilarStructureQuery(Settings.similarityFieldName, new String(molecule), threshold, depth,
                 aromaticityMode, tautomerMode);
 
-        return new SearcherHandler(searcher, query, bufferSize);
+        ResultCollector collector = new ResultCollector();
+        searcher.search(query, collector);
+        return new SearchResult(collector.possition, collector.ids, collector.scores);
     }
 
 

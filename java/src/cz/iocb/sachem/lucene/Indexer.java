@@ -9,6 +9,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import org.apache.lucene.document.BinaryDocValuesField;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.IntPoint;
+import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriter;
@@ -205,6 +206,7 @@ public class Indexer
     {
         Document document = new Document();
         document.add(new IntPoint(Settings.idFieldName, id));
+        document.add(new NumericDocValuesField(Settings.idFieldName, id));
         document.add(new StoredField(Settings.idFieldName, id));
 
         BinaryMolecule molecule = new BinaryMolecule(binary);
