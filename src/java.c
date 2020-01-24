@@ -3,6 +3,7 @@
 #include <libpq/pqsignal.h>
 #include <tcop/tcopprot.h>
 #include "java.h"
+#include "native.h"
 
 
 JavaVM* jvm = NULL;
@@ -96,6 +97,7 @@ void java_init(void)
     toStringMethod = (*env)->GetMethodID(env, exceptionClass, "toString", "()Ljava/lang/String;");
     java_check_exception(__func__);
 
+    native_init();
 
     initialised = true;
 }

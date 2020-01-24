@@ -4,6 +4,7 @@
 #include <executor/spi.h>
 #include <utils/memutils.h>
 #include <funcapi.h>
+#include <math.h>
 #include "enum.h"
 #include "java.h"
 #include "sachem.h"
@@ -273,7 +274,7 @@ static void lucene_search_init(void)
     subsearchMethod = (*env)->GetMethodID(env, searcherClass, "subsearch", "([BLcz/iocb/sachem/molecule/SearchMode;Lcz/iocb/sachem/molecule/ChargeMode;Lcz/iocb/sachem/molecule/IsotopeMode;Lcz/iocb/sachem/molecule/StereoMode;Lcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;I)Lcz/iocb/sachem/lucene/SearchResult;");
     java_check_exception(__func__);
 
-    simsearchMethod = (*env)->GetMethodID(env, searcherClass, "simsearch", "([BFILcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;I)Lcz/iocb/sachem/lucene/SearchResult;");
+    simsearchMethod = (*env)->GetMethodID(env, searcherClass, "simsearch", "([BFILcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;)Lcz/iocb/sachem/lucene/SearchResult;");
     java_check_exception(__func__);
 
 
@@ -339,6 +340,9 @@ static int32 lucene_index_size(jobject lucene)
 
 static HeapTuple lucene_result_get_item(LuceneResult *result)
 {
+    while(result->possition < result->length && result->scores[result->possition] == INFINITY)
+        elog(WARNING, "isomorphism: iteration limit exceeded for target %i", result->ids[result->possition++]);
+
     if(unlikely(result->possition == result->length))
         return NULL;
 
@@ -363,7 +367,7 @@ static void lucene_result_free(LuceneResult *result)
 
 
 static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid search, Oid charge, Oid isotope, Oid stereo,
-        Oid aromaticity, Oid tautomers, int32 limit)
+        Oid aromaticity, Oid tautomers, int32 isomorphismLimit)
 {
     LuceneResult *result = NULL;
     jbyteArray queryArray = NULL;
@@ -386,7 +390,8 @@ static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid search
                 ConvertEnumValue(isotopeModeTable, isotope),
                 ConvertEnumValue(stereoModeTable, stereo),
                 ConvertEnumValue(aromaticityModeTable,  aromaticity),
-                ConvertEnumValue(tautomerModeTable,  tautomers));
+                ConvertEnumValue(tautomerModeTable,  tautomers),
+                isomorphismLimit);
         java_check_exception(__func__);
 
         JavaDeleteRef(queryArray);
@@ -419,7 +424,7 @@ static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid search
 
 
 static LuceneResult *lucene_simsearch(jobject lucene, VarChar *query, float4 threshold, int32 depth, Oid aromaticity,
-        Oid tautomers, int32 limit)
+        Oid tautomers)
 {
     LuceneResult *result = NULL;
     jbyteArray queryArray = NULL;
@@ -511,7 +516,7 @@ Datum substructure_search(PG_FUNCTION_ARGS)
         Oid stereo = PG_GETARG_OID(5);
         Oid aromaticity = PG_GETARG_OID(6);
         Oid tautomers = PG_GETARG_OID(7);
-        int32 limit = PG_GETARG_INT32(8);
+        int32 isomorphismLimit = PG_GETARG_INT32(8);
 
         jobject lucene = lucene_get(index);
 
@@ -520,7 +525,7 @@ Datum substructure_search(PG_FUNCTION_ARGS)
             lucene_search_update_snapshot(lucene, index);
 
             PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
-            funcctx->user_fctx = lucene_subsearch(lucene, query, search, charge, isotope, stereo, aromaticity, tautomers, limit);
+            funcctx->user_fctx = lucene_subsearch(lucene, query, search, charge, isotope, stereo, aromaticity, tautomers, isomorphismLimit);
             PG_MEMCONTEXT_END();
 
             lucene_free(lucene);
@@ -570,7 +575,6 @@ Datum similarity_search(PG_FUNCTION_ARGS)
         int32 depth = PG_GETARG_INT32(3);
         Oid aromaticity = PG_GETARG_OID(4);
         Oid tautomers = PG_GETARG_OID(5);
-        int32 limit = PG_GETARG_INT32(6);
 
         jobject lucene = lucene_get(index);
 
@@ -579,7 +583,7 @@ Datum similarity_search(PG_FUNCTION_ARGS)
             lucene_search_update_snapshot(lucene, index);
 
             PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
-            funcctx->user_fctx = lucene_simsearch(lucene, query, threshold, depth, aromaticity, tautomers, limit);
+            funcctx->user_fctx = lucene_simsearch(lucene, query, threshold, depth, aromaticity, tautomers);
             PG_MEMCONTEXT_END();
 
             lucene_free(lucene);

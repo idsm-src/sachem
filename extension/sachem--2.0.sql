@@ -72,8 +72,8 @@ GRANT SELECT ON TABLE compound_errors TO PUBLIC;
 
 
 CREATE FUNCTION "index_size"(varchar) RETURNS int AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE;
-CREATE FUNCTION "substructure_search"(varchar, varchar, search_mode = 'SUBSTRUCTURE', charge_mode = 'DEFAULT_AS_ANY', isotope_mode = 'IGNORE', stereo_mode = 'IGNORE', aromaticity_mode = 'AUTO', tautomer_mode = 'IGNORE', int = -1) RETURNS TABLE (compound int, score float4) AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
-CREATE FUNCTION "similarity_search"(varchar, varchar, float4 = 0.85, int = 1, aromaticity_mode = 'AUTO', tautomer_mode = 'IGNORE', int = -1) RETURNS TABLE (compound int, score float4) AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION "substructure_search"(varchar, varchar, search_mode = 'SUBSTRUCTURE', charge_mode = 'DEFAULT_AS_ANY', isotope_mode = 'IGNORE', stereo_mode = 'IGNORE', aromaticity_mode = 'AUTO', tautomer_mode = 'IGNORE', int = 0) RETURNS TABLE (compound int, score float4) AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION "similarity_search"(varchar, varchar, float4 = 0.85, int = 1, aromaticity_mode = 'AUTO', tautomer_mode = 'IGNORE') RETURNS TABLE (compound int, score float4) AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "sync_data"(varchar, boolean = false, boolean = true) RETURNS void AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
 CREATE FUNCTION "cleanup"(varchar) RETURNS void AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
 

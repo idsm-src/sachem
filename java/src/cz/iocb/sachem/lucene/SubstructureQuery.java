@@ -35,9 +35,10 @@ import cz.iocb.sachem.molecule.AromaticityMode;
 import cz.iocb.sachem.molecule.BinaryMolecule;
 import cz.iocb.sachem.molecule.BinaryMoleculeBuilder;
 import cz.iocb.sachem.molecule.ChargeMode;
-import cz.iocb.sachem.molecule.Isomorphism;
 import cz.iocb.sachem.molecule.IsotopeMode;
 import cz.iocb.sachem.molecule.MoleculeCreator;
+import cz.iocb.sachem.molecule.NativeIsomorphism;
+import cz.iocb.sachem.molecule.NativeIsomorphism.IterationLimitExceededException;
 import cz.iocb.sachem.molecule.SearchMode;
 import cz.iocb.sachem.molecule.StereoMode;
 import cz.iocb.sachem.molecule.TautomerMode;
@@ -54,13 +55,14 @@ public class SubstructureQuery extends Query
     private final StereoMode stereoMode;
     private final AromaticityMode aromaticityMode;
     private final TautomerMode tautomerMode;
+    private final int iterationLimit;
 
     private final Query subquery;
 
 
     public SubstructureQuery(String field, String query, SearchMode graphMode, ChargeMode chargeMode,
-            IsotopeMode isotopeMode, StereoMode stereoMode, AromaticityMode aromaticityMode, TautomerMode tautomerMode)
-            throws CDKException, IOException, TimeoutException
+            IsotopeMode isotopeMode, StereoMode stereoMode, AromaticityMode aromaticityMode, TautomerMode tautomerMode,
+            int iterationLimit) throws CDKException, IOException, TimeoutException
     {
         this.field = field;
         this.query = query;
@@ -70,6 +72,7 @@ public class SubstructureQuery extends Query
         this.stereoMode = stereoMode;
         this.aromaticityMode = aromaticityMode;
         this.tautomerMode = tautomerMode;
+        this.iterationLimit = iterationLimit;
 
         List<IAtomContainer> queryMolecules = MoleculeCreator.translateQuery(query, aromaticityMode, tautomerMode);
         ArrayList<Query> subqueries = new ArrayList<Query>(queryMolecules.size());
@@ -140,14 +143,12 @@ public class SubstructureQuery extends Query
         private final Query parentQuery;
         private final IAtomContainer tautomer;
 
-        boolean extended;
         private final Set<Integer> fp;
         private final Map<Integer, Set<Integer>> info;
         private final BinaryMolecule molecule;
         private final byte[] moleculeData;
-        private final int originalMoleculeSize;
         private final boolean[] restH;
-        private final Isomorphism isomorphism;
+        private final NativeIsomorphism isomorphism;
 
 
         SingleSubstructureQuery(IAtomContainer tautomer) throws CDKException, IOException
@@ -161,16 +162,10 @@ public class SubstructureQuery extends Query
             for(int i = 0; i < tautomer.getAtomCount(); i++)
                 restH[i] = Boolean.TRUE.equals(tautomer.getAtom(i).getProperty(CDKConstants.REST_H));
 
+            this.isomorphism = new NativeIsomorphism(moleculeData, restH, searchMode, chargeMode, isotopeMode,
+                    stereoMode);
 
-            this.extended = BinaryMolecule.isExtended(moleculeData, chargeMode != ChargeMode.IGNORE,
-                    isotopeMode != IsotopeMode.IGNORE);
-
-            this.molecule = new BinaryMolecule(moleculeData, restH, extended, chargeMode != ChargeMode.IGNORE,
-                    isotopeMode != IsotopeMode.IGNORE, stereoMode != StereoMode.IGNORE, false, false);
-
-            this.originalMoleculeSize = molecule.getOriginalAtomCount() + molecule.getOriginalBondCount();
-            this.isomorphism = new Isomorphism(molecule, searchMode, chargeMode, isotopeMode, stereoMode);
-
+            this.molecule = new BinaryMolecule(moleculeData, null, false, false, false, false, false, false);
             this.info = new HashMap<Integer, Set<Integer>>();
             this.fp = IOCBFingerprint.getSubstructureFingerprint(molecule, info);
         }
@@ -363,43 +358,18 @@ public class SubstructureQuery extends Query
                 boolean isValid() throws IOException
                 {
                     molDocValue.advanceExact(docID);
-                    byte[] data = molDocValue.binaryValue().bytes;
+                    byte[] target = molDocValue.binaryValue().bytes;
 
-                    BinaryMolecule target;
-                    boolean match;
-
-                    if(!extended && (BinaryMolecule.hasPseudoAtom(data) || BinaryMolecule.hasMultivalentHydrogen(data)))
+                    try
                     {
-                        BinaryMolecule molecule = new BinaryMolecule(moleculeData, restH, true,
-                                chargeMode != ChargeMode.IGNORE, isotopeMode != IsotopeMode.IGNORE,
-                                stereoMode != StereoMode.IGNORE, false, false);
-
-                        Isomorphism isomorphism = new Isomorphism(molecule, searchMode, chargeMode, isotopeMode,
-                                stereoMode);
-
-
-                        target = new BinaryMolecule(data, null, true, chargeMode != ChargeMode.IGNORE,
-                                isotopeMode != IsotopeMode.IGNORE, stereoMode != StereoMode.IGNORE, false, false);
-
-                        match = isomorphism.match(target);
+                        this.score = isomorphism.match(target, iterationLimit);
                     }
-                    else
+                    catch(IterationLimitExceededException e)
                     {
-                        target = new BinaryMolecule(data, null, extended, chargeMode != ChargeMode.IGNORE,
-                                isotopeMode != IsotopeMode.IGNORE, stereoMode != StereoMode.IGNORE,
-                                chargeMode == ChargeMode.DEFAULT_AS_UNCHARGED,
-                                isotopeMode == IsotopeMode.DEFAULT_AS_STANDARD);
-
-                        match = isomorphism.match(target);
+                        this.score = Float.POSITIVE_INFINITY;
                     }
 
-                    if(match)
-                    {
-                        int size = (target.getOriginalAtomCount() + target.getOriginalBondCount());
-                        score = size == 0 ? 0.0f : originalMoleculeSize / (float) size;
-                    }
-
-                    return match;
+                    return !Float.isNaN(score);
                 }
 
 

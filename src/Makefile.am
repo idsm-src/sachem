@@ -8,11 +8,16 @@ libsachem_la_LDFLAGS = $(JDK8_LDFLAGS) -Wl,-rpath,$(POSTGRESQL_LIBDIR)
 
 libsachem_la_SOURCES = \
         java.c \
+        native.c \
         sachem.c \
         search.c \
         sync.c
 
 EXTRA_DIST = \
         enum.h \
+        isomorphism.h \
         java.h \
+        memory.h \
+        molecule.h \
+        native.h \
         sachem.h

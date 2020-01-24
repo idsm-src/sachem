@@ -71,8 +71,9 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/lucene/FingerprintBitMapping.java \
     src/cz/iocb/sachem/lucene/FingerprintTokenStream.java \
     src/cz/iocb/sachem/lucene/Indexer.java \
-    src/cz/iocb/sachem/lucene/SearcherHandler.java \
+    src/cz/iocb/sachem/lucene/ResultCollector.java \
     src/cz/iocb/sachem/lucene/Searcher.java \
+    src/cz/iocb/sachem/lucene/SearchResult.java \
     src/cz/iocb/sachem/lucene/Settings.java \
     src/cz/iocb/sachem/lucene/SimilarStructureQuery.java \
     src/cz/iocb/sachem/lucene/SubstructureQuery.java \
@@ -85,6 +86,7 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/molecule/IsotopeMode.java \
     src/cz/iocb/sachem/molecule/MoleculeCreator.java \
     src/cz/iocb/sachem/molecule/Molecule.java \
+    src/cz/iocb/sachem/molecule/NativeIsomorphism.java \
     src/cz/iocb/sachem/molecule/SearchMode.java \
     src/cz/iocb/sachem/molecule/StereoMode.java \
     src/cz/iocb/sachem/molecule/TautomerMode.java \
@@ -92,3 +94,4 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/tautomers/InChIException.java \
     src/cz/iocb/sachem/tautomers/InChI.java \
     src/cz/iocb/sachem/tautomers/InchiTautomerGenerator.java
+ 

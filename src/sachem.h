@@ -2,6 +2,9 @@
 #define SACHEM_H_
 
 #include <postgres.h>
+#include <access/htup.h>
+#include <access/tupdesc.h>
+#include <executor/spi.h>
 #include <fmgr.h>
 #include <utils/builtins.h>
 #include <miscadmin.h>
