@@ -26,7 +26,7 @@ LuceneResult;
 
 static bool initialized = false;
 static TupleDesc tupdesc = NULL;
-static SPIPlanPtr snapshotQueryPlan;
+static SPIPlanPtr configQueryPlan;
 
 static EnumValue searchModeTable[2];
 static EnumValue chargeModeTable[3];
@@ -38,59 +38,11 @@ static EnumValue tautomerModeTable[2];
 static jclass searcherClass;
 static jmethodID getMethod;
 static jmethodID indexSizeMethod;
-static jmethodID setFolderMethod;
 static jmethodID subsearchMethod;
 static jmethodID simsearchMethod;
 static jfieldID lengthField;
 static jfieldID idsField;
 static jfieldID scoresField;
-
-
-static void lucene_set_folder(jobject lucene, const char *path)
-{
-    jstring folder = NULL;
-
-    PG_TRY();
-    {
-        folder = (*env)->NewStringUTF(env, path);
-        java_check_exception(__func__);
-
-        (*env)->CallVoidMethod(env, lucene, setFolderMethod, folder);
-        java_check_exception(__func__);
-
-        JavaDeleteRef(folder);
-    }
-    PG_CATCH();
-    {
-        JavaDeleteRef(folder);
-
-        PG_RE_THROW();
-    }
-    PG_END_TRY();
-}
-
-
-static void lucene_search_update_snapshot(jobject lucene, VarChar *index)
-{
-    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
-        elog(ERROR, "%s: SPI_connect() failed", __func__);
-
-    bool isNullFlag;
-
-    if(unlikely(SPI_execute_plan(snapshotQueryPlan, (Datum[]) { PointerGetDatum(index) }, NULL, true, 0) != SPI_OK_SELECT))
-        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
-
-    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 1))
-        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
-
-    int version = DatumGetInt32(SPI_getbinval(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1, &isNullFlag));
-
-    SPI_finish();
-
-
-    char *path = get_index_path(text_to_cstring(index), version);
-    lucene_set_folder(lucene, path);
-}
 
 
 static void lucene_search_init(void)
@@ -242,17 +194,17 @@ static void lucene_search_init(void)
 
 
     /* prepare snapshot query plan */
-    if(unlikely(snapshotQueryPlan == NULL))
+    if(unlikely(configQueryPlan == NULL))
     {
         if(unlikely(SPI_connect() != SPI_OK_CONNECT))
             elog(ERROR, "%s: SPI_connect() failed", __func__);
 
-        SPIPlanPtr plan = SPI_prepare("select version from sachem.configuration where index_name = $1", 1, (Oid[]) { VARCHAROID });
+        SPIPlanPtr plan = SPI_prepare("select version, threads from sachem.configuration where index_name = $1", 1, (Oid[]) { VARCHAROID });
 
         if(unlikely(SPI_keepplan(plan) == SPI_ERROR_ARGUMENT))
             elog(ERROR, "%s: SPI_keepplan() failed", __func__);
 
-        snapshotQueryPlan = plan;
+        configQueryPlan = plan;
 
         SPI_finish();
     }
@@ -262,13 +214,10 @@ static void lucene_search_init(void)
     searcherClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/Searcher");
     java_check_exception(__func__);
 
-    getMethod = (*env)->GetStaticMethodID(env, searcherClass, "get", "(Ljava/lang/String;)Lcz/iocb/sachem/lucene/Searcher;");
+    getMethod = (*env)->GetStaticMethodID(env, searcherClass, "get", "(Ljava/lang/String;Ljava/lang/String;I)Lcz/iocb/sachem/lucene/Searcher;");
     java_check_exception(__func__);
 
     indexSizeMethod = (*env)->GetMethodID(env, searcherClass, "indexSize", "()I");
-    java_check_exception(__func__);
-
-    setFolderMethod = (*env)->GetMethodID(env, searcherClass, "setFolder", "(Ljava/lang/String;)V");
     java_check_exception(__func__);
 
     subsearchMethod = (*env)->GetMethodID(env, searcherClass, "subsearch", "([BLcz/iocb/sachem/molecule/SearchMode;Lcz/iocb/sachem/molecule/ChargeMode;Lcz/iocb/sachem/molecule/IsotopeMode;Lcz/iocb/sachem/molecule/StereoMode;Lcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;I)Lcz/iocb/sachem/lucene/SearchResult;");
@@ -299,7 +248,24 @@ static jobject lucene_get(VarChar *index)
 {
     lucene_search_init();
 
-    jobject name = NULL;
+
+    if(unlikely(SPI_connect() != SPI_OK_CONNECT))
+        elog(ERROR, "%s: SPI_connect() failed", __func__);
+
+    if(unlikely(SPI_execute_plan(configQueryPlan, (Datum[]) { PointerGetDatum(index) }, NULL, true, 0) != SPI_OK_SELECT))
+        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 2))
+        elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
+
+    int32 version = DatumGetInt32(SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1));
+    int32 threads = DatumGetInt32(SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 2));
+
+    SPI_finish();
+
+
+    jstring name = NULL;
+    jstring folder = NULL;
     jobject instance = NULL;
 
     PG_TRY();
@@ -307,7 +273,10 @@ static jobject lucene_get(VarChar *index)
         name = (*env)->NewStringUTF(env, text_to_cstring(index));
         java_check_exception(__func__);
 
-        instance = (*env)->CallStaticObjectMethod(env, searcherClass, getMethod, name);
+        folder = (*env)->NewStringUTF(env, get_index_path(text_to_cstring(index), version));
+        java_check_exception(__func__);
+
+        instance = (*env)->CallStaticObjectMethod(env, searcherClass, getMethod, name, folder, threads);
         java_check_exception(__func__);
 
         JavaDeleteRef(name);
@@ -315,6 +284,7 @@ static jobject lucene_get(VarChar *index)
     PG_CATCH();
     {
         JavaDeleteRef(name);
+        JavaDeleteRef(folder);
 
         PG_RE_THROW();
     }
@@ -485,7 +455,6 @@ Datum index_size(PG_FUNCTION_ARGS)
 
     PG_TRY();
     {
-        lucene_search_update_snapshot(lucene, index);
         size = lucene_index_size(lucene);
 
         lucene_free(lucene);
@@ -522,8 +491,6 @@ Datum substructure_search(PG_FUNCTION_ARGS)
 
         PG_TRY();
         {
-            lucene_search_update_snapshot(lucene, index);
-
             PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
             funcctx->user_fctx = lucene_subsearch(lucene, query, search, charge, isotope, stereo, aromaticity, tautomers, isomorphismLimit);
             PG_MEMCONTEXT_END();
@@ -580,8 +547,6 @@ Datum similarity_search(PG_FUNCTION_ARGS)
 
         PG_TRY();
         {
-            lucene_search_update_snapshot(lucene, index);
-
             PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
             funcctx->user_fctx = lucene_simsearch(lucene, query, threshold, depth, aromaticity, tautomers);
             PG_MEMCONTEXT_END();

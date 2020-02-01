@@ -148,7 +148,6 @@ public class SubstructureQuery extends Query
         private final BinaryMolecule molecule;
         private final byte[] moleculeData;
         private final boolean[] restH;
-        private final NativeIsomorphism isomorphism;
 
 
         SingleSubstructureQuery(IAtomContainer tautomer) throws CDKException, IOException
@@ -161,9 +160,6 @@ public class SubstructureQuery extends Query
 
             for(int i = 0; i < tautomer.getAtomCount(); i++)
                 restH[i] = Boolean.TRUE.equals(tautomer.getAtom(i).getProperty(CDKConstants.REST_H));
-
-            this.isomorphism = new NativeIsomorphism(moleculeData, restH, searchMode, chargeMode, isotopeMode,
-                    stereoMode);
 
             this.molecule = new BinaryMolecule(moleculeData, null, false, false, false, false, false, false);
             this.info = new HashMap<Integer, Set<Integer>>();
@@ -324,6 +320,7 @@ public class SubstructureQuery extends Query
                 private float score = 0;
                 private final Scorer innerScorer;
                 private final BinaryDocValues molDocValue;
+                private final NativeIsomorphism isomorphism;
 
 
                 protected SingleSubstructureScorer(LeafReaderContext context, Scorer scorer) throws IOException
@@ -331,6 +328,9 @@ public class SubstructureQuery extends Query
                     super(SingleSubstructureWeight.this);
                     this.innerScorer = scorer;
                     this.molDocValue = DocValues.getBinary(context.reader(), field);
+
+                    this.isomorphism = new NativeIsomorphism(moleculeData, restH, searchMode, chargeMode, isotopeMode,
+                            stereoMode);
                 }
 
 

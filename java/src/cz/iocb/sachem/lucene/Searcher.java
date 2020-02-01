@@ -10,6 +10,9 @@ import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.HashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeoutException;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.search.IndexSearcher;
@@ -29,15 +32,27 @@ import cz.iocb.sachem.molecule.TautomerMode;
 
 public class Searcher
 {
+    private static ThreadFactory threadFactory = new ThreadFactory()
+    {
+        @Override
+        public Thread newThread(Runnable r)
+        {
+            Thread t = Executors.defaultThreadFactory().newThread(r);
+            t.setDaemon(true);
+            return t;
+        }
+    };
+
     private static HashMap<String, Searcher> instances = new HashMap<String, Searcher>();
 
     private Path path;
     private Directory folder;
     private IndexSearcher searcher;
     private Thread watcher;
+    private int threadCount;
 
 
-    public static Searcher get(String name)
+    public static Searcher get(String name, String path, int threads) throws IOException
     {
         Searcher searcher = instances.get(name);
 
@@ -47,22 +62,31 @@ public class Searcher
             instances.put(name, searcher);
         }
 
+        searcher.configure(path, threads);
+
         return searcher;
     }
 
 
-    public void setFolder(String newPathName) throws IOException
+    private void configure(String newPathName, int newThreadCount) throws IOException
     {
         Path newPath = Paths.get(newPathName);
 
-        if(newPath.equals(path))
+        if(newThreadCount <= 1)
+            newThreadCount = 0;
+
+        if(newPath.equals(path) && threadCount == newThreadCount)
             return;
 
         close();
 
+
+        Executor executor = newThreadCount > 1 ? Executors.newFixedThreadPool(newThreadCount, threadFactory) : null;
+
+        threadCount = newThreadCount;
         path = newPath;
         folder = FSDirectory.open(newPath);
-        searcher = new IndexSearcher(DirectoryReader.open(folder));
+        searcher = new IndexSearcher(DirectoryReader.open(folder), executor);
         searcher.setSimilarity(new BooleanSimilarity());
 
 
@@ -128,9 +152,7 @@ public class Searcher
         Query query = new SubstructureQuery(Settings.substructureFieldName, new String(molecule), graphMode, chargeMode,
                 isotopeMode, stereoMode, aromaticityMode, tautomerMode, isomorphismLimit);
 
-        ResultCollector collector = new ResultCollector();
-        searcher.search(query, collector);
-        return new SearchResult(collector.possition, collector.ids, collector.scores);
+        return searcher.search(query, new ResultCollectorManager());
     }
 
 
@@ -140,9 +162,7 @@ public class Searcher
         Query query = new SimilarStructureQuery(Settings.similarityFieldName, new String(molecule), threshold, depth,
                 aromaticityMode, tautomerMode);
 
-        ResultCollector collector = new ResultCollector();
-        searcher.search(query, collector);
-        return new SearchResult(collector.possition, collector.ids, collector.scores);
+        return searcher.search(query, new ResultCollectorManager());
     }
 
 

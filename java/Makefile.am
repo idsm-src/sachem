@@ -68,10 +68,11 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/load/DrugbankCompoundUpdater.java \
     src/cz/iocb/sachem/load/GeneralCompoundLoader.java \
     src/cz/iocb/sachem/load/PubChemCompoundUpdater.java \
+    src/cz/iocb/sachem/lucene/BalancedMergePolicy.java \
     src/cz/iocb/sachem/lucene/FingerprintBitMapping.java \
     src/cz/iocb/sachem/lucene/FingerprintTokenStream.java \
     src/cz/iocb/sachem/lucene/Indexer.java \
-    src/cz/iocb/sachem/lucene/ResultCollector.java \
+    src/cz/iocb/sachem/lucene/ResultCollectorManager.java \
     src/cz/iocb/sachem/lucene/Searcher.java \
     src/cz/iocb/sachem/lucene/SearchResult.java \
     src/cz/iocb/sachem/lucene/Settings.java \

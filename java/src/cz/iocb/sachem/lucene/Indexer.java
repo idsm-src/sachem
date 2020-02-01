@@ -15,7 +15,6 @@ import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.SerialMergeScheduler;
-import org.apache.lucene.index.TieredMergePolicy;
 import org.apache.lucene.search.similarities.BooleanSimilarity;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.BytesRef;
@@ -46,31 +45,45 @@ public class Indexer
     private FSDirectory folder;
     private IndexWriter indexer;
 
-    private Thread[] threads;
-    private ArrayBlockingQueue<IndexItem> queue;
+    private Thread[] documentThreads;
+    private Thread indexThread;
+    private ArrayBlockingQueue<IndexItem> moleculeQueue;
+    private ArrayBlockingQueue<Document> documentQueue;
+
 
     private Throwable exception;
 
 
-    public void begin(String path) throws IOException
+    public void begin(String path, int segments, int bufferedDocs, double bufferSize) throws IOException
     {
         folder = FSDirectory.open(Paths.get(path));
 
+        if(bufferedDocs <= 0)
+            bufferedDocs = IndexWriterConfig.DISABLE_AUTO_FLUSH;
+
+        if(bufferSize <= 0)
+            bufferSize = IndexWriterConfig.DISABLE_AUTO_FLUSH;
+
         try
         {
-            TieredMergePolicy policy = new TieredMergePolicy();
-            policy.setMaxMergeAtOnceExplicit(Integer.MAX_VALUE);
-            policy.setMaxMergedSegmentMB(1024 * 1024);
+            BalancedMergePolicy policy = new BalancedMergePolicy(segments);
 
             IndexWriterConfig config = new IndexWriterConfig(null);
+
+            config.setMaxBufferedDocs(bufferedDocs);
+            config.setRAMBufferSizeMB(bufferSize);
+
             config.setMergePolicy(policy);
             config.setSimilarity(new BooleanSimilarity());
             config.setMergeScheduler(new SerialMergeScheduler());
 
             final int cores = Runtime.getRuntime().availableProcessors();
             indexer = new IndexWriter(folder, config);
-            queue = new ArrayBlockingQueue<IndexItem>(4 * cores);
-            threads = new Thread[cores];
+
+            moleculeQueue = new ArrayBlockingQueue<IndexItem>(128 * cores);
+            documentQueue = new ArrayBlockingQueue<Document>(2 * bufferedDocs);
+
+            documentThreads = new Thread[cores];
 
             for(int i = 0; i < cores; i++)
             {
@@ -83,7 +96,7 @@ public class Indexer
                         {
                             try
                             {
-                                IndexItem item = queue.take();
+                                IndexItem item = moleculeQueue.take();
 
                                 if(item.molecule == null)
                                     return;
@@ -112,8 +125,41 @@ public class Indexer
 
                 thread.start();
 
-                threads[i] = thread;
+                documentThreads[i] = thread;
             }
+
+
+            Thread thread = new Thread()
+            {
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        while(true)
+                        {
+                            Document document = documentQueue.take();
+
+                            if(document.getFields().isEmpty())
+                                break;
+
+                            indexer.addDocument(document);
+                        }
+                    }
+                    catch(Throwable e)
+                    {
+                        synchronized(Indexer.this)
+                        {
+                            if(exception != null)
+                                exception = e;
+                        }
+                    }
+                }
+            };
+
+            thread.start();
+
+            indexThread = thread;
         }
         catch(Throwable e)
         {
@@ -137,7 +183,7 @@ public class Indexer
             BinaryMoleculeBuilder builder = new BinaryMoleculeBuilder(container);
 
             byte[] binary = builder.asBytes(true);
-            queue.put(new IndexItem(id, binary));
+            moleculeQueue.put(new IndexItem(id, binary));
         }
         catch(Exception e)
         {
@@ -156,16 +202,16 @@ public class Indexer
 
     public void optimize() throws IOException
     {
-        indexer.forceMerge(1);
+        indexer.forceMergeDeletes();
     }
 
 
     public void commit() throws IOException
     {
+        stopThreads();
+
         if(exception != null)
             throw new IOException(exception);
-
-        stopThreads();
 
         indexer.commit();
         indexer.close();
@@ -187,14 +233,21 @@ public class Indexer
     {
         try
         {
-            if(threads == null)
-                return;
+            if(documentThreads != null)
+            {
+                for(int i = 0; i < documentThreads.length; i++)
+                    moleculeQueue.put(new IndexItem(Integer.MIN_VALUE, null));
 
-            for(int i = 0; i < threads.length; i++)
-                queue.put(new IndexItem(Integer.MIN_VALUE, null));
+                for(int i = 0; i < documentThreads.length; i++)
+                    if(documentThreads[i] != null)
+                        documentThreads[i].join();
+            }
 
-            for(int i = 0; i < threads.length; i++)
-                threads[i].join();
+            if(indexThread != null)
+            {
+                documentQueue.put(new Document());
+                indexThread.join();
+            }
         }
         catch(InterruptedException e)
         {

@@ -17,6 +17,10 @@ CREATE TABLE configuration (
     table_name      VARCHAR NOT NULL CHECK (char_length(table_name) > 0),
     id_column       VARCHAR NOT NULL CHECK (char_length(id_column) > 0),
     molfile_column  VARCHAR NOT NULL CHECK (char_length(molfile_column) > 0),
+    threads         INT NOT NULL CHECK (char_length(molfile_column) > 0),
+    segments        INT NOT NULL CHECK (char_length(molfile_column) > 0),
+    buffered_docs   INT NOT NULL CHECK (char_length(molfile_column) >= 0),
+    buffer_size     FLOAT4 NOT NULL CHECK (char_length(molfile_column) >= 0),
     version         INT NOT NULL,
     PRIMARY KEY (id)
 );
@@ -78,11 +82,11 @@ CREATE FUNCTION "sync_data"(varchar, boolean = false, boolean = true) RETURNS vo
 CREATE FUNCTION "cleanup"(varchar) RETURNS void AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
 
 
-CREATE FUNCTION "add_index"(index_name varchar, schema_name varchar, table_name varchar, id_column varchar = 'id', molfile_column varchar = 'molfile') RETURNS void AS $$
+CREATE FUNCTION "add_index"(index_name varchar, schema_name varchar, table_name varchar, id_column varchar = 'id', molfile_column varchar = 'molfile', threads int = 4, segments int = 4, buffered_docs int = 1000, buffer_size float8 = 64) RETURNS void AS $$
 DECLARE
     idx int;
 BEGIN
-	INSERT INTO sachem.configuration (index_name, schema_name, table_name, id_column, molfile_column, version) VALUES (index_name, schema_name, table_name, id_column, molfile_column, 0);
+	INSERT INTO sachem.configuration (index_name, schema_name, table_name, id_column, molfile_column, threads, segments, buffered_docs, buffer_size, version) VALUES (index_name, schema_name, table_name, id_column, molfile_column, threads, segments, buffered_docs, buffer_size, 0);
 
 	SELECT id INTO idx FROM sachem.configuration AS tbl WHERE tbl.index_name = "add_index".index_name;
 	

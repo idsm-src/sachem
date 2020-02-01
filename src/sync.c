@@ -37,7 +37,7 @@ static void indexer_java_init()
     constructor = (*env)->GetMethodID(env, indexerClass, "<init>", "()V");
     java_check_exception(__func__);
 
-    beginMethod = (*env)->GetMethodID(env, indexerClass, "begin", "(Ljava/lang/String;)V");
+    beginMethod = (*env)->GetMethodID(env, indexerClass, "begin", "(Ljava/lang/String;IID)V");
     java_check_exception(__func__);
 
     addMethod = (*env)->GetMethodID(env, indexerClass, "add", "(I[B)Ljava/lang/String;");
@@ -76,7 +76,7 @@ static void indexer_terminate(jobject indexer)
 }
 
 
-static void indexer_begin(jobject indexer, const char *path)
+static void indexer_begin(jobject indexer, const char *path, int segments, int bufferedDocs, double bufferSize)
 {
     jstring folder = NULL;
 
@@ -85,7 +85,7 @@ static void indexer_begin(jobject indexer, const char *path)
         folder = (*env)->NewStringUTF(env, path);
         java_check_exception(__func__);
 
-        (*env)->CallVoidMethod(env, indexer, beginMethod, folder);
+        (*env)->CallVoidMethod(env, indexer, beginMethod, folder, segments, bufferedDocs, bufferSize);
         java_check_exception(__func__);
 
         JavaDeleteRef(folder);
@@ -305,11 +305,12 @@ Datum sync_data(PG_FUNCTION_ARGS)
 
     /* load configuration */
     if(unlikely(SPI_execute_with_args("select id, version, quote_ident(schema_name), quote_ident(table_name), "
-            "quote_ident(id_column), quote_ident(molfile_column) from sachem.configuration where index_name = $1", 1,
+            "quote_ident(id_column), quote_ident(molfile_column), segments, buffered_docs, buffer_size from "
+            "sachem.configuration where index_name = $1", 1,
             (Oid[]) { VARCHAROID }, (Datum[]) { PointerGetDatum(index) }, NULL, true, 1) != SPI_OK_SELECT))
         elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
-    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 6))
+    if(unlikely(SPI_processed != 1 || SPI_tuptable == NULL || SPI_tuptable->tupdesc->natts != 9))
         elog(ERROR, "%s: SPI_execute_plan() failed", __func__);
 
     Datum indexId = SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 1);
@@ -318,6 +319,9 @@ Datum sync_data(PG_FUNCTION_ARGS)
     char *tableName = text_to_cstring(DatumGetVarCharP(SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 4)));
     char *idColumn = text_to_cstring(DatumGetVarCharP(SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 5)));
     char *molfileColumn = text_to_cstring(DatumGetVarCharP(SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 6)));
+    int32 segments = DatumGetInt32(SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 7));
+    int32 bufferedDocs = DatumGetInt32(SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 8));
+    float8 bufferSize = DatumGetFloat8(SPI_get_value(SPI_tuptable->vals[0], SPI_tuptable->tupdesc, 9));
     char *indexName = text_to_cstring(index);
 
 
@@ -344,7 +348,7 @@ Datum sync_data(PG_FUNCTION_ARGS)
 
     PG_TRY();
     {
-        indexer_begin(indexer, indexPath);
+        indexer_begin(indexer, indexPath, segments, bufferedDocs, bufferSize);
 
         /* delete unnecessary data */
         Portal auditCursor = SPI_cursor_open_with_args(NULL,
