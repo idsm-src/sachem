@@ -65,7 +65,8 @@ static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobjec
     }
 
 
-    bool extend = !isomorphism->query->extended && molecule_has_multivalent_hydrogen(target);
+    bool extend = !isomorphism->query->extended && isomorphism->query->atomCount != isomorphism->query->originalAtomCount &&
+            molecule_has_multivalent_hydrogen(target);
 
     size_t targetsize = molecule_mem_size(target, NULL, extend || isomorphism->query->extended,
             isomorphism->chargeMode != CHARGE_IGNORE, isomorphism->isotopeMode != ISOTOPE_IGNORE,
