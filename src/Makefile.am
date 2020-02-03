@@ -7,6 +7,7 @@ libsachem_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(JDK8_CPPFLAGS) -DBINDIR=\"$(bin
 libsachem_la_LDFLAGS = $(JDK8_LDFLAGS) -Wl,-rpath,$(POSTGRESQL_LIBDIR)
 
 libsachem_la_SOURCES = \
+		info.c \
         java.c \
         native.c \
         sachem.c \

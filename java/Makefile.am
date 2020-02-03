@@ -72,6 +72,7 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/lucene/FingerprintBitMapping.java \
     src/cz/iocb/sachem/lucene/FingerprintTokenStream.java \
     src/cz/iocb/sachem/lucene/Indexer.java \
+    src/cz/iocb/sachem/lucene/IndexInfo.java \
     src/cz/iocb/sachem/lucene/ResultCollectorManager.java \
     src/cz/iocb/sachem/lucene/Searcher.java \
     src/cz/iocb/sachem/lucene/SearchResult.java \

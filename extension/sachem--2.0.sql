@@ -80,6 +80,7 @@ CREATE FUNCTION "substructure_search"(varchar, varchar, search_mode = 'SUBSTRUCT
 CREATE FUNCTION "similarity_search"(varchar, varchar, float4 = 0.85, int = 1, aromaticity_mode = 'AUTO', tautomer_mode = 'IGNORE') RETURNS TABLE (compound int, score float4) AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "sync_data"(varchar, boolean = false, boolean = true) RETURNS void AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
 CREATE FUNCTION "cleanup"(varchar) RETURNS void AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION "segments"(varchar) RETURNS TABLE (name varchar, molecules int, deletes int, size bigint) AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
 
 
 CREATE FUNCTION "add_index"(index_name varchar, schema_name varchar, table_name varchar, id_column varchar = 'id', molfile_column varchar = 'molfile', threads int = 4, segments int = 4, buffered_docs int = 1000, buffer_size float8 = 64) RETURNS void AS $$
