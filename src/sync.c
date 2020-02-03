@@ -366,7 +366,11 @@ Datum sync_data(PG_FUNCTION_ARGS)
                 break;
 
             for(size_t i = 0; i < SPI_processed; i++)
+            {
+                CHECK_FOR_INTERRUPTS();
+
                 indexer_delete(indexer, DatumGetInt32(SPI_get_value(SPI_tuptable->vals[i], SPI_tuptable->tupdesc, 1)));
+            }
         }
 
         SPI_cursor_close(auditCursor);
@@ -397,6 +401,8 @@ Datum sync_data(PG_FUNCTION_ARGS)
 
             for(int i = 0; i < processed; i++)
             {
+                CHECK_FOR_INTERRUPTS();
+
                 Datum id = SPI_get_value(tuptable->vals[i], tuptable->tupdesc, 1);
                 Datum molfile = SPI_get_value(tuptable->vals[i], tuptable->tupdesc, 2);
 
