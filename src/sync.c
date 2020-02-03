@@ -18,7 +18,6 @@ static jmethodID constructor;
 static jmethodID beginMethod;
 static jmethodID addMethod;
 static jmethodID deleteMethod;
-static jmethodID optimizeMethod;
 static jmethodID commitMethod;
 static jmethodID rollbackMethod;
 
@@ -46,10 +45,7 @@ static void indexer_java_init()
     deleteMethod = (*env)->GetMethodID(env, indexerClass, "delete", "(I)V");
     java_check_exception(__func__);
 
-    optimizeMethod = (*env)->GetMethodID(env, indexerClass, "optimize", "()V");
-    java_check_exception(__func__);
-
-    commitMethod = (*env)->GetMethodID(env, indexerClass, "commit", "()V");
+    commitMethod = (*env)->GetMethodID(env, indexerClass, "commit", "(Z)V");
     java_check_exception(__func__);
 
     rollbackMethod = (*env)->GetMethodID(env, indexerClass, "rollback", "()V");
@@ -159,16 +155,9 @@ static void indexer_delete(jobject indexer, int32_t id)
 }
 
 
-static void indexer_optimize(jobject indexer)
+static void indexer_commit(jobject indexer, jboolean optimize)
 {
-    (*env)->CallVoidMethod(env, indexer, optimizeMethod);
-    java_check_exception(__func__);
-}
-
-
-static void indexer_commit(jobject indexer)
-{
-    (*env)->CallVoidMethod(env, indexer, commitMethod);
+    (*env)->CallVoidMethod(env, indexer, commitMethod, optimize);
     java_check_exception(__func__);
 }
 
@@ -439,11 +428,7 @@ Datum sync_data(PG_FUNCTION_ARGS)
             elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
 
-
-        if(optimize)
-            indexer_optimize(indexer);
-
-        indexer_commit(indexer);
+        indexer_commit(indexer, optimize);
     }
     PG_CATCH();
     {

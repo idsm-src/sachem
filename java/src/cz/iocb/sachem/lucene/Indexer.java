@@ -200,18 +200,15 @@ public class Indexer
     }
 
 
-    public void optimize() throws IOException
-    {
-        indexer.forceMergeDeletes();
-    }
-
-
-    public void commit() throws IOException
+    public void commit(boolean optimize) throws IOException
     {
         stopThreads();
 
         if(exception != null)
             throw new IOException(exception);
+
+        if(optimize)
+            indexer.forceMergeDeletes();
 
         indexer.commit();
         indexer.close();
