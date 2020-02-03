@@ -125,6 +125,8 @@ BEGIN
 	
 	EXECUTE 'CREATE TRIGGER "' || index_name || '_sachem_truncate_compound_audit" BEFORE TRUNCATE ON ' ||
 	    schema_name || '.' || table_name ||  ' FOR EACH STATEMENT EXECUTE PROCEDURE sachem."' || index_name || '_compound_audit"()';
+    
+	EXECUTE 'INSERT INTO sachem.compound_audit (index, id, stored) SELECT ' || idx || ', ' || id_column || ', true FROM ' || schema_name || '.' || table_name;
 END
 $$ LANGUAGE PLPGSQL STRICT SECURITY DEFINER;
 
