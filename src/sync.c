@@ -274,8 +274,8 @@ static void delete_directory(int parent, const char *path)
         close(dirfd);
         dirfd = -1;
 
-        if(unlikely(rmdir(path) != 0))
-           elog(ERROR, "%s: rmdir() failed", __func__);
+        if(unlikely(unlinkat(parent, path, AT_REMOVEDIR) != 0))
+           elog(ERROR, "%s: unlinkat() failed", __func__);
     }
     PG_CATCH();
     {
