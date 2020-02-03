@@ -26,7 +26,7 @@ LuceneResult;
 
 static bool initialized = false;
 static TupleDesc tupdesc = NULL;
-static SPIPlanPtr configQueryPlan;
+static SPIPlanPtr configQueryPlan = NULL;
 
 static EnumValue searchModeTable[2];
 static EnumValue chargeModeTable[3];
