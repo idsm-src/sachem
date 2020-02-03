@@ -71,7 +71,7 @@ void java_init(void)
                                                      JARDIR "/jnati-deploy-0.4.jar:"
                                                      JARDIR "/jni-inchi-0.8.jar:"
                                                      JARDIR "/log4j-1.2.17.jar:"
-                                                     JARDIR "/lucene-core-8.2.0.jar:"
+                                                     JARDIR "/lucene-core-8.4.1.jar:"
                                                      JARDIR "/vecmath-1.5.2.jar" }},
             .ignoreUnrecognized = JNI_FALSE
         };

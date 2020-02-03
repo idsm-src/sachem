@@ -19,7 +19,7 @@ jar_DATA = \
     lib/jnati-deploy-0.4.jar \
     lib/jni-inchi-0.8.jar \
     lib/log4j-1.2.17.jar \
-    lib/lucene-core-8.2.0.jar \
+    lib/lucene-core-8.4.1.jar \
     lib/vecmath-1.5.2.jar
 
 jardir = $(datadir)/$(PACKAGE)/jar
@@ -54,7 +54,7 @@ EXTRA_DIST = \
     lib/jnati-deploy-0.4.jar \
     lib/jni-inchi-0.8.jar \
     lib/log4j-1.2.17.jar \
-    lib/lucene-core-8.2.0.jar \
+    lib/lucene-core-8.4.1.jar \
     lib/vecmath-1.5.2.jar \
     src/cz/iocb/sachem/fingerprint/AtomFingerprint.java \
     src/cz/iocb/sachem/fingerprint/CRNGFingerprint.java \
