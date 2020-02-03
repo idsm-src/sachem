@@ -150,5 +150,7 @@ BEGIN
 	EXECUTE 'DROP TRIGGER "' || index_name || '_sachem_compound_audit" ON ' || schema_name || '.' || table_name;
     EXECUTE 'DROP TRIGGER "' || index_name || '_sachem_truncate_compound_audit" ON ' || schema_name || '.' || table_name;
     EXECUTE 'DROP FUNCTION sachem."' || index_name || '_compound_audit"()';
+    
+    PERFORM sachem.cleanup(index_name);
 END
 $$ LANGUAGE PLPGSQL STRICT SECURITY DEFINER;

@@ -474,7 +474,7 @@ Datum cleanup(PG_FUNCTION_ARGS)
     int version = 0;
 
     if(unlikely(SPI_execute_with_args("select version from sachem.configuration where index_name = $1",
-            1, (Oid[]) { VARCHAROID }, (Datum[]) { PointerGetDatum(index) }, NULL, true, 1) != SPI_OK_SELECT))
+            1, (Oid[]) { VARCHAROID }, (Datum[]) { PointerGetDatum(index) }, NULL, false, 1) != SPI_OK_SELECT))
         elog(ERROR, "%s: SPI_execute_with_args() failed", __func__);
 
     if(likely(SPI_processed != 0))
