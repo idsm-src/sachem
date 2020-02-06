@@ -105,11 +105,7 @@ public class Indexer
                                     continue;
 
                                 Document document = createDocument(item.id, item.molecule);
-
-                                synchronized(indexer)
-                                {
-                                    indexer.addDocument(document);
-                                }
+                                documentQueue.put(document);
                             }
                             catch(Throwable e)
                             {
