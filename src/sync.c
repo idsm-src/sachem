@@ -395,7 +395,11 @@ Datum sync_data(PG_FUNCTION_ARGS)
                 Datum id = SPI_get_value(tuptable->vals[i], tuptable->tupdesc, 1);
                 Datum molfile = SPI_get_value(tuptable->vals[i], tuptable->tupdesc, 2);
 
-                VarChar *message = indexer_add(indexer, DatumGetInt32(id), DatumGetVarCharP(molfile));
+                VarChar *data = DatumGetVarCharP(molfile);
+                VarChar *message = indexer_add(indexer, DatumGetInt32(id), data);
+
+                if((Pointer) data != DatumGetPointer(molfile))
+                    pfree(data);
 
                 if(unlikely(message != NULL))
                 {
