@@ -44,6 +44,7 @@ public class Indexer
 
     private FSDirectory folder;
     private IndexWriter indexer;
+    private int segments;
 
     private Thread[] documentThreads;
     private Thread indexThread;
@@ -54,7 +55,7 @@ public class Indexer
     private Throwable exception;
 
 
-    public void begin(String path, int segments, int bufferedDocs, double bufferSize) throws IOException
+    public void begin(String path, int maxSegments, int bufferedDocs, double bufferSize) throws IOException
     {
         folder = FSDirectory.open(Paths.get(path));
 
@@ -66,7 +67,7 @@ public class Indexer
 
         try
         {
-            BalancedMergePolicy policy = new BalancedMergePolicy(segments);
+            BalancedMergePolicy policy = new BalancedMergePolicy();
 
             IndexWriterConfig config = new IndexWriterConfig(null);
 
@@ -79,6 +80,7 @@ public class Indexer
 
             final int cores = Runtime.getRuntime().availableProcessors();
             indexer = new IndexWriter(folder, config);
+            segments = maxSegments;
 
             moleculeQueue = new ArrayBlockingQueue<IndexItem>(128 * cores);
             documentQueue = new ArrayBlockingQueue<Document>(2 * bufferedDocs);
@@ -204,7 +206,7 @@ public class Indexer
             throw new IOException(exception);
 
         if(optimize)
-            indexer.forceMergeDeletes();
+            indexer.forceMerge(segments);
 
         indexer.commit();
         indexer.close();

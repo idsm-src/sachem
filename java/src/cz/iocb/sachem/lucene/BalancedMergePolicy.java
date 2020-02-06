@@ -34,15 +34,6 @@ public class BalancedMergePolicy extends MergePolicy
     }
 
 
-    private final int segmentsCount;
-
-
-    public BalancedMergePolicy(int segmentsCount)
-    {
-        this.segmentsCount = segmentsCount;
-    }
-
-
     @Override
     public MergeSpecification findForcedDeletesMerges(SegmentInfos infos, MergeContext context) throws IOException
     {
@@ -60,24 +51,16 @@ public class BalancedMergePolicy extends MergePolicy
     public MergeSpecification findForcedMerges(SegmentInfos infos, int maxSegmentCount,
             Map<SegmentCommitInfo, Boolean> segmentsToMerge, MergeContext context) throws IOException
     {
-        throw new UnsupportedOperationException();
-    }
-
-
-    @Override
-    public MergeSpecification findMerges(MergeTrigger trigger, SegmentInfos infos, MergeContext context)
-            throws IOException
-    {
         ArrayList<Info> sorted = new ArrayList<Info>(infos.size());
 
         for(SegmentCommitInfo info : infos)
             sorted.add(new Info(info, info.info.maxDoc() - context.numDeletesToMerge(info)));
 
-        while(sorted.size() > segmentsCount)
+        while(sorted.size() > maxSegmentCount)
         {
             sorted.sort((o1, o2) -> Long.compare(o2.docs, o1.docs));
 
-            Info i1 = sorted.get(segmentsCount - 1);
+            Info i1 = sorted.get(maxSegmentCount - 1);
             Info i2 = sorted.get(sorted.size() - 1);
 
             sorted.remove(sorted.size() - 1);
@@ -87,9 +70,17 @@ public class BalancedMergePolicy extends MergePolicy
         MergeSpecification specification = new MergeSpecification();
 
         for(Info info : sorted)
-            if(info.infos.size() > 1)
+            if(info.infos.size() > 1 || info.infos.get(0).hasDeletions())
                 specification.add(new OneMerge(info.infos));
 
         return specification;
+    }
+
+
+    @Override
+    public MergeSpecification findMerges(MergeTrigger trigger, SegmentInfos infos, MergeContext context)
+            throws IOException
+    {
+        return new MergeSpecification();
     }
 }
