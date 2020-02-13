@@ -35,6 +35,7 @@ import cz.iocb.sachem.molecule.AromaticityMode;
 import cz.iocb.sachem.molecule.BinaryMolecule;
 import cz.iocb.sachem.molecule.BinaryMoleculeBuilder;
 import cz.iocb.sachem.molecule.MoleculeCreator;
+import cz.iocb.sachem.molecule.QueryFormat;
 import cz.iocb.sachem.molecule.TautomerMode;
 
 
@@ -53,7 +54,7 @@ public class SimilarStructureQuery extends Query
     private final Query subquery;
 
 
-    public SimilarStructureQuery(String field, String query, float threshold, int maximumDepth,
+    public SimilarStructureQuery(String field, String query, QueryFormat format, float threshold, int maximumDepth,
             AromaticityMode aromaticityMode, TautomerMode tautomerMode)
             throws CDKException, IOException, TimeoutException
     {
@@ -64,7 +65,8 @@ public class SimilarStructureQuery extends Query
         this.aromaticityMode = aromaticityMode;
         this.tautomerMode = tautomerMode;
 
-        List<IAtomContainer> queryMolecules = MoleculeCreator.translateQuery(query, aromaticityMode, tautomerMode);
+        List<IAtomContainer> queryMolecules = MoleculeCreator.translateQuery(query, format, aromaticityMode,
+                tautomerMode);
         ArrayList<Query> subqueries = new ArrayList<Query>(queryMolecules.size());
 
         for(IAtomContainer molecule : queryMolecules)

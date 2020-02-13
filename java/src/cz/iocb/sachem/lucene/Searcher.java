@@ -24,6 +24,7 @@ import org.openscience.cdk.exception.CDKException;
 import cz.iocb.sachem.molecule.AromaticityMode;
 import cz.iocb.sachem.molecule.ChargeMode;
 import cz.iocb.sachem.molecule.IsotopeMode;
+import cz.iocb.sachem.molecule.QueryFormat;
 import cz.iocb.sachem.molecule.SearchMode;
 import cz.iocb.sachem.molecule.StereoMode;
 import cz.iocb.sachem.molecule.TautomerMode;
@@ -145,12 +146,12 @@ public class Searcher
     }
 
 
-    public SearchResult subsearch(byte[] molecule, int n, boolean sort, SearchMode graphMode, ChargeMode chargeMode,
-            IsotopeMode isotopeMode, StereoMode stereoMode, AromaticityMode aromaticityMode, TautomerMode tautomerMode,
-            int isomorphismLimit) throws IOException, CDKException, TimeoutException
+    public SearchResult subsearch(byte[] molecule, QueryFormat format, int n, boolean sort, SearchMode graphMode,
+            ChargeMode chargeMode, IsotopeMode isotopeMode, StereoMode stereoMode, AromaticityMode aromaticityMode,
+            TautomerMode tautomerMode, int isomorphismLimit) throws IOException, CDKException, TimeoutException
     {
-        Query query = new SubstructureQuery(Settings.substructureFieldName, new String(molecule), graphMode, chargeMode,
-                isotopeMode, stereoMode, aromaticityMode, tautomerMode, isomorphismLimit);
+        Query query = new SubstructureQuery(Settings.substructureFieldName, new String(molecule), format, graphMode,
+                chargeMode, isotopeMode, stereoMode, aromaticityMode, tautomerMode, isomorphismLimit);
 
         if(n == 0)
             return new SearchResult();
@@ -163,12 +164,12 @@ public class Searcher
     }
 
 
-    public SearchResult simsearch(byte[] molecule, int n, boolean sort, float threshold, int depth,
+    public SearchResult simsearch(byte[] molecule, QueryFormat format, int n, boolean sort, float threshold, int depth,
             AromaticityMode aromaticityMode, TautomerMode tautomerMode)
             throws IOException, CDKException, TimeoutException
     {
-        Query query = new SimilarStructureQuery(Settings.similarityFieldName, new String(molecule), threshold, depth,
-                aromaticityMode, tautomerMode);
+        Query query = new SimilarStructureQuery(Settings.similarityFieldName, new String(molecule), format, threshold,
+                depth, aromaticityMode, tautomerMode);
 
 
         if(n == 0)

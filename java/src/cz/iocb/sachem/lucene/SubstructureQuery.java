@@ -39,6 +39,7 @@ import cz.iocb.sachem.molecule.IsotopeMode;
 import cz.iocb.sachem.molecule.MoleculeCreator;
 import cz.iocb.sachem.molecule.NativeIsomorphism;
 import cz.iocb.sachem.molecule.NativeIsomorphism.IterationLimitExceededException;
+import cz.iocb.sachem.molecule.QueryFormat;
 import cz.iocb.sachem.molecule.SearchMode;
 import cz.iocb.sachem.molecule.StereoMode;
 import cz.iocb.sachem.molecule.TautomerMode;
@@ -60,9 +61,9 @@ public class SubstructureQuery extends Query
     private final Query subquery;
 
 
-    public SubstructureQuery(String field, String query, SearchMode graphMode, ChargeMode chargeMode,
-            IsotopeMode isotopeMode, StereoMode stereoMode, AromaticityMode aromaticityMode, TautomerMode tautomerMode,
-            int iterationLimit) throws CDKException, IOException, TimeoutException
+    public SubstructureQuery(String field, String query, QueryFormat format, SearchMode graphMode,
+            ChargeMode chargeMode, IsotopeMode isotopeMode, StereoMode stereoMode, AromaticityMode aromaticityMode,
+            TautomerMode tautomerMode, int iterationLimit) throws CDKException, IOException, TimeoutException
     {
         this.field = field;
         this.query = query;
@@ -74,7 +75,8 @@ public class SubstructureQuery extends Query
         this.tautomerMode = tautomerMode;
         this.iterationLimit = iterationLimit;
 
-        List<IAtomContainer> queryMolecules = MoleculeCreator.translateQuery(query, aromaticityMode, tautomerMode);
+        List<IAtomContainer> queryMolecules = MoleculeCreator.translateQuery(query, format, aromaticityMode,
+                tautomerMode);
         ArrayList<Query> subqueries = new ArrayList<Query>(queryMolecules.size());
 
         for(IAtomContainer molecule : queryMolecules)
