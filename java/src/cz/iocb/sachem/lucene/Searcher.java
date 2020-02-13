@@ -145,24 +145,40 @@ public class Searcher
     }
 
 
-    public SearchResult subsearch(byte[] molecule, SearchMode graphMode, ChargeMode chargeMode, IsotopeMode isotopeMode,
-            StereoMode stereoMode, AromaticityMode aromaticityMode, TautomerMode tautomerMode, int isomorphismLimit)
-            throws IOException, CDKException, TimeoutException
+    public SearchResult subsearch(byte[] molecule, int n, boolean sort, SearchMode graphMode, ChargeMode chargeMode,
+            IsotopeMode isotopeMode, StereoMode stereoMode, AromaticityMode aromaticityMode, TautomerMode tautomerMode,
+            int isomorphismLimit) throws IOException, CDKException, TimeoutException
     {
         Query query = new SubstructureQuery(Settings.substructureFieldName, new String(molecule), graphMode, chargeMode,
                 isotopeMode, stereoMode, aromaticityMode, tautomerMode, isomorphismLimit);
 
-        return searcher.search(query, new ResultCollectorManager());
+        if(n == 0)
+            return new SearchResult();
+        else if(n >= 0)
+            return new SearchResult(searcher.search(query, n));
+        else if(sort)
+            return new SearchResult(searcher.search(query, Integer.MAX_VALUE));
+        else
+            return searcher.search(query, new ResultCollectorManager());
     }
 
 
-    public SearchResult simsearch(byte[] molecule, float threshold, int depth, AromaticityMode aromaticityMode,
-            TautomerMode tautomerMode) throws IOException, CDKException, TimeoutException
+    public SearchResult simsearch(byte[] molecule, int n, boolean sort, float threshold, int depth,
+            AromaticityMode aromaticityMode, TautomerMode tautomerMode)
+            throws IOException, CDKException, TimeoutException
     {
         Query query = new SimilarStructureQuery(Settings.similarityFieldName, new String(molecule), threshold, depth,
                 aromaticityMode, tautomerMode);
 
-        return searcher.search(query, new ResultCollectorManager());
+
+        if(n == 0)
+            return new SearchResult();
+        else if(n >= 0)
+            return new SearchResult(searcher.search(query, n));
+        else if(sort)
+            return new SearchResult(searcher.search(query, Integer.MAX_VALUE));
+        else
+            return searcher.search(query, new ResultCollectorManager());
     }
 
 

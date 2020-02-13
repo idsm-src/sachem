@@ -1,4 +1,4 @@
 extensiondir = $(POSTGRESQL_SHAREDIR)/extension
 dist_extension_DATA = \
 		sachem.control  \
-		sachem--2.0.sql
+		sachem--2.1.sql
