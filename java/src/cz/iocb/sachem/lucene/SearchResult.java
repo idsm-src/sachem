@@ -1,5 +1,9 @@
 package cz.iocb.sachem.lucene;
 
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Set;
+import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 
@@ -7,6 +11,8 @@ import org.apache.lucene.search.TopDocs;
 
 public class SearchResult
 {
+    private static final Set<String> fieldsToLoad = Collections.singleton(Settings.idFieldName);
+
     public final int length;
     public final int[] ids;
     public final float[] scores;
@@ -28,7 +34,7 @@ public class SearchResult
     }
 
 
-    public SearchResult(TopDocs hits)
+    public SearchResult(IndexSearcher searcher, TopDocs hits) throws IOException
     {
         this.length = hits.scoreDocs.length;
         this.ids = new int[length];
@@ -38,7 +44,7 @@ public class SearchResult
 
         for(ScoreDoc hit : hits.scoreDocs)
         {
-            ids[i] = hit.doc;
+            ids[i] = searcher.doc(hit.doc, fieldsToLoad).getField(Settings.idFieldName).numericValue().intValue();
             scores[i] = hit.score;
             i++;
         }

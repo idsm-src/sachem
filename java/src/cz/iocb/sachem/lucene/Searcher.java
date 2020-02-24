@@ -156,9 +156,9 @@ public class Searcher
         if(n == 0)
             return new SearchResult();
         else if(n >= 0)
-            return new SearchResult(searcher.search(query, n));
+            return new SearchResult(searcher, searcher.search(query, n));
         else if(sort)
-            return new SearchResult(searcher.search(query, Integer.MAX_VALUE));
+            return new SearchResult(searcher, searcher.search(query, Integer.MAX_VALUE));
         else
             return searcher.search(query, new ResultCollectorManager());
     }
@@ -175,9 +175,9 @@ public class Searcher
         if(n == 0)
             return new SearchResult();
         else if(n >= 0)
-            return new SearchResult(searcher.search(query, n));
+            return new SearchResult(searcher, searcher.search(query, n));
         else if(sort)
-            return new SearchResult(searcher.search(query, Integer.MAX_VALUE));
+            return new SearchResult(searcher, searcher.search(query, Integer.MAX_VALUE));
         else
             return searcher.search(query, new ResultCollectorManager());
     }
