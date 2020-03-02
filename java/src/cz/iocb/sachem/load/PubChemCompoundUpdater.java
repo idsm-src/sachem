@@ -10,6 +10,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.LinkedList;
 import org.apache.commons.net.ftp.FTP;
@@ -109,6 +110,7 @@ public class PubChemCompoundUpdater
 
 
                 FTPFile[] dailyUpdates = ftpClient.listFiles(ftpPath + "/Daily");
+                Arrays.sort(dailyUpdates, (a, b) -> a.getName().compareTo(b.getName()));
 
                 if(dailyUpdates.length == 0)
                     throw new Exception("ftp directory is empty");
@@ -143,6 +145,7 @@ public class PubChemCompoundUpdater
                         throw new Exception("inconsistent server daily data");
 
                     FTPFile[] weeklyUpdates = ftpClient.listFiles(ftpPath + "/Weekly");
+                    Arrays.sort(weeklyUpdates, (a, b) -> a.getName().compareTo(b.getName()));
 
                     if(weeklyUpdates.length == 0)
                         throw new Exception("ftp directory is empty");
