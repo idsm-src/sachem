@@ -30,7 +30,7 @@ CREATE TABLE configuration (
 CREATE TABLE compound_audit (
     index                 INT NOT NULL REFERENCES configuration(id),
     id                    INT NOT NULL,
-    stored                BOOLEAN NOT NULL,
+    delete                BOOLEAN NOT NULL,
     PRIMARY KEY (index, id)
 );
 
@@ -101,22 +101,22 @@ BEGIN
 	$body$
 	BEGIN
 	  IF (TG_OP = ''INSERT'') THEN
-	    INSERT INTO sachem.compound_audit (index, id, stored) VALUES (' || idx || ', NEW.' || id_column || ', true)
-	        ON CONFLICT (index, id) DO UPDATE SET index=EXCLUDED.index, id=EXCLUDED.id, stored=true;
+	    INSERT INTO sachem.compound_audit (index, id, delete) VALUES (' || idx || ', NEW.' || id_column || ', false)
+	        ON CONFLICT DO NOTHING;
 	    RETURN NEW;
 	  ELSIF (TG_OP = ''UPDATE'') THEN
 	    IF (OLD.' || molfile_column || ' != NEW.' || molfile_column || ') THEN
-	        INSERT INTO sachem.compound_audit (index, id, stored) VALUES (' || idx || ', NEW.' || id_column || ', true)
-	            ON CONFLICT (index, id) DO UPDATE SET index=EXCLUDED.index, id=EXCLUDED.id, stored=true;
+	        INSERT INTO sachem.compound_audit (index, id, delete) VALUES (' || idx || ', NEW.' || id_column || ', true)
+	            ON CONFLICT (index, id) DO UPDATE SET index=EXCLUDED.index, id=EXCLUDED.id, delete=true;
 	    END IF;
 	    RETURN NEW;
 	  ELSIF (TG_OP = ''DELETE'') THEN
-	    INSERT INTO sachem.compound_audit (index, id, stored) VALUES (' || idx || ', OLD.' || id_column || ', false)
-	        ON CONFLICT (index, id) DO UPDATE SET index=EXCLUDED.index, id=EXCLUDED.id, stored=false;
+	    INSERT INTO sachem.compound_audit (index, id, delete) VALUES (' || idx || ', OLD.' || id_column || ', true)
+	        ON CONFLICT (index, id) DO UPDATE SET index=EXCLUDED.index, id=EXCLUDED.id, delete=true;
 	    RETURN OLD;
 	  ELSIF (TG_OP = ''TRUNCATE'') THEN
-	    INSERT INTO sachem.compound_audit SELECT ' || idx || ', ' || id_column || ', false FROM ' || schema_name || '.' || table_name || '
-	        ON CONFLICT (index, id) DO UPDATE SET index=EXCLUDED.index, id=EXCLUDED.id, stored=false;
+	    INSERT INTO sachem.compound_audit SELECT ' || idx || ', ' || id_column || ', true FROM ' || schema_name || '.' || table_name || '
+	        ON CONFLICT (index, id) DO UPDATE SET index=EXCLUDED.index, id=EXCLUDED.id, delete=true;
 	    RETURN NULL;
 	  END IF;
 	END;
@@ -128,7 +128,7 @@ BEGIN
 	EXECUTE 'CREATE TRIGGER "' || index_name || '_sachem_truncate_compound_audit" BEFORE TRUNCATE ON ' ||
 	    schema_name || '.' || table_name ||  ' FOR EACH STATEMENT EXECUTE PROCEDURE sachem."' || index_name || '_compound_audit"()';
     
-	EXECUTE 'INSERT INTO sachem.compound_audit (index, id, stored) SELECT ' || idx || ', ' || id_column || ', true FROM ' || schema_name || '.' || table_name;
+	EXECUTE 'INSERT INTO sachem.compound_audit (index, id, delete) SELECT ' || idx || ', ' || id_column || ', false FROM ' || schema_name || '.' || table_name;
 END
 $$ LANGUAGE PLPGSQL STRICT SECURITY DEFINER;
 

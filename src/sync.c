@@ -341,7 +341,7 @@ Datum sync_data(PG_FUNCTION_ARGS)
 
         /* delete unnecessary data */
         Portal auditCursor = SPI_cursor_open_with_args(NULL,
-                "select id from sachem.compound_audit where not stored and index = $1",
+                "select id from sachem.compound_audit where delete and index = $1",
                 1, (Oid[]) { INT4OID }, (Datum[]) { indexId }, NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
 
         while(true)
@@ -367,8 +367,8 @@ Datum sync_data(PG_FUNCTION_ARGS)
 
         /* convert new data */
         char *query = (char *) palloc(110 + 2 * strlen(idColumn) + strlen(molfileColumn) + strlen(schemaName) + strlen(tableName));
-        sprintf(query, "select cmp.%s, cmp.%s from %s.%s cmp, sachem.compound_audit aud where cmp.%s = aud.id and "
-                "aud.stored and aud.index = $1", idColumn, molfileColumn, schemaName, tableName, idColumn);
+        sprintf(query, "select cmp.%s, cmp.%s from %s.%s cmp, sachem.compound_audit aud where cmp.%s = aud.id and aud.index = $1",
+                idColumn, molfileColumn, schemaName, tableName, idColumn);
 
         Portal compoundCursor = SPI_cursor_open_with_args(NULL, query, 1, (Oid[]) { INT4OID }, (Datum[]) { indexId },
                 NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);
