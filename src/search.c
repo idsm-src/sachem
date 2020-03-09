@@ -413,7 +413,7 @@ static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid format
 
 
 static LuceneResult *lucene_simsearch(jobject lucene, VarChar *query, Oid format, int32 topn, bool sort,
-        float4 threshold, int32 depth, Oid aromaticity, Oid tautomers)
+        float4 threshold, int32 radius, Oid aromaticity, Oid tautomers)
 {
     LuceneResult *result = NULL;
     jbyteArray queryArray = NULL;
@@ -431,7 +431,7 @@ static LuceneResult *lucene_simsearch(jobject lucene, VarChar *query, Oid format
         java_check_exception(__func__);
 
         handler = (*env)->CallObjectMethod(env, lucene, simsearchMethod, queryArray,
-                ConvertEnumValue(queryFormatTable, format), topn, sort, threshold, depth,
+                ConvertEnumValue(queryFormatTable, format), topn, sort, threshold, radius,
                 ConvertEnumValue(aromaticityModeTable, aromaticity),
                 ConvertEnumValue(tautomerModeTable, tautomers));
         java_check_exception(__func__);
@@ -562,7 +562,7 @@ Datum similarity_search(PG_FUNCTION_ARGS)
         VarChar *index = PG_GETARG_VARCHAR_P(0);
         VarChar *query = PG_GETARG_VARCHAR_P(1);
         float4 threshold = PG_GETARG_FLOAT4(2);
-        int32 depth = PG_GETARG_INT32(3);
+        int32 radius = PG_GETARG_INT32(3);
         Oid aromaticity = PG_GETARG_OID(4);
         Oid tautomers = PG_GETARG_OID(5);
         Oid format = PG_GETARG_OID(6);
@@ -574,7 +574,7 @@ Datum similarity_search(PG_FUNCTION_ARGS)
         PG_TRY();
         {
             PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
-            funcctx->user_fctx = lucene_simsearch(lucene, query, format, topn, sort, threshold, depth, aromaticity, tautomers);
+            funcctx->user_fctx = lucene_simsearch(lucene, query, format, topn, sort, threshold, radius, aromaticity, tautomers);
             PG_MEMCONTEXT_END();
 
             lucene_free(lucene);
