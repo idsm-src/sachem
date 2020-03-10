@@ -140,28 +140,28 @@ static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobjec
 
 void native_init()
 {
-    outOfMemoryErrorClass = (*env)->FindClass(env, "java/lang/OutOfMemoryError");
+    outOfMemoryErrorClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "java/lang/OutOfMemoryError"));
     java_check_exception(__func__);
 
     outOfMemoryErrorConstructor = (*env)->GetMethodID(env, outOfMemoryErrorClass, "<init>", "()V");
     java_check_exception(__func__);
 
 
-    iterationLimitExceededExceptionClass = (*env)->FindClass(env, "cz/iocb/sachem/molecule/NativeIsomorphism$IterationLimitExceededException");
+    iterationLimitExceededExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/molecule/NativeIsomorphism$IterationLimitExceededException"));
     java_check_exception(__func__);
 
     iterationLimitExceededExceptionConstructor = (*env)->GetMethodID(env, iterationLimitExceededExceptionClass, "<init>", "()V");
     java_check_exception(__func__);
 
 
-    queryCancelExceptionClass = (*env)->FindClass(env, "cz/iocb/sachem/molecule/NativeIsomorphism$QueryCancelException");
+    queryCancelExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/molecule/NativeIsomorphism$QueryCancelException"));
     java_check_exception(__func__);
 
     queryCancelExceptionConstructor = (*env)->GetMethodID(env, queryCancelExceptionClass, "<init>", "()V");
     java_check_exception(__func__);
 
 
-    byteBufferClass = (*env)->FindClass(env, "java/nio/ByteBuffer");
+    byteBufferClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "java/nio/ByteBuffer"));
     java_check_exception(__func__);
 
     allocateDirectMethod = (*env)->GetStaticMethodID(env, byteBufferClass, "allocateDirect", "(I)Ljava/nio/ByteBuffer;");

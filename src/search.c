@@ -229,7 +229,7 @@ static void lucene_search_init(void)
 
 
     /* java init */
-    searcherClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/Searcher");
+    searcherClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/lucene/Searcher"));
     java_check_exception(__func__);
 
     getMethod = (*env)->GetStaticMethodID(env, searcherClass, "get", "(Ljava/lang/String;Ljava/lang/String;I)Lcz/iocb/sachem/lucene/Searcher;");

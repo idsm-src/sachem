@@ -65,7 +65,7 @@ static inline jobject LookupJavaEnumValue(jclass enumClass, const char *name, co
     jfieldID fieldId = (*env)->GetStaticFieldID(env, enumClass, name, sig);
     java_check_exception(__func__);
 
-    jobject fieldValue = (*env)->GetStaticObjectField(env, enumClass, fieldId);
+    jobject fieldValue = (jobject) (*env)->NewGlobalRef(env, (*env)->GetStaticObjectField(env, enumClass, fieldId));
     java_check_exception(__func__);
 
     return fieldValue;

@@ -84,7 +84,7 @@ static void lucene_info_init(void)
 
 
     /* java init */
-    indexInfoClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/IndexInfo");
+    indexInfoClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/lucene/IndexInfo"));
     java_check_exception(__func__);
 
     getSegmentInfosMethod = (*env)->GetStaticMethodID(env, indexInfoClass, "getSegmentInfos", "(Ljava/lang/String;)[Lcz/iocb/sachem/lucene/IndexInfo$SegmentInfo;");

@@ -91,7 +91,7 @@ void java_init(void)
             elog(ERROR, "cannot initialize JVM");
     }
 
-    exceptionClass = (*env)->FindClass(env, "java/lang/Throwable");
+    exceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "java/lang/Throwable"));
     java_check_exception(__func__);
 
     toStringMethod = (*env)->GetMethodID(env, exceptionClass, "toString", "()Ljava/lang/String;");

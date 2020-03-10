@@ -30,7 +30,7 @@ static void indexer_java_init()
     java_init();
 
 
-    indexerClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/Indexer");
+    indexerClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/lucene/Indexer"));
     java_check_exception(__func__);
 
     constructor = (*env)->GetMethodID(env, indexerClass, "<init>", "()V");
