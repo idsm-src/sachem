@@ -328,7 +328,7 @@ static int32 lucene_index_size(jobject lucene)
 
 static HeapTuple lucene_result_get_item(LuceneResult *result)
 {
-    while(result->possition < result->length && result->scores[result->possition] == INFINITY)
+    while(result->possition < result->length && result->scores[result->possition] == 0)
         elog(WARNING, "isomorphism: iteration limit exceeded for target %i", result->ids[result->possition++]);
 
     if(unlikely(result->possition == result->length))

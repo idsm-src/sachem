@@ -907,6 +907,8 @@ static inline bool vf2state_match_core(VF2State *restrict vf2state)
 
 static inline bool vf2state_match(VF2State *restrict vf2state, const Molecule *restrict target, void *memory, int limit)
 {
+    vf2state->counter = limit > 0 ? limit : (uint) -1;
+
     if(likely(vf2state->graphMode != GRAPH_EXACT))
     {
         if(vf2state->query->heavyAtomCount + vf2state->query->hydrogenAtomCount > target->heavyAtomCount + target->hydrogenAtomCount)
@@ -925,8 +927,6 @@ static inline bool vf2state_match(VF2State *restrict vf2state, const Molecule *r
     }
 
     int targetAtomCount = target->atomCount;
-
-    vf2state->counter = limit > 0 ? limit : (uint) -1;
 
     vf2state->target = target;
     vf2state->targetAtomCount = targetAtomCount;
