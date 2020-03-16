@@ -205,8 +205,10 @@ public class Indexer
         if(exception != null)
             throw new IOException(exception);
 
+        indexer.forceMerge(segments);
+
         if(optimize)
-            indexer.forceMerge(segments);
+            indexer.forceMergeDeletes();
 
         indexer.commit();
         indexer.close();

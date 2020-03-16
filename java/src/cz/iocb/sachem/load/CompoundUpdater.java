@@ -36,6 +36,7 @@ public class CompoundUpdater
         String pgPassword = properties.getProperty("postgres.password");
         String pgDatabase = properties.getProperty("postgres.database");
         String index = properties.getProperty("sachem.index");
+        boolean optimize = properties.getBooleanProperty("sachem.optimize");
         boolean autoclean = properties.getBooleanProperty("sachem.autoclean");
 
         String ftpServer = properties.getProperty("ftp.server");
@@ -175,9 +176,10 @@ public class CompoundUpdater
                     statement.executeBatch();
                 }
 
-                try(PreparedStatement statement = connection.prepareStatement("select sachem.sync_data(?)"))
+                try(PreparedStatement statement = connection.prepareStatement("select sachem.sync_data(?, false, ?)"))
                 {
                     statement.setString(1, index);
+                    statement.setBoolean(2, optimize);
                     statement.execute();
                 }
 

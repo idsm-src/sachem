@@ -70,7 +70,7 @@ public class BalancedMergePolicy extends MergePolicy
         MergeSpecification specification = new MergeSpecification();
 
         for(Info info : sorted)
-            if(info.infos.size() > 1 || info.infos.get(0).hasDeletions())
+            if(info.infos.size() > 1)
                 specification.add(new OneMerge(info.infos));
 
         return specification;
