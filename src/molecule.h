@@ -513,7 +513,7 @@ static inline Molecule *molecule_extend(void *memory, const Molecule *restrict t
     }
 
     molecule->bondLists = (AtomIdx *) alloc_memory(&memory, BOND_LIST_BASE_SIZE * molecule->atomCount * sizeof(AtomIdx));
-    memcpy(molecule->bondLists, template->bondLists, template->atomCount * sizeof(AtomIdx));
+    memcpy(molecule->bondLists, template->bondLists, BOND_LIST_BASE_SIZE * template->atomCount * sizeof(AtomIdx));
 
     molecule->bondListSizes = (MolSize *) alloc_memory_zero(&memory, molecule->atomCount * sizeof(MolSize));
     memcpy(molecule->bondListSizes, template->bondListSizes, template->atomCount * sizeof(MolSize));
