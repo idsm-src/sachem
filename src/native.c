@@ -28,7 +28,7 @@ static jobject JNICALL native_isomorphism_create(JNIEnv *env, jclass clazz, jbyt
         return NULL;
     }
 
-    bool extended = molecule_is_extended_search_needed(query, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE);
+    bool extended = molecule_is_extended_search_needed(query, graphMode != GRAPH_EXACT, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE);
 
     size_t isosize = vf2state_mem_size(query, extended);
     size_t molsize = molecule_mem_size(query, restH, extended, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE, stereoMode != STEREO_IGNORE, false, false);
@@ -65,7 +65,11 @@ static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobjec
     }
 
 
-    bool extend = !isomorphism->query->extended && isomorphism->query->hydrogenAtomCount && molecule_has_multivalent_hydrogen(target);
+    bool extend = !isomorphism->query->extended && isomorphism->query->hydrogenAtomCount &&
+            (molecule_has_multivalent_hydrogen(target) ||
+                    (isomorphism->graphMode == GRAPH_EXACT && (
+                            (isomorphism->chargeMode == CHARGE_DEFAULT_AS_UNCHARGED && molecule_has_charged_hydrogen(target)) ||
+                            (isomorphism->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD && molecule_has_hydrogen_isotope(target)))));
 
     size_t targetsize = molecule_mem_size(target, NULL, extend || isomorphism->query->extended,
             isomorphism->chargeMode != CHARGE_IGNORE, isomorphism->isotopeMode != ISOTOPE_IGNORE,
