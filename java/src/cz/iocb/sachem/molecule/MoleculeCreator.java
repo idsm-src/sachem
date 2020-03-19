@@ -145,13 +145,7 @@ public class MoleculeCreator
 
         try
         {
-            molecule = AccessController.doPrivileged((PrivilegedExceptionAction<IAtomContainer>) () -> {
-                return mdlReader.read(new AtomContainer());
-            });
-        }
-        catch(PrivilegedActionException e)
-        {
-            throw(CDKException) e.getException();
+            molecule = mdlReader.read(new AtomContainer());
         }
         catch(Exception e)
         {

@@ -13,9 +13,6 @@
  */
 package cz.iocb.sachem.tautomers;
 
-import java.security.AccessController;
-import java.security.PrivilegedActionException;
-import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -84,9 +81,7 @@ public class InChI
     {
         try
         {
-            InChIGenerator generator = AccessController.doPrivileged((PrivilegedExceptionAction<InChIGenerator>) () -> {
-                return InChIGeneratorFactory.getInstance().getInChIGenerator(molecule, options);
-            });
+            InChIGenerator generator = InChIGeneratorFactory.getInstance().getInChIGenerator(molecule, options);
 
             value = generator.getInchi();
             aux = generator.getAuxInfo();
@@ -105,10 +100,6 @@ public class InChI
 
                 throw new InChIException("cannot generate InChI");
             }
-        }
-        catch(PrivilegedActionException e)
-        {
-            throw(CDKException) e.getException();
         }
         catch(IllegalArgumentException e)
         {
