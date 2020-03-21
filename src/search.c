@@ -31,6 +31,7 @@ static SPIPlanPtr configQueryPlan = NULL;
 static EnumValue searchModeTable[2];
 static EnumValue chargeModeTable[3];
 static EnumValue isotopeModeTable[3];
+static EnumValue radicalModeTable[3];
 static EnumValue stereoModeTable[2];
 static EnumValue aromaticityModeTable[3];
 static EnumValue tautomerModeTable[2];
@@ -105,6 +106,23 @@ static void lucene_search_init(void)
         {
             isotopeModeTable[i].oid = LookupExplicitEnumValue(typoid, values[i]);
             isotopeModeTable[i].object = LookupJavaEnumValue(enumClass, values[i], "Lcz/iocb/sachem/molecule/IsotopeMode;");
+        }
+    }
+
+
+    /* radical modes */
+    {
+        Oid typoid = LookupExplicitEnumType(spaceid, "radical_mode");
+
+        jclass enumClass = (*env)->FindClass(env, "cz/iocb/sachem/molecule/RadicalMode");
+        java_check_exception(__func__);
+
+        const char* const values[] = { "IGNORE", "DEFAULT_AS_STANDARD", "DEFAULT_AS_ANY" };
+
+        for(int i = 0; i < 3; i++)
+        {
+            radicalModeTable[i].oid = LookupExplicitEnumValue(typoid, values[i]);
+            radicalModeTable[i].object = LookupJavaEnumValue(enumClass, values[i], "Lcz/iocb/sachem/molecule/RadicalMode;");
         }
     }
 
@@ -246,7 +264,7 @@ static void lucene_search_init(void)
     indexSizeMethod = (*env)->GetMethodID(env, searcherClass, "indexSize", "()I");
     java_check_exception(__func__);
 
-    subsearchMethod = (*env)->GetMethodID(env, searcherClass, "subsearch", "([BLcz/iocb/sachem/molecule/QueryFormat;IZLcz/iocb/sachem/molecule/SearchMode;Lcz/iocb/sachem/molecule/ChargeMode;Lcz/iocb/sachem/molecule/IsotopeMode;Lcz/iocb/sachem/molecule/StereoMode;Lcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;J)Lcz/iocb/sachem/lucene/SearchResult;");
+    subsearchMethod = (*env)->GetMethodID(env, searcherClass, "subsearch", "([BLcz/iocb/sachem/molecule/QueryFormat;IZLcz/iocb/sachem/molecule/SearchMode;Lcz/iocb/sachem/molecule/ChargeMode;Lcz/iocb/sachem/molecule/IsotopeMode;Lcz/iocb/sachem/molecule/RadicalMode;Lcz/iocb/sachem/molecule/StereoMode;Lcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;J)Lcz/iocb/sachem/lucene/SearchResult;");
     java_check_exception(__func__);
 
     simsearchMethod = (*env)->GetMethodID(env, searcherClass, "simsearch", "([BLcz/iocb/sachem/molecule/QueryFormat;IZFILcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;)Lcz/iocb/sachem/lucene/SearchResult;");
@@ -363,7 +381,7 @@ static void lucene_result_free(LuceneResult *result)
 
 
 static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid format, int32 topn, bool sort, Oid search,
-        Oid charge, Oid isotope, Oid stereo, Oid aromaticity, Oid tautomers, int64 matchingLimit)
+        Oid charge, Oid isotope, Oid radical, Oid stereo, Oid aromaticity, Oid tautomers, int64 matchingLimit)
 {
     LuceneResult *result = NULL;
     jbyteArray queryArray = NULL;
@@ -385,6 +403,7 @@ static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid format
                 ConvertEnumValue(searchModeTable, search),
                 ConvertEnumValue(chargeModeTable, charge),
                 ConvertEnumValue(isotopeModeTable, isotope),
+                ConvertEnumValue(radicalModeTable, radical),
                 ConvertEnumValue(stereoModeTable, stereo),
                 ConvertEnumValue(aromaticityModeTable,  aromaticity),
                 ConvertEnumValue(tautomerModeTable,  tautomers),
@@ -413,6 +432,7 @@ static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid format
                         ConvertEnumValue(searchModeTable, search),
                         ConvertEnumValue(chargeModeTable, charge),
                         ConvertEnumValue(isotopeModeTable, isotope),
+                        ConvertEnumValue(radicalModeTable, radical),
                         ConvertEnumValue(stereoModeTable, stereo),
                         ConvertEnumValue(aromaticityModeTable,  aromaticity),
                         tautomerModeTable[0].object,
@@ -567,20 +587,21 @@ Datum substructure_search(PG_FUNCTION_ARGS)
         Oid search = PG_GETARG_OID(2);
         Oid charge = PG_GETARG_OID(3);
         Oid isotope = PG_GETARG_OID(4);
-        Oid stereo = PG_GETARG_OID(5);
-        Oid aromaticity = PG_GETARG_OID(6);
-        Oid tautomers = PG_GETARG_OID(7);
-        Oid format = PG_GETARG_OID(8);
-        int32 topn = PG_GETARG_INT32(9);
-        bool sort = PG_GETARG_BOOL(10);
-        int64 matchingLimit = PG_GETARG_INT64(11);
+        Oid radical = PG_GETARG_OID(5);
+        Oid stereo = PG_GETARG_OID(6);
+        Oid aromaticity = PG_GETARG_OID(7);
+        Oid tautomers = PG_GETARG_OID(8);
+        Oid format = PG_GETARG_OID(9);
+        int32 topn = PG_GETARG_INT32(10);
+        bool sort = PG_GETARG_BOOL(11);
+        int64 matchingLimit = PG_GETARG_INT64(12);
 
         jobject lucene = lucene_get(index);
 
         PG_TRY();
         {
             PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
-            funcctx->user_fctx = lucene_subsearch(lucene, query, format, topn, sort, search, charge, isotope, stereo, aromaticity, tautomers, matchingLimit);
+            funcctx->user_fctx = lucene_subsearch(lucene, query, format, topn, sort, search, charge, isotope, radical, stereo, aromaticity, tautomers, matchingLimit);
             PG_MEMCONTEXT_END();
 
             lucene_free(lucene);

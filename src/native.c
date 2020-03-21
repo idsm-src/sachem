@@ -15,7 +15,7 @@ static jmethodID queryCancelExceptionConstructor;
 
 
 static jobject JNICALL native_isomorphism_create(JNIEnv *env, jclass clazz, jbyteArray queryArray,
-        jbooleanArray restHArray, jint searchMode, jint chargeMode, jint isotopeMode, jint stereoMode)
+        jbooleanArray restHArray, jint searchMode, jint chargeMode, jint isotopeMode, jint radicalMode, jint stereoMode)
 {
     uint8_t *query = (uint8_t *) (*env)->GetByteArrayElements(env, queryArray, NULL);
 
@@ -35,18 +35,18 @@ static jobject JNICALL native_isomorphism_create(JNIEnv *env, jclass clazz, jbyt
         }
     }
 
-    bool extended = molecule_is_extended_search_needed(query, searchMode != SEARCH_EXACT, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE);
+    bool extended = molecule_is_extended_search_needed(query, searchMode != SEARCH_EXACT, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE, radicalMode != RADICAL_IGNORE);
 
     size_t isosize = vf2state_mem_size(query, extended);
-    size_t molsize = molecule_mem_size(query, restH, extended, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE, stereoMode != STEREO_IGNORE, false, false);
+    size_t molsize = molecule_mem_size(query, restH, extended, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE, radicalMode != RADICAL_IGNORE, stereoMode != STEREO_IGNORE, false, false, false);
 
     jobject buffer = (*env)->CallStaticObjectMethod(env, byteBufferClass, allocateDirectMethod, (jint) (isosize + molsize));
 
     if(likely(!(*env)->ExceptionCheck(env)))
     {
         void *memory = (*env)->GetDirectBufferAddress(env, buffer);
-        Molecule *molecule = molecule_create(memory + isosize, query, restH, extended, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE, stereoMode != STEREO_IGNORE, false, false);
-        vf2state_create(memory, molecule, searchMode, chargeMode, isotopeMode, stereoMode);
+        Molecule *molecule = molecule_create(memory + isosize, query, restH, extended, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE, radicalMode != RADICAL_IGNORE, stereoMode != STEREO_IGNORE, false, false, false);
+        vf2state_create(memory, molecule, searchMode, chargeMode, isotopeMode, radicalMode, stereoMode);
     }
 
     (*env)->ReleaseByteArrayElements(env, queryArray, (jbyte *) query, JNI_ABORT);
@@ -78,12 +78,13 @@ static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobjec
             (molecule_has_multivalent_hydrogen(target) ||
                     (isomorphism->searchMode == SEARCH_EXACT && (
                             (isomorphism->chargeMode == CHARGE_DEFAULT_AS_UNCHARGED && molecule_has_charged_hydrogen(target)) ||
-                            (isomorphism->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD && molecule_has_hydrogen_isotope(target)))));
+                            (isomorphism->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD && molecule_has_hydrogen_isotope(target)) ||
+                            (isomorphism->radicalMode == RADICAL_DEFAULT_AS_STANDARD && molecule_has_hydrogen_radical(target)))));
 
     size_t targetsize = molecule_mem_size(target, NULL, extend || isomorphism->query->extended,
-            isomorphism->chargeMode != CHARGE_IGNORE, isomorphism->isotopeMode != ISOTOPE_IGNORE,
+            isomorphism->chargeMode != CHARGE_IGNORE, isomorphism->isotopeMode != ISOTOPE_IGNORE, isomorphism->radicalMode != RADICAL_IGNORE,
             isomorphism->stereoMode != STEREO_IGNORE, isomorphism->chargeMode == CHARGE_DEFAULT_AS_UNCHARGED,
-            isomorphism->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD);
+            isomorphism->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD, isomorphism->radicalMode == RADICAL_DEFAULT_AS_STANDARD);
 
     size_t isosize = extend ? vf2state_extended_mem_size(isomorphism->query) : 0;
     size_t molsize = extend ? molecule_extended_mem_size(isomorphism->query) : 0;
@@ -106,13 +107,13 @@ static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobjec
     if(extend)
     {
         Molecule *query = molecule_extend(molmemory + targetsize + isosize, isomorphism->query);
-        isomorphism = vf2state_create(molmemory + targetsize, query, isomorphism->searchMode, isomorphism->chargeMode, isomorphism->isotopeMode, isomorphism->stereoMode);
+        isomorphism = vf2state_create(molmemory + targetsize, query, isomorphism->searchMode, isomorphism->chargeMode, isomorphism->isotopeMode, isomorphism->radicalMode, isomorphism->stereoMode);
     }
 
     Molecule *molecule = molecule_create(molmemory, target, NULL, isomorphism->query->extended,
-            isomorphism->chargeMode != CHARGE_IGNORE, isomorphism->isotopeMode != ISOTOPE_IGNORE,
+            isomorphism->chargeMode != CHARGE_IGNORE, isomorphism->isotopeMode != ISOTOPE_IGNORE, isomorphism->radicalMode != RADICAL_IGNORE,
             isomorphism->stereoMode != STEREO_IGNORE, isomorphism->chargeMode == CHARGE_DEFAULT_AS_UNCHARGED,
-            isomorphism->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD);
+            isomorphism->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD, isomorphism->radicalMode == RADICAL_DEFAULT_AS_STANDARD);
 
     (*env)->ReleaseByteArrayElements(env, targetArray, (jbyte *) target, JNI_ABORT);
 
@@ -189,7 +190,7 @@ void native_init()
     {
         {
             "create",
-            "([B[ZIIII)Ljava/nio/ByteBuffer;",
+            "([B[ZIIIII)Ljava/nio/ByteBuffer;",
             native_isomorphism_create
         },
         {

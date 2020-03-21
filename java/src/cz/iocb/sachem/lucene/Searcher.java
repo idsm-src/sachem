@@ -25,6 +25,7 @@ import cz.iocb.sachem.molecule.AromaticityMode;
 import cz.iocb.sachem.molecule.ChargeMode;
 import cz.iocb.sachem.molecule.IsotopeMode;
 import cz.iocb.sachem.molecule.QueryFormat;
+import cz.iocb.sachem.molecule.RadicalMode;
 import cz.iocb.sachem.molecule.SearchMode;
 import cz.iocb.sachem.molecule.StereoMode;
 import cz.iocb.sachem.molecule.TautomerMode;
@@ -147,11 +148,12 @@ public class Searcher
 
 
     public SearchResult subsearch(byte[] molecule, QueryFormat format, int n, boolean sort, SearchMode searchMode,
-            ChargeMode chargeMode, IsotopeMode isotopeMode, StereoMode stereoMode, AromaticityMode aromaticityMode,
-            TautomerMode tautomerMode, long matchingLimit) throws IOException, CDKException, TimeoutException
+            ChargeMode chargeMode, IsotopeMode isotopeMode, RadicalMode radicalMode, StereoMode stereoMode,
+            AromaticityMode aromaticityMode, TautomerMode tautomerMode, long matchingLimit)
+            throws IOException, CDKException, TimeoutException
     {
         Query query = new SubstructureQuery(Settings.substructureFieldName, new String(molecule), format, searchMode,
-                chargeMode, isotopeMode, stereoMode, aromaticityMode, tautomerMode, matchingLimit);
+                chargeMode, isotopeMode, radicalMode, stereoMode, aromaticityMode, tautomerMode, matchingLimit);
 
         if(n == 0)
             return new SearchResult();

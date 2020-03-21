@@ -178,7 +178,7 @@ public class Indexer
         {
             IAtomContainer container = MoleculeCreator.getMoleculeFromMolfile(new String(molfile),
                     AromaticityMode.AUTO);
-            BinaryMoleculeBuilder builder = new BinaryMoleculeBuilder(container, false, false, false);
+            BinaryMoleculeBuilder builder = new BinaryMoleculeBuilder(container, false, false, false, false);
 
             byte[] binary = builder.asBytes(true);
             moleculeQueue.put(new IndexItem(id, binary));

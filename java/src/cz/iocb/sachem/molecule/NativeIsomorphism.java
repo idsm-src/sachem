@@ -21,10 +21,10 @@ public class NativeIsomorphism
 
 
     public NativeIsomorphism(byte[] query, boolean[] restH, SearchMode searchMode, ChargeMode chargeMode,
-            IsotopeMode isotopeMode, StereoMode stereoMode)
+            IsotopeMode isotopeMode, RadicalMode radicalMode, StereoMode stereoMode)
     {
         implementation = create(query, restH, searchMode.ordinal(), chargeMode.ordinal(), isotopeMode.ordinal(),
-                stereoMode.ordinal());
+                radicalMode.ordinal(), stereoMode.ordinal());
     }
 
 
@@ -39,5 +39,5 @@ public class NativeIsomorphism
 
 
     private static native ByteBuffer create(byte[] query, boolean[] restH, int searchMode, int chargeMode,
-            int isotopeMode, int stereoMode);
+            int isotopeMode, int radicalMode, int stereoMode);
 }

@@ -1,3 +1,17 @@
+diff --git a/base/core/src/main/java/org/openscience/cdk/CDKConstants.java b/base/core/src/main/java/org/openscience/cdk/CDKConstants.java
+index 95f6308ae2..a0b3c0d194 100644
+--- a/base/core/src/main/java/org/openscience/cdk/CDKConstants.java
++++ b/base/core/src/main/java/org/openscience/cdk/CDKConstants.java
+@@ -425,6 +425,9 @@ public class CDKConstants {
+     public static final String      CTAB_SGROUPS                 = "cdk:CtabSgroups";
+ 
+ 
++    public static final String      SPIN_MULTIPLICITY            = "cdk:SpinMultiplicity";
++
++
+     /**
+      * Property for reaction objects where the conditions of reactions can be placed.
+      */
 diff --git a/base/core/src/main/java/org/openscience/cdk/atomtype/CDKAtomTypeMatcher.java b/base/core/src/main/java/org/openscience/cdk/atomtype/CDKAtomTypeMatcher.java
 index b08e73d76f..d224dab775 100755
 --- a/base/core/src/main/java/org/openscience/cdk/atomtype/CDKAtomTypeMatcher.java
@@ -103,8 +117,31 @@ index 06a6113e57..237b49d48f 100644
          avisit[container.indexOf(beg)] = true;
          avisit[container.indexOf(end)] = true;
          int count = 0;
+diff --git a/descriptor/cip/src/main/java/org/openscience/cdk/geometry/cip/rules/MassNumberRule.java b/descriptor/cip/src/main/java/org/openscience/cdk/geometry/cip/rules/MassNumberRule.java
+index 51a7440b85..79fadebaaa 100644
+--- a/descriptor/cip/src/main/java/org/openscience/cdk/geometry/cip/rules/MassNumberRule.java
++++ b/descriptor/cip/src/main/java/org/openscience/cdk/geometry/cip/rules/MassNumberRule.java
+@@ -28,6 +28,7 @@ import java.io.IOException;
+ import org.openscience.cdk.config.Isotopes;
+ import org.openscience.cdk.config.IsotopeFactory;
+ import org.openscience.cdk.geometry.cip.ILigand;
++import org.openscience.cdk.interfaces.IIsotope;
+ import org.openscience.cdk.tools.ILoggingTool;
+ import org.openscience.cdk.tools.LoggingToolFactory;
+ 
+@@ -63,7 +64,9 @@ class MassNumberRule implements ISequenceSubRule<ILigand> {
+         Integer massNumber = ligand.getLigandAtom().getMassNumber();
+         if (massNumber != null) return massNumber;
+         if (factory == null) return 0;
+-        return factory.getMajorIsotope(ligand.getLigandAtom().getSymbol()).getMassNumber();
++        IIsotope isotope = factory.getMajorIsotope(ligand.getLigandAtom().getSymbol());
++        if (isotope == null) return 0;
++        return isotope.getMassNumber();
+     }
+ 
+ }
 diff --git a/storage/ctab/src/main/java/org/openscience/cdk/io/MDLV2000Reader.java b/storage/ctab/src/main/java/org/openscience/cdk/io/MDLV2000Reader.java
-index 6a3202d4e1..859e445c13 100644
+index 6a3202d4e1..364daf4d02 100644
 --- a/storage/ctab/src/main/java/org/openscience/cdk/io/MDLV2000Reader.java
 +++ b/storage/ctab/src/main/java/org/openscience/cdk/io/MDLV2000Reader.java
 @@ -687,6 +687,7 @@ public class MDLV2000Reader extends DefaultChemObjectReader {
@@ -115,3 +152,12 @@ index 6a3202d4e1..859e445c13 100644
              case 39: // ccc: charge
                  charge = toCharge(line.charAt(38));
              case 36: // dd: mass difference
+@@ -942,6 +943,8 @@ public class MDLV2000Reader extends DefaultChemObjectReader {
+                         int value = readMolfileInt(line, st + 4);
+                         SPIN_MULTIPLICITY multiplicity = SPIN_MULTIPLICITY.ofValue(value);
+ 
++                        container.getAtom(offset + index).setProperty(CDKConstants.SPIN_MULTIPLICITY, multiplicity);
++
+                         for (int e = 0; e < multiplicity.getSingleElectrons(); e++)
+                             container.addSingleElectron(offset + index);
+                     }
