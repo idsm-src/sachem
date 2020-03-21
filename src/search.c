@@ -246,7 +246,7 @@ static void lucene_search_init(void)
     indexSizeMethod = (*env)->GetMethodID(env, searcherClass, "indexSize", "()I");
     java_check_exception(__func__);
 
-    subsearchMethod = (*env)->GetMethodID(env, searcherClass, "subsearch", "([BLcz/iocb/sachem/molecule/QueryFormat;IZLcz/iocb/sachem/molecule/SearchMode;Lcz/iocb/sachem/molecule/ChargeMode;Lcz/iocb/sachem/molecule/IsotopeMode;Lcz/iocb/sachem/molecule/StereoMode;Lcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;I)Lcz/iocb/sachem/lucene/SearchResult;");
+    subsearchMethod = (*env)->GetMethodID(env, searcherClass, "subsearch", "([BLcz/iocb/sachem/molecule/QueryFormat;IZLcz/iocb/sachem/molecule/SearchMode;Lcz/iocb/sachem/molecule/ChargeMode;Lcz/iocb/sachem/molecule/IsotopeMode;Lcz/iocb/sachem/molecule/StereoMode;Lcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;J)Lcz/iocb/sachem/lucene/SearchResult;");
     java_check_exception(__func__);
 
     simsearchMethod = (*env)->GetMethodID(env, searcherClass, "simsearch", "([BLcz/iocb/sachem/molecule/QueryFormat;IZFILcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;)Lcz/iocb/sachem/lucene/SearchResult;");
@@ -363,7 +363,7 @@ static void lucene_result_free(LuceneResult *result)
 
 
 static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid format, int32 topn, bool sort, Oid search,
-        Oid charge, Oid isotope, Oid stereo, Oid aromaticity, Oid tautomers, int32 isomorphismLimit)
+        Oid charge, Oid isotope, Oid stereo, Oid aromaticity, Oid tautomers, int64 matchingLimit)
 {
     LuceneResult *result = NULL;
     jbyteArray queryArray = NULL;
@@ -388,7 +388,7 @@ static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid format
                 ConvertEnumValue(stereoModeTable, stereo),
                 ConvertEnumValue(aromaticityModeTable,  aromaticity),
                 ConvertEnumValue(tautomerModeTable,  tautomers),
-                isomorphismLimit);
+                matchingLimit);
 
         if((*env)->ExceptionOccurred(env) != NULL && tautomers == tautomerModeTable[1].oid)
         {
@@ -416,7 +416,7 @@ static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid format
                         ConvertEnumValue(stereoModeTable, stereo),
                         ConvertEnumValue(aromaticityModeTable,  aromaticity),
                         tautomerModeTable[0].object,
-                        isomorphismLimit);
+                        matchingLimit);
             }
         }
 
@@ -573,14 +573,14 @@ Datum substructure_search(PG_FUNCTION_ARGS)
         Oid format = PG_GETARG_OID(8);
         int32 topn = PG_GETARG_INT32(9);
         bool sort = PG_GETARG_BOOL(10);
-        int32 isomorphismLimit = PG_GETARG_INT32(11);
+        int64 matchingLimit = PG_GETARG_INT64(11);
 
         jobject lucene = lucene_get(index);
 
         PG_TRY();
         {
             PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
-            funcctx->user_fctx = lucene_subsearch(lucene, query, format, topn, sort, search, charge, isotope, stereo, aromaticity, tautomers, isomorphismLimit);
+            funcctx->user_fctx = lucene_subsearch(lucene, query, format, topn, sort, search, charge, isotope, stereo, aromaticity, tautomers, matchingLimit);
             PG_MEMCONTEXT_END();
 
             lucene_free(lucene);

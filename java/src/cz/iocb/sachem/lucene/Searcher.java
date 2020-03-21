@@ -148,10 +148,10 @@ public class Searcher
 
     public SearchResult subsearch(byte[] molecule, QueryFormat format, int n, boolean sort, SearchMode searchMode,
             ChargeMode chargeMode, IsotopeMode isotopeMode, StereoMode stereoMode, AromaticityMode aromaticityMode,
-            TautomerMode tautomerMode, int isomorphismLimit) throws IOException, CDKException, TimeoutException
+            TautomerMode tautomerMode, long matchingLimit) throws IOException, CDKException, TimeoutException
     {
         Query query = new SubstructureQuery(Settings.substructureFieldName, new String(molecule), format, searchMode,
-                chargeMode, isotopeMode, stereoMode, aromaticityMode, tautomerMode, isomorphismLimit);
+                chargeMode, isotopeMode, stereoMode, aromaticityMode, tautomerMode, matchingLimit);
 
         if(n == 0)
             return new SearchResult();

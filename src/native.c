@@ -58,7 +58,7 @@ static jobject JNICALL native_isomorphism_create(JNIEnv *env, jclass clazz, jbyt
 }
 
 
-static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobject buffer, jbyteArray targetArray, jint limit)
+static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobject buffer, jbyteArray targetArray, jlong limit)
 {
     VF2State *isomorphism = (VF2State *) (*env)->GetDirectBufferAddress(env, buffer);
     uint8_t *target = (uint8_t *) (*env)->GetByteArrayElements(env, targetArray, NULL);
@@ -194,7 +194,7 @@ void native_init()
         },
         {
             "match",
-            "(Ljava/nio/ByteBuffer;[BI)F",
+            "(Ljava/nio/ByteBuffer;[BJ)F",
             native_isomorphism_match
         }
     };
