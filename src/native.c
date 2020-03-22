@@ -126,7 +126,7 @@ static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobjec
         double heavyBond = molecule->heavyBondCount ? isomorphism->query->heavyBondCount / (double) molecule->heavyBondCount : 1.0;
         double hydrogenBond = molecule->hydrogenBondCount ? isomorphism->query->hydrogenBondCount / (double) molecule->hydrogenBondCount : 1.0;
 
-        score = heavyAtom / 2 + heavyBond / 4 + hydrogenAtom / 8 + hydrogenBond / 16;
+        score = (8 * heavyAtom + 4 * heavyBond + 2 * hydrogenAtom + 1 * hydrogenBond) / 15;
     }
     else if(unlikely(isomorphism->counter == 0))
     {
