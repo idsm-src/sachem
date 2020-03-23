@@ -38,14 +38,14 @@ static jobject JNICALL native_isomorphism_create(JNIEnv *env, jclass clazz, jbyt
     bool extended = molecule_is_extended_search_needed(query, searchMode != SEARCH_EXACT, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE, radicalMode != RADICAL_IGNORE);
 
     size_t isosize = vf2state_mem_size(query, extended);
-    size_t molsize = molecule_mem_size(query, restH, extended, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE, radicalMode != RADICAL_IGNORE, stereoMode != STEREO_IGNORE, false, false, false);
+    size_t molsize = molecule_mem_size(query, restH, extended, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE, radicalMode != RADICAL_IGNORE, stereoMode != STEREO_IGNORE, true, false, false, false);
 
     jobject buffer = (*env)->CallStaticObjectMethod(env, byteBufferClass, allocateDirectMethod, (jint) (isosize + molsize));
 
     if(likely(!(*env)->ExceptionCheck(env)))
     {
         void *memory = (*env)->GetDirectBufferAddress(env, buffer);
-        Molecule *molecule = molecule_create(memory + isosize, query, restH, extended, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE, radicalMode != RADICAL_IGNORE, stereoMode != STEREO_IGNORE, false, false, false);
+        Molecule *molecule = molecule_create(memory + isosize, query, restH, extended, chargeMode != CHARGE_IGNORE, isotopeMode != ISOTOPE_IGNORE, radicalMode != RADICAL_IGNORE, stereoMode != STEREO_IGNORE, true, false, false, false);
         vf2state_create(memory, molecule, searchMode, chargeMode, isotopeMode, radicalMode, stereoMode);
     }
 
@@ -73,6 +73,8 @@ static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobjec
         return -INFINITY;
     }
 
+    if(isomorphism->searchMode == SEARCH_EXACT && isomorphism->query->sgroups == NULL && molecule_has_sgroup(target))
+        return NAN;
 
     bool extend = !isomorphism->query->extended && isomorphism->query->hydrogenAtomCount &&
             (molecule_has_multivalent_hydrogen(target) ||
@@ -83,8 +85,9 @@ static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobjec
 
     size_t targetsize = molecule_mem_size(target, NULL, extend || isomorphism->query->extended,
             isomorphism->chargeMode != CHARGE_IGNORE, isomorphism->isotopeMode != ISOTOPE_IGNORE, isomorphism->radicalMode != RADICAL_IGNORE,
-            isomorphism->stereoMode != STEREO_IGNORE, isomorphism->chargeMode == CHARGE_DEFAULT_AS_UNCHARGED,
-            isomorphism->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD, isomorphism->radicalMode == RADICAL_DEFAULT_AS_STANDARD);
+            isomorphism->stereoMode != STEREO_IGNORE, isomorphism->searchMode == SEARCH_EXACT || isomorphism->query->sgroups != NULL,
+            isomorphism->chargeMode == CHARGE_DEFAULT_AS_UNCHARGED, isomorphism->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD,
+            isomorphism->radicalMode == RADICAL_DEFAULT_AS_STANDARD);
 
     size_t isosize = extend ? vf2state_extended_mem_size(isomorphism->query) : 0;
     size_t molsize = extend ? molecule_extended_mem_size(isomorphism->query) : 0;
@@ -111,9 +114,11 @@ static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobjec
     }
 
     Molecule *molecule = molecule_create(molmemory, target, NULL, isomorphism->query->extended,
-            isomorphism->chargeMode != CHARGE_IGNORE, isomorphism->isotopeMode != ISOTOPE_IGNORE, isomorphism->radicalMode != RADICAL_IGNORE,
-            isomorphism->stereoMode != STEREO_IGNORE, isomorphism->chargeMode == CHARGE_DEFAULT_AS_UNCHARGED,
-            isomorphism->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD, isomorphism->radicalMode == RADICAL_DEFAULT_AS_STANDARD);
+            isomorphism->chargeMode != CHARGE_IGNORE, isomorphism->isotopeMode != ISOTOPE_IGNORE,
+            isomorphism->radicalMode != RADICAL_IGNORE, isomorphism->stereoMode != STEREO_IGNORE,
+            isomorphism->searchMode == SEARCH_EXACT || isomorphism->query->sgroups != NULL,
+            isomorphism->chargeMode == CHARGE_DEFAULT_AS_UNCHARGED, isomorphism->isotopeMode == ISOTOPE_DEFAULT_AS_STANDARD,
+            isomorphism->radicalMode == RADICAL_DEFAULT_AS_STANDARD);
 
     (*env)->ReleaseByteArrayElements(env, targetArray, (jbyte *) target, JNI_ABORT);
 
