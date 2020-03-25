@@ -20,12 +20,20 @@ public class ResultCollectorManager implements CollectorManager<ResultCollector,
 {
     private static final int bufferSize = 100000;
 
+    private final String name;
 
+    
     private static class ResultBuffer
     {
         int[] ids = new int[bufferSize];
         float[] scores = new float[bufferSize];
         int possition = 0;
+    }
+
+
+    ResultCollectorManager(String name)
+    {
+        this.name = name;
     }
 
 
@@ -111,6 +119,6 @@ public class ResultCollectorManager implements CollectorManager<ResultCollector,
             }
         }
 
-        return new SearchResult(length, ids, scores);
+        return new SearchResult(name, length, ids, scores);
     }
 }

@@ -13,6 +13,7 @@ public class SearchResult
 {
     private static final Set<String> fieldsToLoad = Collections.singleton(Settings.idFieldName);
 
+    public final String name;
     public final int length;
     public final int[] ids;
     public final float[] scores;
@@ -20,22 +21,25 @@ public class SearchResult
 
     public SearchResult()
     {
+        this.name = "";
         this.length = 0;
         this.ids = new int[0];
         this.scores = new float[0];
     }
 
 
-    public SearchResult(int length, int[] ids, float[] scores)
+    public SearchResult(String name, int length, int[] ids, float[] scores)
     {
+        this.name = name;
         this.length = length;
         this.ids = ids;
         this.scores = scores;
     }
 
 
-    public SearchResult(IndexSearcher searcher, TopDocs hits) throws IOException
+    public SearchResult(String name, IndexSearcher searcher, TopDocs hits) throws IOException
     {
+        this.name = name;
         this.length = hits.scoreDocs.length;
         this.ids = new int[length];
         this.scores = new float[length];

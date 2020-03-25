@@ -54,12 +54,26 @@ import org.openscience.cdk.smiles.SmilesParser;
 import org.openscience.cdk.tools.CDKHydrogenAdder;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 import org.openscience.cdk.tools.manipulator.AtomTypeManipulator;
+import cz.iocb.sachem.tautomers.InChIException;
 import cz.iocb.sachem.tautomers.InchiTautomerGenerator;
 
 
 
 public class MoleculeCreator
 {
+    public static class QueryMolecule
+    {
+        final public String name;
+        final public List<IAtomContainer> tautomers;
+
+        QueryMolecule(String name, List<IAtomContainer> tautomers)
+        {
+            this.name = name;
+            this.tautomers = tautomers;
+        }
+    }
+
+
     private static final ThreadLocal<Aromaticity> aromaticity = new ThreadLocal<Aromaticity>()
     {
         @Override
@@ -70,7 +84,7 @@ public class MoleculeCreator
     };
 
 
-    public static List<IAtomContainer> translateQuery(String query, QueryFormat format, AromaticityMode aromaticityMode,
+    public static QueryMolecule translateQuery(String query, QueryFormat format, AromaticityMode aromaticityMode,
             TautomerMode tautomerMode) throws CDKException, IOException, TimeoutException
     {
         try
@@ -105,22 +119,36 @@ public class MoleculeCreator
             }
 
 
+            String name = queries.size() > 0 ? queries.get(0).getTitle() : null;
+
+            if(name == null)
+                name = "";
+
+
             if(tautomerMode == TautomerMode.INCHI)
             {
-                InchiTautomerGenerator generator = new InchiTautomerGenerator();
-                List<IAtomContainer> tautomers = new ArrayList<IAtomContainer>();
+                try
+                {
+                    InchiTautomerGenerator generator = new InchiTautomerGenerator();
+                    List<IAtomContainer> tautomers = new ArrayList<IAtomContainer>();
 
-                for(IAtomContainer molecule : queries)
-                    tautomers.addAll(generator.getTautomers(molecule));
+                    for(IAtomContainer molecule : queries)
+                        tautomers.addAll(generator.getTautomers(molecule));
 
-                for(IAtomContainer tautomer : tautomers)
-                    tautomer.setAtoms(BinaryMoleculeSort.atomsByFrequency(tautomer));
+                    for(IAtomContainer tautomer : tautomers)
+                        tautomer.setAtoms(BinaryMoleculeSort.atomsByFrequency(tautomer));
 
-                queries = tautomers;
+                    queries = tautomers;
+                }
+                catch(CDKException e)
+                {
+                    throw new InChIException(name.isEmpty() ? "<unnamed>" :
+                            ("'" + name + "'") + ": cannot generate tautomers: " + e.getMessage());
+                }
             }
 
 
-            return queries;
+            return new QueryMolecule(name, queries);
         }
         catch(CloneNotSupportedException e)
         {
@@ -235,6 +263,7 @@ public class MoleculeCreator
 
             MoleculeCreator.configureMolecule(molecule, aromaticityMode);
             molecule.setAtoms(BinaryMoleculeSort.atomsByFrequency(molecule));
+            molecule.setTitle(smiles);
 
             return molecule;
         }

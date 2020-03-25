@@ -12,6 +12,9 @@
 
 typedef struct
 {
+    VarChar *index;
+    jstring name;
+
     int32 length;
     int32 possition;
 
@@ -38,12 +41,13 @@ static EnumValue tautomerModeTable[2];
 static EnumValue queryFormatTable[4];
 
 static jclass searcherClass;
-static jclass cdkExceptionClass;
+static jclass inchiExceptionClass;
 static jmethodID getMessageMethod;
 static jmethodID getMethod;
 static jmethodID indexSizeMethod;
 static jmethodID subsearchMethod;
 static jmethodID simsearchMethod;
+static jfieldID nameField;
 static jfieldID lengthField;
 static jfieldID idsField;
 static jfieldID scoresField;
@@ -252,10 +256,10 @@ static void lucene_search_init(void)
     searcherClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/lucene/Searcher"));
     java_check_exception(__func__);
 
-    cdkExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "org/openscience/cdk/exception/CDKException"));
+    inchiExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/tautomers/InChIException"));
     java_check_exception(__func__);
 
-    getMessageMethod = (*env)->GetMethodID(env, cdkExceptionClass, "getMessage", "()Ljava/lang/String;");
+    getMessageMethod = (*env)->GetMethodID(env, inchiExceptionClass, "getMessage", "()Ljava/lang/String;");
     java_check_exception(__func__);
 
     getMethod = (*env)->GetStaticMethodID(env, searcherClass, "get", "(Ljava/lang/String;Ljava/lang/String;I)Lcz/iocb/sachem/lucene/Searcher;");
@@ -272,6 +276,9 @@ static void lucene_search_init(void)
 
 
     jclass resultClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/SearchResult");
+    java_check_exception(__func__);
+
+    nameField = (*env)->GetFieldID(env, resultClass, "name", "Ljava/lang/String;");
     java_check_exception(__func__);
 
     lengthField = (*env)->GetFieldID(env, resultClass, "length", "I");
@@ -355,7 +362,22 @@ static int32 lucene_index_size(jobject lucene)
 static HeapTuple lucene_result_get_item(LuceneResult *result)
 {
     while(result->possition < result->length && result->scores[result->possition] == 0)
-        elog(WARNING, "isomorphism: iteration limit exceeded for target %i", result->ids[result->possition++]);
+    {
+        char *idx = text_to_cstring(result->index);
+        const char *name = (*env)->GetStringUTFChars(env, result->name, NULL);
+
+        if(name == NULL)
+            elog(WARNING, "<unknown>: isomorphism: iteration limit exceeded for target %i in index '%s'", result->ids[result->possition++], idx);
+        else if(name[0] == '\0')
+            elog(WARNING, "<unnamed>: isomorphism: iteration limit exceeded for target %i in index '%s'", result->ids[result->possition++], idx);
+        else
+            elog(WARNING, "'%s': isomorphism: iteration limit exceeded for target %i in index '%s'", name, result->ids[result->possition++], idx);
+
+        pfree(idx);
+
+        if(name != NULL)
+            (*env)->ReleaseStringUTFChars(env, result->name, name);
+    }
 
     if(unlikely(result->possition == result->length))
         return NULL;
@@ -374,13 +396,14 @@ static void lucene_result_free(LuceneResult *result)
 {
     if(likely(result != NULL))
     {
+        JavaDeleteRef(result->name);
         JavaDeleteIntegerArray(result->idsArray, result->ids, JNI_ABORT);
         JavaDeleteFloatArray(result->scoresArray, result->scores, JNI_ABORT);
     }
 }
 
 
-static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid format, int32 topn, bool sort, Oid search,
+static LuceneResult *lucene_subsearch(jobject lucene, VarChar *index, VarChar *query, Oid format, int32 topn, bool sort, Oid search,
         Oid charge, Oid isotope, Oid radical, Oid stereo, Oid aromaticity, Oid tautomers, int64 matchingLimit)
 {
     LuceneResult *result = NULL;
@@ -413,12 +436,12 @@ static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid format
         {
             jthrowable exception = (*env)->ExceptionOccurred(env);
 
-            if((*env)->IsInstanceOf(env, exception, cdkExceptionClass))
+            if((*env)->IsInstanceOf(env, exception, inchiExceptionClass))
             {
                 jstring message = (jstring)(*env)->CallObjectMethod(env, exception, getMessageMethod);
                 const char *mstr = message != NULL ? (*env)->GetStringUTFChars(env, message, NULL) : NULL;
 
-                elog(WARNING, "cannot generate tautomers: %s", mstr != NULL ? mstr : "unknown jvm error");
+                elog(WARNING, "%s", mstr != NULL ? mstr : "unknown jvm error");
 
                 if(mstr != NULL)
                     (*env)->ReleaseStringUTFChars(env, message, mstr);
@@ -446,6 +469,9 @@ static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid format
 
         result = palloc0(sizeof(LuceneResult));
 
+        result->index = index;
+        result->name = (jstring) (*env)->GetObjectField(env, handler, nameField);
+
         result->idsArray = (*env)->GetObjectField(env, handler, idsField);
         result->ids = (*env)->GetIntArrayElements(env, result->idsArray, NULL);
 
@@ -471,7 +497,7 @@ static LuceneResult *lucene_subsearch(jobject lucene, VarChar *query, Oid format
 }
 
 
-static LuceneResult *lucene_simsearch(jobject lucene, VarChar *query, Oid format, int32 topn, bool sort,
+static LuceneResult *lucene_simsearch(jobject lucene, VarChar *index, VarChar *query, Oid format, int32 topn, bool sort,
         float4 threshold, int32 radius, Oid aromaticity, Oid tautomers)
 {
     LuceneResult *result = NULL;
@@ -498,12 +524,12 @@ static LuceneResult *lucene_simsearch(jobject lucene, VarChar *query, Oid format
         {
             jthrowable exception = (*env)->ExceptionOccurred(env);
 
-            if((*env)->IsInstanceOf(env, exception, cdkExceptionClass))
+            if((*env)->IsInstanceOf(env, exception, inchiExceptionClass))
             {
                 jstring message = (jstring)(*env)->CallObjectMethod(env, exception, getMessageMethod);
                 const char *mstr = message != NULL ? (*env)->GetStringUTFChars(env, message, NULL) : NULL;
 
-                elog(WARNING, "cannot generate tautomers: %s", mstr != NULL ? mstr : "unknown jvm error");
+                elog(WARNING, "%s", mstr != NULL ? mstr : "unknown jvm error");
 
                 if(mstr != NULL)
                     (*env)->ReleaseStringUTFChars(env, message, mstr);
@@ -524,6 +550,9 @@ static LuceneResult *lucene_simsearch(jobject lucene, VarChar *query, Oid format
         JavaDeleteRef(queryArray);
 
         result = palloc0(sizeof(LuceneResult));
+
+        result->index = index;
+        result->name = (jstring) (*env)->GetObjectField(env, handler, nameField);
 
         result->idsArray = (*env)->GetObjectField(env, handler, idsField);
         result->ids = (*env)->GetIntArrayElements(env, result->idsArray, NULL);
@@ -601,7 +630,8 @@ Datum substructure_search(PG_FUNCTION_ARGS)
         PG_TRY();
         {
             PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
-            funcctx->user_fctx = lucene_subsearch(lucene, query, format, topn, sort, search, charge, isotope, radical, stereo, aromaticity, tautomers, matchingLimit);
+            VarChar *index = PG_GETARG_VARCHAR_P(0);
+            funcctx->user_fctx = lucene_subsearch(lucene, index, query, format, topn, sort, search, charge, isotope, radical, stereo, aromaticity, tautomers, matchingLimit);
             PG_MEMCONTEXT_END();
 
             lucene_free(lucene);
@@ -660,7 +690,8 @@ Datum similarity_search(PG_FUNCTION_ARGS)
         PG_TRY();
         {
             PG_MEMCONTEXT_BEGIN(funcctx->multi_call_memory_ctx);
-            funcctx->user_fctx = lucene_simsearch(lucene, query, format, topn, sort, threshold, radius, aromaticity, tautomers);
+            VarChar *index = PG_GETARG_VARCHAR_P(0);
+            funcctx->user_fctx = lucene_simsearch(lucene, index, query, format, topn, sort, threshold, radius, aromaticity, tautomers);
             PG_MEMCONTEXT_END();
 
             lucene_free(lucene);

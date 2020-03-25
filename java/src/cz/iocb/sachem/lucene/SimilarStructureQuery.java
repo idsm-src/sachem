@@ -35,6 +35,7 @@ import cz.iocb.sachem.molecule.AromaticityMode;
 import cz.iocb.sachem.molecule.BinaryMolecule;
 import cz.iocb.sachem.molecule.BinaryMoleculeBuilder;
 import cz.iocb.sachem.molecule.MoleculeCreator;
+import cz.iocb.sachem.molecule.MoleculeCreator.QueryMolecule;
 import cz.iocb.sachem.molecule.QueryFormat;
 import cz.iocb.sachem.molecule.TautomerMode;
 
@@ -52,6 +53,7 @@ public class SimilarStructureQuery extends Query
     private final float threshold;
     private final int similarityRadius;
     private final Query subquery;
+    final String name;
 
 
     public SimilarStructureQuery(String field, String query, QueryFormat queryFormat, float threshold,
@@ -66,11 +68,13 @@ public class SimilarStructureQuery extends Query
         this.aromaticityMode = aromaticityMode;
         this.tautomerMode = tautomerMode;
 
-        List<IAtomContainer> queryMolecules = MoleculeCreator.translateQuery(query, queryFormat, aromaticityMode,
-                tautomerMode);
-        ArrayList<Query> subqueries = new ArrayList<Query>(queryMolecules.size());
+        QueryMolecule queryMolecule = MoleculeCreator.translateQuery(query, queryFormat, aromaticityMode, tautomerMode);
 
-        for(IAtomContainer molecule : queryMolecules)
+        this.name = queryMolecule.name;
+
+        ArrayList<Query> subqueries = new ArrayList<Query>(queryMolecule.tautomers.size());
+
+        for(IAtomContainer molecule : queryMolecule.tautomers)
             subqueries.add(new SingleSimilarityQuery(molecule));
 
         this.subquery = new DisjunctionMaxQuery(subqueries, 0);

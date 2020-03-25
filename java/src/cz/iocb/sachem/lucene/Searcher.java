@@ -16,7 +16,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeoutException;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
 import org.apache.lucene.search.similarities.BooleanSimilarity;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -152,17 +151,18 @@ public class Searcher
             AromaticityMode aromaticityMode, TautomerMode tautomerMode, long matchingLimit)
             throws IOException, CDKException, TimeoutException
     {
-        Query query = new SubstructureQuery(Settings.substructureFieldName, new String(molecule), format, searchMode,
-                chargeMode, isotopeMode, radicalMode, stereoMode, aromaticityMode, tautomerMode, matchingLimit);
+        SubstructureQuery query = new SubstructureQuery(Settings.substructureFieldName, new String(molecule), format,
+                searchMode, chargeMode, isotopeMode, radicalMode, stereoMode, aromaticityMode, tautomerMode,
+                matchingLimit);
 
         if(n == 0)
             return new SearchResult();
         else if(n >= 0)
-            return new SearchResult(searcher, searcher.search(query, n));
+            return new SearchResult(query.name, searcher, searcher.search(query, n));
         else if(sort)
-            return new SearchResult(searcher, searcher.search(query, Integer.MAX_VALUE));
+            return new SearchResult(query.name, searcher, searcher.search(query, Integer.MAX_VALUE));
         else
-            return searcher.search(query, new ResultCollectorManager());
+            return searcher.search(query, new ResultCollectorManager(query.name));
     }
 
 
@@ -170,18 +170,18 @@ public class Searcher
             AromaticityMode aromaticityMode, TautomerMode tautomerMode)
             throws IOException, CDKException, TimeoutException
     {
-        Query query = new SimilarStructureQuery(Settings.similarityFieldName, new String(molecule), format, threshold,
-                depth, aromaticityMode, tautomerMode);
+        SimilarStructureQuery query = new SimilarStructureQuery(Settings.similarityFieldName, new String(molecule),
+                format, threshold, depth, aromaticityMode, tautomerMode);
 
 
         if(n == 0)
             return new SearchResult();
         else if(n >= 0)
-            return new SearchResult(searcher, searcher.search(query, n));
+            return new SearchResult(query.name, searcher, searcher.search(query, n));
         else if(sort)
-            return new SearchResult(searcher, searcher.search(query, Integer.MAX_VALUE));
+            return new SearchResult(query.name, searcher, searcher.search(query, Integer.MAX_VALUE));
         else
-            return searcher.search(query, new ResultCollectorManager());
+            return searcher.search(query, new ResultCollectorManager(query.name));
     }
 
 

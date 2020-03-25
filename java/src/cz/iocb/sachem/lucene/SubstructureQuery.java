@@ -38,6 +38,7 @@ import cz.iocb.sachem.molecule.BinaryMoleculeBuilder;
 import cz.iocb.sachem.molecule.ChargeMode;
 import cz.iocb.sachem.molecule.IsotopeMode;
 import cz.iocb.sachem.molecule.MoleculeCreator;
+import cz.iocb.sachem.molecule.MoleculeCreator.QueryMolecule;
 import cz.iocb.sachem.molecule.NativeIsomorphism;
 import cz.iocb.sachem.molecule.NativeIsomorphism.IterationLimitExceededException;
 import cz.iocb.sachem.molecule.QueryFormat;
@@ -61,8 +62,8 @@ public class SubstructureQuery extends Query
     private final AromaticityMode aromaticityMode;
     private final TautomerMode tautomerMode;
     private final long iterationLimit;
-
     private final Query subquery;
+    final String name;
 
 
     public SubstructureQuery(String field, String query, QueryFormat queryFormat, SearchMode searchMode,
@@ -82,11 +83,14 @@ public class SubstructureQuery extends Query
         this.tautomerMode = tautomerMode;
         this.iterationLimit = iterationLimit;
 
-        List<IAtomContainer> queryMolecules = MoleculeCreator.translateQuery(query, queryFormat, aromaticityMode,
+        QueryMolecule queryMolecules = MoleculeCreator.translateQuery(query, queryFormat, aromaticityMode,
                 tautomerMode);
-        ArrayList<Query> subqueries = new ArrayList<Query>(queryMolecules.size());
 
-        for(IAtomContainer molecule : queryMolecules)
+        this.name = queryMolecules.name;
+
+        ArrayList<Query> subqueries = new ArrayList<Query>(queryMolecules.tautomers.size());
+
+        for(IAtomContainer molecule : queryMolecules.tautomers)
             subqueries.add(new SingleSubstructureQuery(molecule));
 
         this.subquery = new DisjunctionMaxQuery(subqueries, 0);
