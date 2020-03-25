@@ -46,6 +46,7 @@ public class PubChemCompoundUpdater
         String index = properties.getProperty("sachem.index");
         boolean optimize = properties.getBooleanProperty("sachem.optimize");
         boolean autoclean = properties.getBooleanProperty("sachem.autoclean");
+        boolean rename = properties.getBooleanProperty("sachem.rename");
 
         String ftpServer = properties.getProperty("ftp.server");
         int ftpPort = properties.getIntProperty("ftp.port");
@@ -240,7 +241,7 @@ public class PubChemCompoundUpdater
 
             try
             {
-                CompoundLoader loader = new CompoundLoader(connection, index, idTag, idPrefix);
+                CompoundLoader loader = new CompoundLoader(connection, index, idTag, idPrefix, rename);
 
                 if(version == null)
                 {

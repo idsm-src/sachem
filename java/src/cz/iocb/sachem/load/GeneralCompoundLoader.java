@@ -26,6 +26,7 @@ public class GeneralCompoundLoader
         String pgPassword = properties.getProperty("postgres.password");
         String pgDatabase = properties.getProperty("postgres.database");
         String index = properties.getProperty("sachem.index");
+        boolean rename = properties.getBooleanProperty("sachem.rename");
 
         String idTag = properties.getProperty("sdf.idtag");
         String idPrefix = properties.getProperty("sdf.idprefix", "");
@@ -39,7 +40,7 @@ public class GeneralCompoundLoader
 
             try
             {
-                CompoundLoader loader = new CompoundLoader(connection, index, idTag, idPrefix);
+                CompoundLoader loader = new CompoundLoader(connection, index, idTag, idPrefix, rename);
                 loader.loadDirectory(new File(args[1]));
 
                 try(PreparedStatement statement = connection.prepareStatement("select sachem.sync_data(?)"))

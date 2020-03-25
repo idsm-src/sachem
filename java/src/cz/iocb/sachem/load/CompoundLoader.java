@@ -29,6 +29,7 @@ public class CompoundLoader
     private final Connection connection;
     private final String idTag;
     private final String idPrefix;
+    private final boolean rename;
 
     final String schema;
     final String table;
@@ -36,12 +37,13 @@ public class CompoundLoader
     final String molColumn;
 
 
-    public CompoundLoader(Connection connection, String index, String idTag, String idPrefix)
+    public CompoundLoader(Connection connection, String index, String idTag, String idPrefix, boolean setName)
             throws SQLException, IOException
     {
         this.connection = connection;
         this.idTag = "> <" + idTag + ">";
         this.idPrefix = idPrefix;
+        this.rename = setName;
 
 
         try(PreparedStatement statement = connection
@@ -81,6 +83,9 @@ public class CompoundLoader
                 Integer id = null;
                 StringBuilder sdfBuilder = new StringBuilder();
 
+                if(rename)
+                    reader.readLine();
+
                 while(!line.startsWith(">") && !line.equals("$$$$") && line != null)
                 {
                     sdfBuilder.append(line);
@@ -98,6 +103,9 @@ public class CompoundLoader
                     if(line.compareTo(idTag) == 0)
                     {
                         line = reader.readLine();
+
+                        if(rename)
+                            sdf = line.trim() + "\n" + sdf;
 
                         id = Integer.parseInt(line.replaceAll("^" + idPrefix, ""));
                     }

@@ -43,6 +43,7 @@ public class DrugbankCompoundUpdater
         String index = properties.getProperty("sachem.index");
         boolean optimize = properties.getBooleanProperty("sachem.optimize");
         boolean autoclean = properties.getBooleanProperty("sachem.autoclean");
+        boolean rename = properties.getBooleanProperty("sachem.rename");
 
         String httpServer = properties.getProperty("http.server");
         String httpUserName = properties.getProperty("http.username");
@@ -156,7 +157,7 @@ public class DrugbankCompoundUpdater
 
             try
             {
-                CompoundLoader loader = new CompoundLoader(connection, index, idTag, idPrefix);
+                CompoundLoader loader = new CompoundLoader(connection, index, idTag, idPrefix, rename);
                 loader.loadDirectory(directory);
 
                 try(PreparedStatement statement = connection.prepareStatement("delete from sachem.compound_sources "
