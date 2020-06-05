@@ -4,7 +4,6 @@ jar_DATA = \
     lib/cdk-atomtype-2.3.jar \
     lib/cdk-core-2.3.jar \
     lib/cdk-ctab-2.3.jar \
-    lib/cdk-inchi-2.3.jar \
     lib/cdk-interfaces-2.3.jar \
     lib/cdk-ioformats-2.3.jar \
     lib/cdk-isomorphism-2.3.jar \
@@ -15,9 +14,6 @@ jar_DATA = \
     lib/commons-net-3.6.jar \
     lib/guava-28.1-jre.jar \
     lib/jdbc-postgresql.jar \
-    lib/jnati-core-0.4.jar \
-    lib/jnati-deploy-0.4.jar \
-    lib/jni-inchi-0.8.jar \
     lib/log4j-1.2.17.jar \
     lib/lucene-core-8.4.1.jar \
     lib/vecmath-1.5.2.jar
@@ -39,7 +35,6 @@ EXTRA_DIST = \
     lib/cdk-atomtype-2.3.jar \
     lib/cdk-core-2.3.jar \
     lib/cdk-ctab-2.3.jar \
-    lib/cdk-inchi-2.3.jar \
     lib/cdk-interfaces-2.3.jar \
     lib/cdk-ioformats-2.3.jar \
     lib/cdk-isomorphism-2.3.jar \
@@ -50,9 +45,6 @@ EXTRA_DIST = \
     lib/commons-net-3.6.jar \
     lib/guava-28.1-jre.jar \
     lib/jdbc-postgresql.jar \
-    lib/jnati-core-0.4.jar \
-    lib/jnati-deploy-0.4.jar \
-    lib/jni-inchi-0.8.jar \
     lib/log4j-1.2.17.jar \
     lib/lucene-core-8.4.1.jar \
     lib/vecmath-1.5.2.jar \
@@ -84,6 +76,8 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/molecule/BinaryMolecule.java \
     src/cz/iocb/sachem/molecule/BinaryMoleculeSort.java \
     src/cz/iocb/sachem/molecule/ChargeMode.java \
+    src/cz/iocb/sachem/molecule/InChITautomerGenerator.java \
+    src/cz/iocb/sachem/molecule/InChITools.java \
     src/cz/iocb/sachem/molecule/Isomorphism.java \
     src/cz/iocb/sachem/molecule/IsotopeMode.java \
     src/cz/iocb/sachem/molecule/MoleculeCreator.java \
@@ -93,9 +87,4 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/molecule/RadicalMode.java \
     src/cz/iocb/sachem/molecule/SearchMode.java \
     src/cz/iocb/sachem/molecule/StereoMode.java \
-    src/cz/iocb/sachem/molecule/TautomerMode.java \
-    src/cz/iocb/sachem/tautomers/CombinationCountException.java \
-    src/cz/iocb/sachem/tautomers/InChIException.java \
-    src/cz/iocb/sachem/tautomers/InChI.java \
-    src/cz/iocb/sachem/tautomers/InchiTautomerGenerator.java
- 
+    src/cz/iocb/sachem/molecule/TautomerMode.java

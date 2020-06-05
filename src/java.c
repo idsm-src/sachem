@@ -3,6 +3,7 @@
 #include <libpq/pqsignal.h>
 #include <tcop/tcopprot.h>
 #include "java.h"
+#include "inchi.h"
 #include "native.h"
 
 
@@ -58,7 +59,6 @@ void java_init(void)
                                                      JARDIR "/cdk-atomtype-2.3.jar:"
                                                      JARDIR "/cdk-core-2.3.jar:"
                                                      JARDIR "/cdk-ctab-2.3.jar:"
-                                                     JARDIR "/cdk-inchi-2.3.jar:"
                                                      JARDIR "/cdk-interfaces-2.3.jar:"
                                                      JARDIR "/cdk-ioformats-2.3.jar:"
                                                      JARDIR "/cdk-isomorphism-2.3.jar:"
@@ -67,9 +67,6 @@ void java_init(void)
                                                      JARDIR "/cdk-standard-2.3.jar:"
                                                      JARDIR "/cdk-valencycheck-2.3.jar:"
                                                      JARDIR "/guava-28.1-jre.jar:"
-                                                     JARDIR "/jnati-core-0.4.jar:"
-                                                     JARDIR "/jnati-deploy-0.4.jar:"
-                                                     JARDIR "/jni-inchi-0.8.jar:"
                                                      JARDIR "/log4j-1.2.17.jar:"
                                                      JARDIR "/lucene-core-8.4.1.jar:"
                                                      JARDIR "/vecmath-1.5.2.jar" }},
@@ -98,6 +95,7 @@ void java_init(void)
     java_check_exception(__func__);
 
     native_init();
+    inchi_init();
 
     initialised = true;
 }

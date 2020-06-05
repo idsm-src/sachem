@@ -20,9 +20,9 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.BytesRef;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import cz.iocb.sachem.fingerprint.IOCBFingerprint;
-import cz.iocb.sachem.molecule.AromaticityMode;
 import cz.iocb.sachem.molecule.BinaryMolecule;
 import cz.iocb.sachem.molecule.BinaryMoleculeBuilder;
+import cz.iocb.sachem.molecule.InChITools.InChIException;
 import cz.iocb.sachem.molecule.MoleculeCreator;
 
 
@@ -176,12 +176,18 @@ public class Indexer
 
         try
         {
-            IAtomContainer container = MoleculeCreator.getMoleculeFromMolfile(new String(molfile),
-                    AromaticityMode.AUTO);
-            BinaryMoleculeBuilder builder = new BinaryMoleculeBuilder(container, false, false, false, false);
+            try
+            {
+                IAtomContainer container = MoleculeCreator.translateMolecule(new String(molfile), true);
+                moleculeQueue.put(new IndexItem(id, BinaryMoleculeBuilder.asBytes(container, true)));
+            }
+            catch(InChIException e)
+            {
+                IAtomContainer container = MoleculeCreator.translateMolecule(new String(molfile), false);
+                moleculeQueue.put(new IndexItem(id, BinaryMoleculeBuilder.asBytes(container, true)));
 
-            byte[] binary = builder.asBytes(true);
-            moleculeQueue.put(new IndexItem(id, binary));
+                return "warning: inchi cannot be generated: " + e.getMessage();
+            }
         }
         catch(Exception e)
         {

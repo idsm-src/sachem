@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2019 Jakub Galgonek   galgonek@uochb.cas.cz
+ * Copyright (C) 2015-2020 Jakub Galgonek   galgonek@uochb.cas.cz
  * Copyright (C) 2008-2009 Mark Rijnbeek    markr@ebi.ac.uk
  *
  * This program is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General
@@ -22,6 +22,7 @@ import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -41,21 +42,27 @@ import org.openscience.cdk.interfaces.IBond.Order;
 import org.openscience.cdk.interfaces.IChemObjectBuilder;
 import org.openscience.cdk.interfaces.IIsotope;
 import org.openscience.cdk.interfaces.IPseudoAtom;
+import org.openscience.cdk.interfaces.IStereoElement;
 import org.openscience.cdk.io.DefaultChemObjectReader;
 import org.openscience.cdk.io.MDLV2000Reader;
 import org.openscience.cdk.io.MDLV3000Reader;
 import org.openscience.cdk.io.RGroupQueryReader;
 import org.openscience.cdk.io.formats.RGroupQueryFormat;
+import org.openscience.cdk.isomorphism.matchers.IQueryBond;
 import org.openscience.cdk.isomorphism.matchers.QueryBond;
 import org.openscience.cdk.isomorphism.matchers.RGroupQuery;
 import org.openscience.cdk.silent.AtomContainer;
 import org.openscience.cdk.silent.SilentChemObjectBuilder;
 import org.openscience.cdk.smiles.SmilesParser;
+import org.openscience.cdk.stereo.DoubleBondStereochemistry;
+import org.openscience.cdk.stereo.ExtendedCisTrans;
+import org.openscience.cdk.stereo.ExtendedTetrahedral;
+import org.openscience.cdk.stereo.TetrahedralChirality;
 import org.openscience.cdk.tools.CDKHydrogenAdder;
 import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 import org.openscience.cdk.tools.manipulator.AtomTypeManipulator;
-import cz.iocb.sachem.tautomers.InChIException;
-import cz.iocb.sachem.tautomers.InchiTautomerGenerator;
+import cz.iocb.sachem.molecule.InChITautomerGenerator.InChITautomerException;
+import cz.iocb.sachem.molecule.InChITools.InChIException;
 
 
 
@@ -74,6 +81,9 @@ public class MoleculeCreator
     }
 
 
+    public static final String STEREO_FLAG = "STEREO_FLAG";
+
+
     private static final ThreadLocal<Aromaticity> aromaticity = new ThreadLocal<Aromaticity>()
     {
         @Override
@@ -84,80 +94,170 @@ public class MoleculeCreator
     };
 
 
-    public static QueryMolecule translateQuery(String query, QueryFormat format, AromaticityMode aromaticityMode,
+    public static QueryMolecule translateQuery(String query, QueryFormat format, ChargeMode chargeMode,
+            IsotopeMode isotopeMode, RadicalMode radicalMode, StereoMode stereoMode, AromaticityMode aromaticityMode,
             TautomerMode tautomerMode) throws CDKException, IOException, TimeoutException
     {
-        try
+        List<IAtomContainer> molecules = null;
+
+        switch(format)
         {
-            List<IAtomContainer> queries = null;
+            case MOLFILE:
+                molecules = Arrays.asList(MoleculeCreator.getMoleculeFromMolfile(query, aromaticityMode));
+                break;
 
-            switch(format)
+            case SMILES:
+                molecules = Arrays.asList(MoleculeCreator.getMoleculeFromSmiles(query, aromaticityMode));
+                break;
+
+            case RGROUP:
+                molecules = getMoleculesFromRGroupQuery(query, aromaticityMode);
+                break;
+
+            case UNSPECIFIED:
+                List<String> lines = Arrays.asList(query.split("\\n"));
+
+                if(((RGroupQueryFormat) RGroupQueryFormat.getInstance()).matches(lines).matched())
+                    molecules = getMoleculesFromRGroupQuery(query, aromaticityMode);
+                else if(lines.size() > 1)
+                    molecules = Arrays.asList(MoleculeCreator.getMoleculeFromMolfile(query, aromaticityMode));
+                else
+                    molecules = Arrays.asList(MoleculeCreator.getMoleculeFromSmiles(query, aromaticityMode));
+
+                break;
+        }
+
+
+        String name = molecules.size() > 0 ? molecules.get(0).getTitle() : null;
+
+        if(name == null)
+            name = "";
+
+
+        List<IAtomContainer> queries = new ArrayList<IAtomContainer>();
+
+        if(tautomerMode == TautomerMode.IGNORE)
+        {
+            for(IAtomContainer molecule : molecules)
             {
-                case MOLFILE:
-                    queries = Arrays.asList(MoleculeCreator.getMoleculeFromMolfile(query, aromaticityMode));
-                    break;
+                if(chargeMode == ChargeMode.IGNORE)
+                    for(IAtom atom : molecule.atoms())
+                        atom.setFormalCharge(0);
 
-                case SMILES:
-                    queries = Arrays.asList(MoleculeCreator.getMoleculeFromSmiles(query, aromaticityMode));
-                    break;
+                if(radicalMode == RadicalMode.IGNORE)
+                    for(IAtom atom : molecule.atoms())
+                        atom.removeProperty(CDKConstants.SPIN_MULTIPLICITY);
 
-                case RGROUP:
-                    queries = getMoleculesFromRGroupQuery(query, aromaticityMode);
-                    break;
+                if(isotopeMode == IsotopeMode.IGNORE)
+                    for(IAtom atom : molecule.atoms())
+                        atom.setMassNumber(null);
 
-                case UNSPECIFIED:
-                    List<String> lines = Arrays.asList(query.split("\\n"));
+                if(stereoMode == StereoMode.STRICT)
+                {
+                    boolean hasQueryBond = false;
 
-                    if(((RGroupQueryFormat) RGroupQueryFormat.getInstance()).matches(lines).matched())
-                        queries = getMoleculesFromRGroupQuery(query, aromaticityMode);
-                    else if(lines.size() > 1)
-                        queries = Arrays.asList(MoleculeCreator.getMoleculeFromMolfile(query, aromaticityMode));
+                    for(IBond bond : molecule.bonds())
+                        if(bond instanceof IQueryBond || bond.getOrder() == Order.UNSET)
+                            hasQueryBond = true;
+
+                    if(!hasQueryBond)
+                        setStereo(molecule, new InChITools(molecule, false, false));
                     else
-                        queries = Arrays.asList(MoleculeCreator.getMoleculeFromSmiles(query, aromaticityMode));
+                        setStereo(molecule);
+                }
 
-                    break;
+                queries.add(molecule);
             }
-
-
-            String name = queries.size() > 0 ? queries.get(0).getTitle() : null;
-
-            if(name == null)
-                name = "";
-
-
-            if(tautomerMode == TautomerMode.INCHI)
+        }
+        else
+        {
+            for(IAtomContainer molecule : molecules)
             {
+                InChITools inchi;
+
                 try
                 {
-                    InchiTautomerGenerator generator = new InchiTautomerGenerator();
-                    List<IAtomContainer> tautomers = new ArrayList<IAtomContainer>();
-
-                    for(IAtomContainer molecule : queries)
-                        tautomers.addAll(generator.getTautomers(molecule));
-
-                    for(IAtomContainer tautomer : tautomers)
-                        tautomer.setAtoms(BinaryMoleculeSort.atomsByFrequency(tautomer));
-
-                    queries = tautomers;
+                    inchi = new InChITools(molecule, true, false);
                 }
-                catch(CDKException e)
+                catch(InChIException e)
                 {
-                    throw new InChIException(name.isEmpty() ? "<unnamed>" :
-                            ("'" + name + "'") + ": cannot generate tautomers: " + e.getMessage());
+                    throw new InChITautomerException(e.getMessage());
+                }
+
+
+                boolean resetStereo = false;
+
+                if(stereoMode == StereoMode.STRICT && chargeMode == ChargeMode.IGNORE)
+                    for(IAtom atom : molecule.atoms())
+                        if(atom.getFormalCharge() != 0)
+                            resetStereo = true;
+
+                if(stereoMode == StereoMode.STRICT && radicalMode == RadicalMode.IGNORE)
+                    for(IAtom atom : molecule.atoms())
+                        if(atom.getProperty(CDKConstants.SPIN_MULTIPLICITY) == null)
+                            resetStereo = true;
+
+                if(isotopeMode == IsotopeMode.IGNORE)
+                    for(IAtom atom : molecule.atoms())
+                        atom.setMassNumber(null);
+
+                if(stereoMode == StereoMode.STRICT)
+                    setStereo(molecule, inchi);
+
+
+                for(IAtomContainer tautomer : InChITautomerGenerator.generate(molecule, inchi.getTautomericBonds(),
+                        inchi.getTautomericGroups()))
+                {
+                    if(chargeMode == ChargeMode.IGNORE)
+                        for(IAtom atom : tautomer.atoms())
+                            atom.setFormalCharge(0);
+
+                    if(radicalMode == RadicalMode.IGNORE)
+                        for(IAtom atom : tautomer.atoms())
+                            atom.removeProperty(CDKConstants.SPIN_MULTIPLICITY);
+
+                    if(resetStereo && (!inchi.getStereoAtoms().isEmpty() || !inchi.getStereoBonds().isEmpty()))
+                    {
+                        /* fix stereo */
+                        InChITools tautomerInchi = new InChITools(tautomer, false, false);
+
+                        HashSet<Object> stereo = new HashSet<Object>();
+                        stereo.addAll(tautomerInchi.getStereoAtoms());
+                        stereo.add(tautomerInchi.getStereoBonds());
+
+                        for(IAtom atom : inchi.getStereoAtoms())
+                            if(!stereo.contains(atom))
+                                atom.removeProperty(STEREO_FLAG);
+
+                        for(IBond bond : inchi.getStereoBonds())
+                            if(!stereo.contains(bond))
+                                bond.removeProperty(STEREO_FLAG);
+                    }
+
+
+                    queries.add(tautomer);
                 }
             }
-
-
-            return new QueryMolecule(name, queries);
         }
-        catch(CloneNotSupportedException e)
-        {
-            return null;
-        }
+
+        return new QueryMolecule(name, queries);
     }
 
 
-    public static IAtomContainer getMoleculeFromMolfile(String mol, AromaticityMode aromaticityMode)
+    public static IAtomContainer translateMolecule(String mol, boolean inchiStereo) throws CDKException, IOException
+    {
+        IAtomContainer molecule = getMoleculeFromMolfile(mol, AromaticityMode.AUTO);
+
+        if(inchiStereo)
+            setStereo(molecule, new InChITools(molecule, false, true));
+        else
+            setStereo(molecule);
+
+        return molecule;
+    }
+
+
+    private static IAtomContainer getMoleculeFromMolfile(String mol, AromaticityMode aromaticityMode)
             throws CDKException, IOException
     {
         DefaultChemObjectReader mdlReader;
@@ -241,7 +341,7 @@ public class MoleculeCreator
     }
 
 
-    public static IAtomContainer getMoleculeFromSmiles(String smiles, AromaticityMode aromaticityMode)
+    private static IAtomContainer getMoleculeFromSmiles(String smiles, AromaticityMode aromaticityMode)
             throws CDKException
     {
         try
@@ -274,7 +374,7 @@ public class MoleculeCreator
     }
 
 
-    public static List<IAtomContainer> getMoleculesFromRGroupQuery(String rgroup, AromaticityMode aromaticityMode)
+    private static List<IAtomContainer> getMoleculesFromRGroupQuery(String rgroup, AromaticityMode aromaticityMode)
             throws CDKException, IOException
     {
         try(RGroupQueryReader reader = new RGroupQueryReader(new ByteArrayInputStream(rgroup.getBytes())))
@@ -339,6 +439,36 @@ public class MoleculeCreator
                 for(IBond bond : unset)
                     bond.setOrder(Order.UNSET);
             }
+        }
+    }
+
+
+    private static void setStereo(IAtomContainer molecule, InChITools inchi)
+    {
+        molecule.setStereoElements(inchi.getStereoElements());
+
+        for(IAtom atom : inchi.getStereoAtoms())
+            atom.setProperty(STEREO_FLAG, Boolean.TRUE);
+
+        for(IBond bond : inchi.getStereoBonds())
+            if(!bond.isAromatic())
+                bond.setProperty(STEREO_FLAG, Boolean.TRUE);
+    }
+
+
+    private static void setStereo(IAtomContainer molecule)
+    {
+        for(@SuppressWarnings("rawtypes")
+        IStereoElement element : molecule.stereoElements())
+        {
+            if(element instanceof TetrahedralChirality)
+                ((TetrahedralChirality) element).getChiralAtom().setProperty(STEREO_FLAG, Boolean.TRUE);
+            else if(element instanceof ExtendedTetrahedral)
+                ((ExtendedTetrahedral) element).focus().setProperty(STEREO_FLAG, Boolean.TRUE);
+            else if(element instanceof DoubleBondStereochemistry)
+                ((DoubleBondStereochemistry) element).getStereoBond().setProperty(STEREO_FLAG, Boolean.TRUE);
+            else if(element instanceof ExtendedCisTrans)
+                ((ExtendedCisTrans) element).getFocus().setProperty(STEREO_FLAG, Boolean.TRUE);
         }
     }
 }

@@ -3,7 +3,7 @@ pglib_LTLIBRARIES = libsachem.la
 
 libsachem_la_CFLAGS = -std=gnu99 -O3 -march=native -flto -minline-stringops-dynamically -Wall -Wno-parentheses -g
 libsachem_la_CXXFLAGS = -std=c++11 -O3 -march=native -flto -minline-stringops-dynamically -Wall -g
-libsachem_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(JDK8_CPPFLAGS) -DTARGET_API_LIB -DBINDIR=\"$(bindir)\" -DJARDIR=\"$(datadir)/$(PACKAGE)/jar\"
+libsachem_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(JDK8_CPPFLAGS) -I$(srcdir)/inchi -DTARGET_API_LIB -DBINDIR=\"$(bindir)\" -DJARDIR=\"$(datadir)/$(PACKAGE)/jar\"
 libsachem_la_LDFLAGS = $(JDK8_LDFLAGS) -Wl,-rpath,$(POSTGRESQL_LIBDIR)
 
 libsachem_la_SOURCES = \
@@ -24,6 +24,7 @@ libsachem_la_SOURCES = \
         inchi/ichitaut.c \
         inchi/strutil.c \
         inchi/util.c \
+        inchi.c \
         info.c \
         java.c \
         native.c \
@@ -59,6 +60,7 @@ EXTRA_DIST = \
         inchi/strutil.h \
         inchi/util.h \
         enum.h \
+        inchi.h \
         isomorphism.h \
         java.h \
         memory.h \

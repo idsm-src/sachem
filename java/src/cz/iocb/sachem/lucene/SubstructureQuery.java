@@ -83,8 +83,8 @@ public class SubstructureQuery extends Query
         this.tautomerMode = tautomerMode;
         this.iterationLimit = iterationLimit;
 
-        QueryMolecule queryMolecules = MoleculeCreator.translateQuery(query, queryFormat, aromaticityMode,
-                tautomerMode);
+        QueryMolecule queryMolecules = MoleculeCreator.translateQuery(query, queryFormat, chargeMode, isotopeMode,
+                radicalMode, stereoMode, aromaticityMode, tautomerMode);
 
         this.name = queryMolecules.name;
 
@@ -170,9 +170,7 @@ public class SubstructureQuery extends Query
             this.parentQuery = SubstructureQuery.this;
             this.tautomer = tautomer;
 
-            this.moleculeData = (new BinaryMoleculeBuilder(tautomer, chargeMode == ChargeMode.IGNORE,
-                    isotopeMode == IsotopeMode.IGNORE, radicalMode == RadicalMode.IGNORE,
-                    stereoMode == StereoMode.IGNORE)).asBytes(searchMode == SearchMode.EXACT);
+            this.moleculeData = BinaryMoleculeBuilder.asBytes(tautomer, searchMode == SearchMode.EXACT);
 
             boolean hasRestH = false;
 

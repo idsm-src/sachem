@@ -34,9 +34,13 @@ import cz.iocb.sachem.fingerprint.IOCBFingerprint;
 import cz.iocb.sachem.molecule.AromaticityMode;
 import cz.iocb.sachem.molecule.BinaryMolecule;
 import cz.iocb.sachem.molecule.BinaryMoleculeBuilder;
+import cz.iocb.sachem.molecule.ChargeMode;
+import cz.iocb.sachem.molecule.IsotopeMode;
 import cz.iocb.sachem.molecule.MoleculeCreator;
 import cz.iocb.sachem.molecule.MoleculeCreator.QueryMolecule;
 import cz.iocb.sachem.molecule.QueryFormat;
+import cz.iocb.sachem.molecule.RadicalMode;
+import cz.iocb.sachem.molecule.StereoMode;
 import cz.iocb.sachem.molecule.TautomerMode;
 
 
@@ -68,7 +72,9 @@ public class SimilarStructureQuery extends Query
         this.aromaticityMode = aromaticityMode;
         this.tautomerMode = tautomerMode;
 
-        QueryMolecule queryMolecule = MoleculeCreator.translateQuery(query, queryFormat, aromaticityMode, tautomerMode);
+        QueryMolecule queryMolecule = MoleculeCreator.translateQuery(query, queryFormat,
+                ChargeMode.DEFAULT_AS_UNCHARGED, IsotopeMode.DEFAULT_AS_STANDARD, RadicalMode.DEFAULT_AS_STANDARD,
+                StereoMode.IGNORE, aromaticityMode, tautomerMode);
 
         this.name = queryMolecule.name;
 
@@ -137,9 +143,7 @@ public class SimilarStructureQuery extends Query
             this.parentQuery = SimilarStructureQuery.this;
             this.tautomer = tautomer;
 
-            byte[] moleculeData = (new BinaryMoleculeBuilder(tautomer, true, true, true, true)).asBytes(false);
-
-            BinaryMolecule molecule = new BinaryMolecule(moleculeData);
+            BinaryMolecule molecule = new BinaryMolecule(BinaryMoleculeBuilder.asBytes(tautomer, false));
 
             this.fp = IOCBFingerprint.getSimilarityFingerprint(molecule, similarityRadius);
             this.fpSize = fp.stream().map(i -> i.size()).reduce(0, Integer::sum);

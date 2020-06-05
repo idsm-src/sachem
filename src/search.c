@@ -256,7 +256,7 @@ static void lucene_search_init(void)
     searcherClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/lucene/Searcher"));
     java_check_exception(__func__);
 
-    inchiExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/tautomers/InChIException"));
+    inchiExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/molecule/InChITautomerGenerator$InChITautomerException"));
     java_check_exception(__func__);
 
     getMessageMethod = (*env)->GetMethodID(env, inchiExceptionClass, "getMessage", "()Ljava/lang/String;");

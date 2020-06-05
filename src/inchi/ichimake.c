@@ -572,6 +572,7 @@ int GetSp3RelRacAbs( const INChI *pINChI, INChI_Stereo *Stereo )
     return nRet;
 }
 
+#ifdef UNUSED_IN_SACHEM
 /*
     CompINChILayers( ... )
 
@@ -1125,6 +1126,7 @@ int CompINChILayers( const INCHI_SORT *p1,
 
     return ret;
 }
+#endif
 
 /*
     INChI_SegmentAction( ... )
@@ -2749,6 +2751,7 @@ exit_function:
 }
 #endif  /* } READ_INCHI_STRING */
 
+#ifdef UNUSED_IN_SACHEM
 /*
     Create_INChI( ... )
 
@@ -3550,6 +3553,7 @@ exit_function:
         inchi_free( ebend );
     return ret;
 }
+#endif
 
 #ifndef COMPILE_ANSI_ONLY /* { */
 int GetAtomOrdNbrInCanonOrd( struct tagCANON_GLOBALS *pCG,
