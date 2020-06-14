@@ -20,8 +20,6 @@ import org.openscience.cdk.interfaces.IPseudoAtom;
 import org.openscience.cdk.interfaces.IStereoElement;
 import org.openscience.cdk.interfaces.ITetrahedralChirality;
 import org.openscience.cdk.interfaces.ITetrahedralChirality.Stereo;
-import org.openscience.cdk.isomorphism.matchers.Expr;
-import org.openscience.cdk.isomorphism.matchers.QueryBond;
 import org.openscience.cdk.stereo.DoubleBondStereochemistry;
 import org.openscience.cdk.stereo.ExtendedCisTrans;
 import org.openscience.cdk.stereo.ExtendedTetrahedral;
@@ -97,11 +95,11 @@ public class InChITools
     }
 
 
-    public InChITools(IAtomContainer molecule, boolean tautomers, boolean ignoreAnyBonds) throws CDKException
+    public InChITools(IAtomContainer molecule, boolean tautomers) throws CDKException
     {
         this.molecule = molecule;
 
-        if(process(moleculeAsBytes(molecule, ignoreAnyBonds), tautomers) < 0)
+        if(process(moleculeAsBytes(molecule), tautomers) < 0)
             throw new InChIException("generation fails");
 
         molecule.setStereoElements(stereo);
@@ -293,7 +291,7 @@ public class InChITools
     }
 
 
-    private static final byte[] moleculeAsBytes(IAtomContainer molecule, boolean ignoreAnyBonds) throws CDKException
+    private static final byte[] moleculeAsBytes(IAtomContainer molecule) throws CDKException
     {
         if(molecule.getAtomCount() > Short.MAX_VALUE)
             throw new InChIException("too many atoms");
@@ -309,18 +307,6 @@ public class InChITools
             int offset = index * RECORD_SIZE;
             IAtom atom = molecule.getAtom(index);
             List<IBond> bonds = molecule.getConnectedBondsList(atom);
-
-            if(ignoreAnyBonds)
-            {
-                for(Iterator<IBond> it = bonds.iterator(); it.hasNext();)
-                {
-                    IBond bond = it.next();
-
-                    if(bond instanceof QueryBond && ((QueryBond) bond).getExpression().type() == Expr.Type.TRUE)
-                        it.remove();
-                }
-            }
-
             int multiplicity = molecule.getConnectedSingleElectronsCount(atom);
 
             int valence = 0;

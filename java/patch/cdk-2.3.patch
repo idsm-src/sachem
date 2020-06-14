@@ -25,11 +25,54 @@ index b08e73d76f..d224dab775 100755
              	max = bond.getOrder();
          }
          return max;
+diff --git a/base/core/src/main/java/org/openscience/cdk/graph/Cycles.java b/base/core/src/main/java/org/openscience/cdk/graph/Cycles.java
+index ef7960ff86..c841b3cc37 100644
+--- a/base/core/src/main/java/org/openscience/cdk/graph/Cycles.java
++++ b/base/core/src/main/java/org/openscience/cdk/graph/Cycles.java
+@@ -746,7 +746,7 @@ public final class Cycles {
+             /** {@inheritDoc} */
+             @Override
+             int[][] apply(int[][] graph, int length) throws Intractable {
+-                final int threshold = 684; // see. AllRingsFinder.Threshold.Pubchem_99
++                final int threshold = 3072; // see. AllRingsFinder.Threshold.Pubchem_994
+                 AllCycles ac = new AllCycles(graph, Math.min(length, graph.length), threshold);
+                 if (!ac.completed())
+                     throw new Intractable("A large number of cycles were being generated and the"
+@@ -807,7 +807,7 @@ public final class Cycles {
+             /** {@inheritDoc} */
+             @Override
+             int[][] apply(int[][] graph, int length) throws Intractable {
+-                final int threshold = 684; // see. AllRingsFinder.Threshold.Pubchem_99
++                final int threshold = 3072; // see. AllRingsFinder.Threshold.Pubchem_994
+                 AllCycles ac = new AllCycles(graph, Math.min(length, graph.length), threshold);
+ 
+                 return ac.completed() ? ac.paths() : VERTEX_SHORT.apply(graph, length);
+@@ -978,8 +978,8 @@ public final class Cycles {
+ 
+         private final int predefinedLength;
+ 
+-        // see. AllRingsFinder.Threshold.Pubchem_99
+-        private final int threshold = 684;
++        // see. AllRingsFinder.Threshold.Pubchem_994
++        private final int threshold = 3072;
+ 
+         private AllUpToLength(int length) {
+             this.predefinedLength = length;
 diff --git a/base/standard/src/main/java/org/openscience/cdk/graph/invariant/Canon.java b/base/standard/src/main/java/org/openscience/cdk/graph/invariant/Canon.java
-index 07f8ee2137..ff52e3cdce 100644
+index 07f8ee2137..73d426d4b0 100644
 --- a/base/standard/src/main/java/org/openscience/cdk/graph/invariant/Canon.java
 +++ b/base/standard/src/main/java/org/openscience/cdk/graph/invariant/Canon.java
-@@ -341,6 +341,7 @@ public final class Canon {
+@@ -280,6 +280,9 @@ public final class Canon {
+             System.arraycopy(nextVs, 0, currVs, 0, nnu);
+         }
+ 
++        if(symmetry == null)
++            symmetry = new long[0];
++
+         return symmetry;
+     }
+ 
+@@ -341,6 +344,7 @@ public final class Canon {
              int expH = 0;
              int elem = atomicNumber(atom);
              int chg = charge(atom);
@@ -37,7 +80,7 @@ index 07f8ee2137..ff52e3cdce 100644
  
              // count non-suppressed (explicit) hydrogens
              for (int w : graph[v])
-@@ -358,6 +359,8 @@ public final class Canon {
+@@ -358,6 +362,8 @@ public final class Canon {
              label |= Math.abs(chg) & 0x3;
              label <<= 4; // hydrogen count <= 15 (4 bits)
              label |= impH + expH & 0xf;
@@ -140,8 +183,20 @@ index 51a7440b85..79fadebaaa 100644
      }
  
  }
+diff --git a/pom.xml b/pom.xml
+index ee9f9b4aa6..9900ee472a 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -27,6 +27,7 @@
+     <properties>
+         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
++	    <maven.test.skip>true</maven.test.skip>
+     </properties>
+ 
+     <licenses>
 diff --git a/storage/ctab/src/main/java/org/openscience/cdk/io/MDLV2000Reader.java b/storage/ctab/src/main/java/org/openscience/cdk/io/MDLV2000Reader.java
-index 6a3202d4e1..364daf4d02 100644
+index 6a3202d4e1..24d4f411e6 100644
 --- a/storage/ctab/src/main/java/org/openscience/cdk/io/MDLV2000Reader.java
 +++ b/storage/ctab/src/main/java/org/openscience/cdk/io/MDLV2000Reader.java
 @@ -687,6 +687,7 @@ public class MDLV2000Reader extends DefaultChemObjectReader {
@@ -161,3 +216,18 @@ index 6a3202d4e1..364daf4d02 100644
                          for (int e = 0; e < multiplicity.getSingleElectrons(); e++)
                              container.addSingleElectron(offset + index);
                      }
+@@ -1202,6 +1205,14 @@ public class MDLV2000Reader extends DefaultChemObjectReader {
+                     }
+                     break;
+ 
++                // Data Sgroup Field Description [Sgroup]
++                // M SDT sss fff...fffgghhh...hhhiijjj...
++                // sss: Index of component Sgroup
++                case M_SDT:
++                    sgroup = ensureSgroup(sgroups, readMolfileInt(line, 7));
++                    sgroup.putValue(SgroupKey.CtabLabel, line.substring(11).trim());
++                    break;
++
+                 // M  END
+                 //
+                 // This entry goes at the end of the properties block and is required for molfiles which contain a

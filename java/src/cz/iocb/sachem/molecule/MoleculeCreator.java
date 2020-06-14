@@ -48,6 +48,7 @@ import org.openscience.cdk.io.MDLV2000Reader;
 import org.openscience.cdk.io.MDLV3000Reader;
 import org.openscience.cdk.io.RGroupQueryReader;
 import org.openscience.cdk.io.formats.RGroupQueryFormat;
+import org.openscience.cdk.isomorphism.matchers.Expr;
 import org.openscience.cdk.isomorphism.matchers.IQueryBond;
 import org.openscience.cdk.isomorphism.matchers.QueryBond;
 import org.openscience.cdk.isomorphism.matchers.RGroupQuery;
@@ -59,7 +60,6 @@ import org.openscience.cdk.stereo.ExtendedCisTrans;
 import org.openscience.cdk.stereo.ExtendedTetrahedral;
 import org.openscience.cdk.stereo.TetrahedralChirality;
 import org.openscience.cdk.tools.CDKHydrogenAdder;
-import org.openscience.cdk.tools.manipulator.AtomContainerManipulator;
 import org.openscience.cdk.tools.manipulator.AtomTypeManipulator;
 import cz.iocb.sachem.molecule.InChITautomerGenerator.InChITautomerException;
 import cz.iocb.sachem.molecule.InChITools.InChIException;
@@ -89,7 +89,7 @@ public class MoleculeCreator
         @Override
         protected Aromaticity initialValue()
         {
-            return new Aromaticity(ElectronDonation.cdkAllowingExocyclic(), Cycles.cdkAromaticSet());
+            return new Aromaticity(ElectronDonation.daylight(), Cycles.or(Cycles.all(), Cycles.cdkAromaticSet()));
         }
     };
 
@@ -103,30 +103,33 @@ public class MoleculeCreator
         switch(format)
         {
             case MOLFILE:
-                molecules = Arrays.asList(MoleculeCreator.getMoleculeFromMolfile(query, aromaticityMode));
+                molecules = Arrays.asList(MoleculeCreator.getMoleculeFromMolfile(query));
                 break;
 
             case SMILES:
-                molecules = Arrays.asList(MoleculeCreator.getMoleculeFromSmiles(query, aromaticityMode));
+                molecules = Arrays.asList(MoleculeCreator.getMoleculeFromSmiles(query));
                 break;
 
             case RGROUP:
-                molecules = getMoleculesFromRGroupQuery(query, aromaticityMode);
+                molecules = getMoleculesFromRGroupQuery(query);
                 break;
 
             case UNSPECIFIED:
                 List<String> lines = Arrays.asList(query.split("\\n"));
 
                 if(((RGroupQueryFormat) RGroupQueryFormat.getInstance()).matches(lines).matched())
-                    molecules = getMoleculesFromRGroupQuery(query, aromaticityMode);
+                    molecules = getMoleculesFromRGroupQuery(query);
                 else if(lines.size() > 1)
-                    molecules = Arrays.asList(MoleculeCreator.getMoleculeFromMolfile(query, aromaticityMode));
+                    molecules = Arrays.asList(MoleculeCreator.getMoleculeFromMolfile(query));
                 else
-                    molecules = Arrays.asList(MoleculeCreator.getMoleculeFromSmiles(query, aromaticityMode));
+                    molecules = Arrays.asList(MoleculeCreator.getMoleculeFromSmiles(query));
 
                 break;
         }
 
+
+        for(IAtomContainer molecule : molecules)
+            configureAromaticity(molecule, aromaticityMode);
 
         String name = molecules.size() > 0 ? molecules.get(0).getTitle() : null;
 
@@ -161,7 +164,7 @@ public class MoleculeCreator
                             hasQueryBond = true;
 
                     if(!hasQueryBond)
-                        setStereo(molecule, new InChITools(molecule, false, false));
+                        setStereo(molecule, new InChITools(molecule, false));
                     else
                         setStereo(molecule);
                 }
@@ -177,7 +180,7 @@ public class MoleculeCreator
 
                 try
                 {
-                    inchi = new InChITools(molecule, true, false);
+                    inchi = new InChITools(molecule, true);
                 }
                 catch(InChIException e)
                 {
@@ -219,7 +222,7 @@ public class MoleculeCreator
                     if(resetStereo && (!inchi.getStereoAtoms().isEmpty() || !inchi.getStereoBonds().isEmpty()))
                     {
                         /* fix stereo */
-                        InChITools tautomerInchi = new InChITools(tautomer, false, false);
+                        InChITools tautomerInchi = new InChITools(tautomer, false);
 
                         HashSet<Object> stereo = new HashSet<Object>();
                         stereo.addAll(tautomerInchi.getStereoAtoms());
@@ -246,19 +249,32 @@ public class MoleculeCreator
 
     public static IAtomContainer translateMolecule(String mol, boolean inchiStereo) throws CDKException, IOException
     {
-        IAtomContainer molecule = getMoleculeFromMolfile(mol, AromaticityMode.AUTO);
+        IAtomContainer molecule = getMoleculeFromMolfile(mol);
+
+        List<IBond> otherBonds = new LinkedList<IBond>();
+
+        for(IBond bond : molecule.bonds())
+            if(bond instanceof QueryBond && ((QueryBond) bond).getExpression().type() == Expr.Type.TRUE)
+                otherBonds.add(bond);
+
+        for(IBond bond : otherBonds)
+            molecule.removeBond(bond);
+
+        configureAromaticity(molecule, AromaticityMode.AUTO);
 
         if(inchiStereo)
-            setStereo(molecule, new InChITools(molecule, false, true));
+            setStereo(molecule, new InChITools(molecule, false));
         else
             setStereo(molecule);
+
+        for(IBond bond : otherBonds)
+            molecule.addBond(bond);
 
         return molecule;
     }
 
 
-    private static IAtomContainer getMoleculeFromMolfile(String mol, AromaticityMode aromaticityMode)
-            throws CDKException, IOException
+    private static IAtomContainer getMoleculeFromMolfile(String mol) throws CDKException, IOException
     {
         DefaultChemObjectReader mdlReader;
 
@@ -333,16 +349,13 @@ public class MoleculeCreator
             }
         }
 
-
-        MoleculeCreator.configureMolecule(molecule, aromaticityMode);
         molecule.setAtoms(BinaryMoleculeSort.atomsByFrequency(molecule));
 
         return molecule;
     }
 
 
-    private static IAtomContainer getMoleculeFromSmiles(String smiles, AromaticityMode aromaticityMode)
-            throws CDKException
+    private static IAtomContainer getMoleculeFromSmiles(String smiles) throws CDKException
     {
         try
         {
@@ -360,8 +373,6 @@ public class MoleculeCreator
                 }
             });
 
-
-            MoleculeCreator.configureMolecule(molecule, aromaticityMode);
             molecule.setAtoms(BinaryMoleculeSort.atomsByFrequency(molecule));
             molecule.setTitle(smiles);
 
@@ -374,33 +385,27 @@ public class MoleculeCreator
     }
 
 
-    private static List<IAtomContainer> getMoleculesFromRGroupQuery(String rgroup, AromaticityMode aromaticityMode)
-            throws CDKException, IOException
+    private static List<IAtomContainer> getMoleculesFromRGroupQuery(String rgroup) throws CDKException, IOException
     {
         try(RGroupQueryReader reader = new RGroupQueryReader(new ByteArrayInputStream(rgroup.getBytes())))
         {
             RGroupQuery rGroupQuery = reader.read(new RGroupQuery(SilentChemObjectBuilder.getInstance()));
             List<IAtomContainer> molecules = rGroupQuery.getAllConfigurations();
 
-            for(IAtomContainer molecule : molecules)
-                configureMolecule(molecule, aromaticityMode);
-
             return molecules;
         }
-    }
-
-
-    private static void configureMolecule(IAtomContainer molecule, AromaticityMode aromaticityMode) throws CDKException
-    {
-        kekulize(molecule);
-        AtomContainerManipulator.percieveAtomTypesAndConfigureAtoms(molecule);
-        configureAromaticity(molecule, aromaticityMode);
     }
 
 
     private static void configureAromaticity(IAtomContainer molecule, AromaticityMode aromaticityMode)
             throws CDKException
     {
+        kekulize(molecule);
+
+        for(IBond bond : molecule.bonds())
+            if(bond instanceof IQueryBond || bond.getOrder() == Order.UNSET)
+                return;
+
         switch(aromaticityMode)
         {
             case PRESERVE:
