@@ -22,6 +22,7 @@ libsachem_la_SOURCES = \
         inchi/ichisort.c \
         inchi/ichister.c \
         inchi/ichitaut.c \
+        inchi/readinch.c \
         inchi/strutil.c \
         inchi/util.c \
         inchi.c \
@@ -57,6 +58,7 @@ EXTRA_DIST = \
         inchi/ixa.h \
         inchi/mode.h \
         inchi/mol_fmt.h \
+        inchi/readinch.h \
         inchi/strutil.h \
         inchi/util.h \
         enum.h \
