@@ -71,6 +71,8 @@ public class InChITools
     private static final int ZERO_ATW_DIFF = 127;
     private static final int MAXVAL = 20;
     private static final int RECORD_SIZE = 176;
+    private static final int STEREO_RECORD_SIZE = 12;
+    private static final short NO_ATOM = -1;
     private static Isotopes isotopes;
 
     private final IAtomContainer molecule;
@@ -95,25 +97,36 @@ public class InChITools
     }
 
 
-    public InChITools(IAtomContainer molecule, boolean tautomers) throws CDKException
+    public InChITools(IAtomContainer molecule, int mode, boolean tautomers) throws CDKException
     {
         this.molecule = molecule;
 
-        if(process(moleculeAsBytes(molecule), tautomers) < 0)
+        boolean is0D = true;
+
+        for(IAtom atom : molecule.atoms())
+        {
+            if(atom.getPoint3d() != null || atom.getPoint2d() != null)
+            {
+                is0D = false;
+                break;
+            }
+        }
+
+        if(process(moleculeAsBytes(molecule), is0D ? stereoAsBytes(molecule) : null, mode, tautomers) < 0)
             throw new InChIException("generation fails");
 
         molecule.setStereoElements(stereo);
     }
 
 
-    private native int process(byte[] molecule, boolean tautomerism);
+    private native int process(byte[] molecule, byte[] stereo, int mode, boolean tautomerism);
 
 
     void setStereoAtoms(short[] data)
     {
         for(int i = 0; i < data.length;)
         {
-            final IAtom atom = molecule.getAtom(data[i++]);
+            final IAtom atom = molecule.getAtom(data[i++] - 1);
             final int parity = data[i++];
 
             if(parity == -1 || parity == -2)
@@ -180,7 +193,7 @@ public class InChITools
     {
         for(int i = 0; i < data.length; i++)
         {
-            final IBond bond = molecule.getBond(molecule.getAtom(data[i++]), molecule.getAtom(data[i++]));
+            final IBond bond = molecule.getBond(molecule.getAtom(data[i++] - 1), molecule.getAtom(data[i++] - 1));
             final int parity = data[i];
 
             if(parity == -1 || parity == -2)
@@ -251,8 +264,8 @@ public class InChITools
     void setAlternatingBonds(short[] data)
     {
         for(int i = 0; i < data.length; i++)
-            tautomericBonds
-                    .add(molecule.indexOf(molecule.getBond(molecule.getAtom(data[i++]), molecule.getAtom(data[i]))));
+            tautomericBonds.add(
+                    molecule.indexOf(molecule.getBond(molecule.getAtom(data[i++] - 1), molecule.getAtom(data[i] - 1))));
     }
 
 
@@ -267,7 +280,7 @@ public class InChITools
 
 
         for(int i = 2; i < data.length; i++)
-            group.atoms.add((int) data[i]);
+            group.atoms.add(data[i] - 1);
     }
 
 
@@ -288,6 +301,116 @@ public class InChITools
 
             atom = bond.getOther(atom);
         }
+    }
+
+
+    private static final byte[] stereoAsBytes(IAtomContainer molecule) throws CDKException
+    {
+        ArrayList<IStereoElement<?, ?>> elements = new ArrayList<IStereoElement<?, ?>>();
+
+        for(IStereoElement<?, ?> e : molecule.stereoElements())
+            elements.add(e);
+
+        byte array[] = new byte[STEREO_RECORD_SIZE * elements.size()];
+        ByteBuffer buffer = ByteBuffer.wrap(array);
+        buffer.order(ByteOrder.nativeOrder());
+
+        for(IStereoElement<?, ?> element : elements)
+        {
+            if(element instanceof TetrahedralChirality)
+            {
+                TetrahedralChirality e = (TetrahedralChirality) element;
+
+                int implicitH = -1;
+
+                for(int i = 0; i < 4; i++)
+                    if(e.getLigands()[i] == e.getFocus())
+                        implicitH = i;
+
+                if(implicitH != -1)
+                    buffer.putShort((short) molecule.indexOf(e.getFocus()));
+
+                for(int i = 0; i < 4; i++)
+                    if(e.getLigands()[i] != e.getFocus())
+                        buffer.putShort((short) molecule.indexOf(e.getLigands()[i]));
+
+                buffer.putShort((short) molecule.indexOf(e.getFocus()));
+
+                buffer.put(/* INCHI_StereoType_Tetrahedral */ (byte) 2);
+
+                if(implicitH == -1 || implicitH % 2 == 0)
+                    buffer.put(e.getStereo() == Stereo.CLOCKWISE ? (byte) 2 : (byte) 1);
+                else
+                    buffer.put(e.getStereo() == Stereo.CLOCKWISE ? (byte) 1 : (byte) 2);
+            }
+            else if(element instanceof DoubleBondStereochemistry)
+            {
+                DoubleBondStereochemistry e = (DoubleBondStereochemistry) element;
+
+                IBond bond = e.getStereoBond();
+                IBond[] bonds = e.getBonds();
+
+                if(!bonds[0].contains(bond.getAtom(0)))
+                    bonds = new IBond[] { bonds[1], bonds[0] };
+
+                buffer.putShort((short) molecule.indexOf(bonds[0].getOther(bond.getAtom(0))));
+                buffer.putShort((short) molecule.indexOf(bond.getAtom(0)));
+                buffer.putShort((short) molecule.indexOf(bond.getAtom(1)));
+                buffer.putShort((short) molecule.indexOf(bonds[1].getOther(bond.getAtom(1))));
+
+                buffer.putShort(NO_ATOM);
+
+                buffer.put(/* INCHI_StereoType_DoubleBond */ (byte) 1);
+                buffer.put(e.getStereo() == Conformation.OPPOSITE ? (byte) 2 : (byte) 1);
+            }
+            else if(element instanceof ExtendedTetrahedral)
+            {
+                ExtendedTetrahedral e = (ExtendedTetrahedral) element;
+
+                IAtom[] terminals = e.findTerminalAtoms(molecule);
+                IAtom[] ligands = e.getCarriers().toArray(new IAtom[0]);
+
+                if((terminals[0] != ligands[0] && molecule.getBond(terminals[0], ligands[0]) == null)
+                        || (terminals[0] != ligands[1] && molecule.getBond(terminals[0], ligands[1]) == null))
+                    terminals = new IAtom[] { terminals[1], terminals[0] };
+
+                buffer.putShort((short) molecule.indexOf(terminals[0] != ligands[0] ? ligands[0] : ligands[1]));
+                buffer.putShort((short) molecule.indexOf(terminals[0]));
+                buffer.putShort((short) molecule.indexOf(terminals[1]));
+                buffer.putShort((short) molecule.indexOf(terminals[1] != ligands[2] ? ligands[2] : ligands[3]));
+
+                buffer.putShort((short) molecule.indexOf(e.focus()));
+
+                buffer.put(/* INCHI_StereoType_Allene */ (byte) 3);
+
+                if(terminals[0] == ligands[0] ^ terminals[1] == ligands[2])
+                    buffer.put(e.winding() == Stereo.CLOCKWISE ? (byte) 2 : (byte) 1);
+                else
+                    buffer.put(e.winding() == Stereo.CLOCKWISE ? (byte) 1 : (byte) 2);
+            }
+            else if(element instanceof ExtendedCisTrans)
+            {
+                ExtendedCisTrans e = (ExtendedCisTrans) element;
+
+                IAtom[] terminals = ExtendedCisTrans.findTerminalAtoms(molecule, e.getFocus());
+                IBond[] bonds = e.getCarriers().toArray(new IBond[0]);
+
+                if(!bonds[0].contains(terminals[0]))
+                    bonds = new IBond[] { bonds[1], bonds[0] };
+
+                buffer.putShort((short) molecule.indexOf(bonds[0].getOther(terminals[0])));
+                buffer.putShort((short) molecule.indexOf(terminals[0]));
+                buffer.putShort((short) molecule.indexOf(terminals[1]));
+                buffer.putShort((short) molecule.indexOf(bonds[1].getOther(terminals[1])));
+
+                buffer.putShort(NO_ATOM);
+
+                buffer.put(/* INCHI_StereoType_DoubleBond */ (byte) 1);
+                buffer.put(e.getConfigOrder() == IStereoElement.OPPOSITE ? (byte) 2 : (byte) 1);
+            }
+        }
+
+        return array;
     }
 
 
@@ -318,7 +441,7 @@ public class InChITools
                 throw new InChIException("too large number of bonds");
 
             buffer.put(offset + Field.el_number, (byte) (int) atom.getAtomicNumber());
-            buffer.putShort(offset + Field.orig_at_number, (short) index);
+            buffer.putShort(offset + Field.orig_at_number, (short) (index + 1));
             buffer.put(offset + Field.valence, (byte) bonds.size());
             buffer.put(offset + Field.chem_bonds_valence, (byte) valence);
             buffer.put(offset + Field.num_H, (byte) (int) atom.getImplicitHydrogenCount());

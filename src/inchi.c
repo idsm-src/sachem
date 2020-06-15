@@ -7,6 +7,8 @@
 #include "ichister.h"
 #include "ichi.h"
 #include "strutil.h"
+#include "inchi_api.h"
+#include "readinch.h"
 
 
 int inp2spATOM(inp_ATOM *inp_at, int num_inp_at, sp_ATOM *at);
@@ -21,7 +23,7 @@ static jmethodID  setAlternatingBondsMethod;
 static jmethodID  setTautomericGroupMethod;
 
 
-static int process_component(JNIEnv *env, jobject object, inp_ATOM *inp_at, int num_atoms, int tautomer)
+static int process_component(JNIEnv *env, jobject object, inp_ATOM *inp_at, int num_atoms, int mode, bool tautomer)
 {
     BCN Bcn;
     ATOM_SIZES s;
@@ -70,7 +72,7 @@ static int process_component(JNIEnv *env, jobject object, inp_ATOM *inp_at, int 
     /* set stereo parities to at[] */
     int bPointedEdgeStereo = /* PES_BIT_POINT_EDGE_STEREO | */ STEREO_WEDGE_ONLY | PES_BIT_PHOSPHINE_STEREO | PES_BIT_ARSINE_STEREO | PES_BIT_FIX_SP3_BUG;
 
-    ret = set_stereo_parity(&CG, inp_at, at, num_atoms, group_info.tni.nNumRemovedExplicitH, &s.nMaxNumStereoAtoms, &s.nMaxNumStereoBonds, 0 /* | CMODE_NO_ALT_SBONDS */, bPointedEdgeStereo, AB_PARITY_UNKN);
+    ret = set_stereo_parity(&CG, inp_at, at, num_atoms, group_info.tni.nNumRemovedExplicitH, &s.nMaxNumStereoAtoms, &s.nMaxNumStereoBonds, mode, bPointedEdgeStereo, AB_PARITY_UNKN);
 
     if(RETURNED_ERROR(ret))
         goto exit_function; /* stereo bond error */
@@ -194,23 +196,28 @@ static int process_component(JNIEnv *env, jobject object, inp_ATOM *inp_at, int 
 
         int at_num1_parity = bHasIsotopicAtoms ? at[at_num1].parity2 : at[at_num1].parity;
         int at_num2_parity = bHasIsotopicAtoms ? at[at_num2].parity2 : at[at_num2].parity;
+
+
+        int n1 = 0, n2 = 0;
+
+        for(; (bHasIsotopicAtoms ? at[at_num1].stereo_bond_neighbor2[n1] : at[at_num1].stereo_bond_neighbor[n1]) != at_num2 + 1; n1++);
+        for(; (bHasIsotopicAtoms ? at[at_num2].stereo_bond_neighbor2[n2] : at[at_num2].stereo_bond_neighbor[n2]) != at_num1 + 1; n2++);
+
+        int at_num1_bond_parity = PARITY_VAL((bHasIsotopicAtoms ? at[at_num1].stereo_bond_parity2 : at[at_num1].stereo_bond_parity)[n1]);
+        int at_num2_bond_parity = PARITY_VAL((bHasIsotopicAtoms ? at[at_num2].stereo_bond_parity2 : at[at_num2].stereo_bond_parity)[n2]);
+
         int parity = 0;
 
-        if(at_num1_parity == AB_PARITY_UNKN || at_num2_parity == AB_PARITY_UNKN )
+        if(at_num1_parity == AB_PARITY_UNKN || at_num2_parity == AB_PARITY_UNKN || at_num1_bond_parity == AB_PARITY_UNKN || at_num2_bond_parity == AB_PARITY_UNKN)
         {
             parity = AB_PARITY_UNKN;
         }
-        else if(at_num1_parity == AB_PARITY_UNDF || at_num2_parity == AB_PARITY_UNDF )
+        else if(at_num1_parity == AB_PARITY_UNDF || at_num2_parity == AB_PARITY_UNDF || at_num1_bond_parity == AB_PARITY_UNDF || at_num2_bond_parity == AB_PARITY_UNDF)
         {
             parity = AB_PARITY_UNDF;
         }
         else if(PARITY_WELL_DEF(at_num1_parity) && PARITY_WELL_DEF(at_num2_parity))
         {
-            int n1 = 0, n2 = 0;
-
-            for(; (bHasIsotopicAtoms ? at[at_num1].stereo_bond_neighbor2[n1] : at[at_num1].stereo_bond_neighbor[n1]) != at_num2 + 1; n1++);
-            for(; (bHasIsotopicAtoms ? at[at_num2].stereo_bond_neighbor2[n2] : at[at_num2].stereo_bond_neighbor[n2]) != at_num1 + 1; n2++);
-
             parity += at_num1_parity + at_num2_parity + at[at_num1].valence + at[at_num2].valence;
             parity += bHasIsotopicAtoms ? (int)at[at_num1].stereo_bond_ord2[n1] + (int)at[at_num2].stereo_bond_ord2[n2] : (int) at[at_num1].stereo_bond_ord[n1] + (int) at[at_num2].stereo_bond_ord[n2];
 
@@ -356,7 +363,7 @@ exit_function:
 }
 
 
-static int process_molecule(JNIEnv *env, jobject object, inp_ATOM *inp_at, int num_atoms, int tautomer)
+static int process_molecule(JNIEnv *env, jobject object, inp_ATOM *inp_at, int num_atoms, int mode, bool tautomer)
 {
     int num_components = 0;
 
@@ -387,7 +394,7 @@ static int process_molecule(JNIEnv *env, jobject object, inp_ATOM *inp_at, int n
             goto exit_function;
         }
 
-        if((ret = process_component(env, object, component_at, component_num_atoms, tautomer)) < 0)
+        if((ret = process_component(env, object, component_at, component_num_atoms, mode, tautomer)) < 0)
             goto exit_function;
     }
 
@@ -398,7 +405,7 @@ static int process_molecule(JNIEnv *env, jobject object, inp_ATOM *inp_at, int n
 }
 
 
-static jint JNICALL inchi_tools_process(JNIEnv *env, jobject object, jbyteArray array, jboolean tautomer)
+static jint JNICALL inchi_tools_process(JNIEnv *env, jobject object, jbyteArray array, jbyteArray stereo, jint mode, jboolean tautomer)
 {
     inp_ATOM *inp_at = (inp_ATOM *) (*env)->GetByteArrayElements(env, array, NULL);
     int num_atoms = (*env)->GetArrayLength(env, array) / sizeof(inp_ATOM);
@@ -406,7 +413,30 @@ static jint JNICALL inchi_tools_process(JNIEnv *env, jobject object, jbyteArray 
     if(inp_at == NULL)
         return -1;
 
-    int ret = process_molecule(env, object, inp_at, num_atoms, tautomer);
+    if(stereo != NULL)
+    {
+        inchi_Stereo0D *stereo0D = (inchi_Stereo0D *) (*env)->GetByteArrayElements(env, stereo, NULL);
+        int num_stereos = (*env)->GetArrayLength(env, stereo) / sizeof(inchi_Stereo0D);
+
+        if(stereo0D == NULL)
+        {
+            (*env)->ReleaseByteArrayElements(env, array, (jbyte *) inp_at, JNI_ABORT);
+            return -1;
+        }
+
+        int err = 0;
+
+        if(Extract0DParities(inp_at, num_atoms, stereo0D, num_stereos, NULL, &err, AB_PARITY_UNKN))
+        {
+            (*env)->ReleaseByteArrayElements(env, stereo, (jbyte *) stereo0D, JNI_ABORT);
+            (*env)->ReleaseByteArrayElements(env, array, (jbyte *) inp_at, JNI_ABORT);
+            return -1;
+        }
+
+        (*env)->ReleaseByteArrayElements(env, stereo, (jbyte *) stereo0D, JNI_ABORT);
+    }
+
+    int ret = process_molecule(env, object, inp_at, num_atoms, mode, tautomer);
 
     (*env)->ReleaseByteArrayElements(env, array, (jbyte *) inp_at, JNI_ABORT);
 
@@ -436,7 +466,7 @@ void inchi_init()
     {
         {
             "process",
-            "([BZ)I",
+            "([B[BIZ)I",
             inchi_tools_process
         }
     };

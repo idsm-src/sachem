@@ -82,6 +82,9 @@ public class MoleculeCreator
 
 
     public static final String STEREO_FLAG = "STEREO_FLAG";
+    private static final int REQ_MODE_MIN_SB_RING_SHFT = 16;
+    private static final int INCHI_QUERY_MODE = 8 << REQ_MODE_MIN_SB_RING_SHFT;
+    private static final int INCHI_DB_MODE = 0;
 
 
     private static final ThreadLocal<Aromaticity> aromaticity = new ThreadLocal<Aromaticity>()
@@ -164,7 +167,7 @@ public class MoleculeCreator
                             hasQueryBond = true;
 
                     if(!hasQueryBond)
-                        setStereo(molecule, new InChITools(molecule, false));
+                        setStereo(molecule, new InChITools(molecule, INCHI_QUERY_MODE, false));
                     else
                         setStereo(molecule);
                 }
@@ -180,7 +183,7 @@ public class MoleculeCreator
 
                 try
                 {
-                    inchi = new InChITools(molecule, true);
+                    inchi = new InChITools(molecule, INCHI_QUERY_MODE, true);
                 }
                 catch(InChIException e)
                 {
@@ -222,7 +225,7 @@ public class MoleculeCreator
                     if(resetStereo && (!inchi.getStereoAtoms().isEmpty() || !inchi.getStereoBonds().isEmpty()))
                     {
                         /* fix stereo */
-                        InChITools tautomerInchi = new InChITools(tautomer, false);
+                        InChITools tautomerInchi = new InChITools(tautomer, INCHI_QUERY_MODE, false);
 
                         HashSet<Object> stereo = new HashSet<Object>();
                         stereo.addAll(tautomerInchi.getStereoAtoms());
@@ -263,7 +266,7 @@ public class MoleculeCreator
         configureAromaticity(molecule, AromaticityMode.AUTO);
 
         if(inchiStereo)
-            setStereo(molecule, new InChITools(molecule, false));
+            setStereo(molecule, new InChITools(molecule, INCHI_DB_MODE, false));
         else
             setStereo(molecule);
 
