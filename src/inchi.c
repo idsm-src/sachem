@@ -72,7 +72,7 @@ static int process_component(JNIEnv *env, jobject object, inp_ATOM *inp_at, int 
     /* set stereo parities to at[] */
     int bPointedEdgeStereo = /* PES_BIT_POINT_EDGE_STEREO | */ STEREO_WEDGE_ONLY | PES_BIT_PHOSPHINE_STEREO | PES_BIT_ARSINE_STEREO | PES_BIT_FIX_SP3_BUG;
 
-    ret = set_stereo_parity(&CG, inp_at, at, num_atoms, group_info.tni.nNumRemovedExplicitH, &s.nMaxNumStereoAtoms, &s.nMaxNumStereoBonds, mode, bPointedEdgeStereo, AB_PARITY_UNKN);
+    ret = set_stereo_parity(&CG, inp_at, at, num_atoms, group_info.tni.nNumRemovedExplicitH, &s.nMaxNumStereoAtoms, &s.nMaxNumStereoBonds, mode, bPointedEdgeStereo, AB_PARITY_UNDF /*AB_PARITY_UNKN*/);
 
     if(RETURNED_ERROR(ret))
         goto exit_function; /* stereo bond error */
@@ -122,7 +122,7 @@ static int process_component(JNIEnv *env, jobject object, inp_ATOM *inp_at, int 
         s.nLenLinearCTIsotopicTautomer = 0;
     }
 
-    INCHI_MODE nMode = ((s.nLenLinearCTTautomer == 0) ? CANON_MODE_CT : CANON_MODE_TAUT) | REQ_MODE_DIFF_UU_STEREO /*| CMODE_NO_ALT_SBONDS*/;
+    INCHI_MODE nMode = ((s.nLenLinearCTTautomer == 0) ? CANON_MODE_CT : CANON_MODE_TAUT) /*| REQ_MODE_DIFF_UU_STEREO | CMODE_NO_ALT_SBONDS*/;
     nMode |= bHasIsotopicAtoms ? CANON_MODE_ISO : 0;
     nMode |= bHasIsotopicAtoms && s.bMayHaveStereo ? CANON_MODE_ISO_STEREO : 0;
     nMode |= !bHasIsotopicAtoms && s.bMayHaveStereo ? CANON_MODE_STEREO : 0;
@@ -426,7 +426,7 @@ static jint JNICALL inchi_tools_process(JNIEnv *env, jobject object, jbyteArray 
 
         int err = 0;
 
-        if(Extract0DParities(inp_at, num_atoms, stereo0D, num_stereos, NULL, &err, AB_PARITY_UNKN))
+        if(Extract0DParities(inp_at, num_atoms, stereo0D, num_stereos, NULL, &err, AB_PARITY_UNDF /*AB_PARITY_UNKN*/))
         {
             (*env)->ReleaseByteArrayElements(env, stereo, (jbyte *) stereo0D, JNI_ABORT);
             (*env)->ReleaseByteArrayElements(env, array, (jbyte *) inp_at, JNI_ABORT);
