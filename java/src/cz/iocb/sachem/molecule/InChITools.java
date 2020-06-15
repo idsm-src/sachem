@@ -372,7 +372,7 @@ public class InChITools
 
     private static final int getMassDiff(IAtom atom)
     {
-        if(atom.getMassNumber() == null)
+        if(atom.getMassNumber() == null || atom.getMassNumber() == -1)
             return 0;
 
         if(atom.getAtomicNumber() == 0)

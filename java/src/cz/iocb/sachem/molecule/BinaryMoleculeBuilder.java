@@ -122,7 +122,7 @@ public class BinaryMoleculeBuilder
             if(a.getFormalCharge() != 0)
                 specialCount++;
 
-            if(a.getMassNumber() != null)
+            if(a.getMassNumber() != null && a.getMassNumber() != -1)
                 specialCount++;
 
             if(a.getProperty(CDKConstants.SPIN_MULTIPLICITY) != null)
@@ -369,7 +369,7 @@ public class BinaryMoleculeBuilder
                 stream.write(a.getFormalCharge());
             }
 
-            if(a.getMassNumber() != null)
+            if(a.getMassNumber() != null && a.getMassNumber() != -1)
             {
                 int mass = a.getMassNumber() - a.getAtomicNumber() + 1;
 
