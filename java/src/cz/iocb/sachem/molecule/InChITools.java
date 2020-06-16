@@ -114,8 +114,6 @@ public class InChITools
 
         if(process(moleculeAsBytes(molecule), is0D ? stereoAsBytes(molecule) : null, mode, tautomers) < 0)
             throw new InChIException("generation fails");
-
-        molecule.setStereoElements(stereo);
     }
 
 

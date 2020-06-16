@@ -39,6 +39,7 @@ import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IAtomType;
 import org.openscience.cdk.interfaces.IBond;
 import org.openscience.cdk.interfaces.IBond.Order;
+import org.openscience.cdk.interfaces.IChemObject;
 import org.openscience.cdk.interfaces.IChemObjectBuilder;
 import org.openscience.cdk.interfaces.IIsotope;
 import org.openscience.cdk.interfaces.IPseudoAtom;
@@ -179,19 +180,11 @@ public class MoleculeCreator
         {
             for(IAtomContainer molecule : molecules)
             {
-                InChITools inchi;
-
-                try
-                {
-                    inchi = new InChITools(molecule, INCHI_QUERY_MODE, true);
-                }
-                catch(InChIException e)
-                {
-                    throw new InChITautomerException(e.getMessage());
-                }
-
-
                 boolean resetStereo = false;
+
+                if(isotopeMode == IsotopeMode.IGNORE)
+                    for(IAtom atom : molecule.atoms())
+                        atom.setMassNumber(null);
 
                 if(stereoMode == StereoMode.STRICT && chargeMode == ChargeMode.IGNORE)
                     for(IAtom atom : molecule.atoms())
@@ -200,48 +193,53 @@ public class MoleculeCreator
 
                 if(stereoMode == StereoMode.STRICT && radicalMode == RadicalMode.IGNORE)
                     for(IAtom atom : molecule.atoms())
-                        if(atom.getProperty(CDKConstants.SPIN_MULTIPLICITY) == null)
+                        if(atom.getProperty(CDKConstants.SPIN_MULTIPLICITY) != null)
                             resetStereo = true;
 
-                if(isotopeMode == IsotopeMode.IGNORE)
-                    for(IAtom atom : molecule.atoms())
-                        atom.setMassNumber(null);
 
-                if(stereoMode == StereoMode.STRICT)
-                    setStereo(molecule, inchi);
-
-
-                for(IAtomContainer tautomer : InChITautomerGenerator.generate(molecule, inchi.getTautomericBonds(),
-                        inchi.getTautomericGroups()))
+                try
                 {
-                    if(chargeMode == ChargeMode.IGNORE)
-                        for(IAtom atom : tautomer.atoms())
-                            atom.setFormalCharge(0);
+                    InChITools inchi = new InChITools(molecule, INCHI_QUERY_MODE, true);
+                    resetStereo &= !inchi.getStereoAtoms().isEmpty() || !inchi.getStereoBonds().isEmpty();
 
-                    if(radicalMode == RadicalMode.IGNORE)
-                        for(IAtom atom : tautomer.atoms())
-                            atom.removeProperty(CDKConstants.SPIN_MULTIPLICITY);
+                    if(stereoMode == StereoMode.STRICT)
+                        setStereo(molecule, inchi);
 
-                    if(resetStereo && (!inchi.getStereoAtoms().isEmpty() || !inchi.getStereoBonds().isEmpty()))
+                    for(IAtomContainer tautomer : InChITautomerGenerator.generate(molecule, inchi.getTautomericBonds(),
+                            inchi.getTautomericGroups()))
                     {
-                        /* fix stereo */
-                        InChITools tautomerInchi = new InChITools(tautomer, INCHI_QUERY_MODE, false);
+                        if(chargeMode == ChargeMode.IGNORE)
+                            for(IAtom atom : tautomer.atoms())
+                                atom.setFormalCharge(0);
 
-                        HashSet<Object> stereo = new HashSet<Object>();
-                        stereo.addAll(tautomerInchi.getStereoAtoms());
-                        stereo.add(tautomerInchi.getStereoBonds());
+                        if(radicalMode == RadicalMode.IGNORE)
+                            for(IAtom atom : tautomer.atoms())
+                                atom.removeProperty(CDKConstants.SPIN_MULTIPLICITY);
 
-                        for(IAtom atom : inchi.getStereoAtoms())
-                            if(!stereo.contains(atom))
-                                atom.removeProperty(STEREO_FLAG);
+                        if(resetStereo)
+                        {
+                            /* fix stereo */
+                            InChITools tautomerInchi = new InChITools(tautomer, INCHI_QUERY_MODE, false);
 
-                        for(IBond bond : inchi.getStereoBonds())
-                            if(!stereo.contains(bond))
-                                bond.removeProperty(STEREO_FLAG);
+                            HashSet<IChemObject> stereo = new HashSet<IChemObject>();
+                            stereo.addAll(tautomerInchi.getStereoAtoms());
+                            stereo.addAll(tautomerInchi.getStereoBonds());
+
+                            for(IAtom atom : inchi.getStereoAtoms())
+                                if(!stereo.contains(atom))
+                                    atom.removeProperty(STEREO_FLAG);
+
+                            for(IBond bond : inchi.getStereoBonds())
+                                if(!stereo.contains(bond))
+                                    bond.removeProperty(STEREO_FLAG);
+                        }
+
+                        queries.add(tautomer);
                     }
-
-
-                    queries.add(tautomer);
+                }
+                catch(InChIException e)
+                {
+                    throw new InChITautomerException(e.getMessage());
                 }
             }
         }
