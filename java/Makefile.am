@@ -70,7 +70,9 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/lucene/SearchResult.java \
     src/cz/iocb/sachem/lucene/Settings.java \
     src/cz/iocb/sachem/lucene/SimilarStructureQuery.java \
+    src/cz/iocb/sachem/lucene/SortedResultCollectorManager.java \
     src/cz/iocb/sachem/lucene/SubstructureQuery.java \
+    src/cz/iocb/sachem/lucene/TopResultCollectorManager.java \
     src/cz/iocb/sachem/molecule/AromaticityMode.java \
     src/cz/iocb/sachem/molecule/BinaryMoleculeBuilder.java \
     src/cz/iocb/sachem/molecule/BinaryMolecule.java \

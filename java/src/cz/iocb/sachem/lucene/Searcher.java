@@ -156,11 +156,11 @@ public class Searcher
                 matchingLimit);
 
         if(n == 0)
-            return new SearchResult();
+            return new SearchResult(query.name);
         else if(n >= 0)
-            return new SearchResult(query.name, searcher, searcher.search(query, n));
+            return searcher.search(query, new TopResultCollectorManager(query.name, n));
         else if(sort)
-            return new SearchResult(query.name, searcher, searcher.search(query, Integer.MAX_VALUE));
+            return searcher.search(query, new SortedResultCollectorManager(query.name));
         else
             return searcher.search(query, new ResultCollectorManager(query.name));
     }
@@ -175,11 +175,11 @@ public class Searcher
 
 
         if(n == 0)
-            return new SearchResult();
+            return new SearchResult(query.name);
         else if(n >= 0)
-            return new SearchResult(query.name, searcher, searcher.search(query, n));
+            return searcher.search(query, new TopResultCollectorManager(query.name, n));
         else if(sort)
-            return new SearchResult(query.name, searcher, searcher.search(query, Integer.MAX_VALUE));
+            return searcher.search(query, new SortedResultCollectorManager(query.name));
         else
             return searcher.search(query, new ResultCollectorManager(query.name));
     }
