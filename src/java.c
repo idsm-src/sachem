@@ -130,8 +130,9 @@ void java_check_exception(const char *str)
         }
 
         JavaDeleteRef(message);
-        JavaDeleteRef(exception);
     }
+
+    JavaDeleteRef(exception);
 
     elog(ERROR, "%s: java error: %s", str, error);
 }

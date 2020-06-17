@@ -43,7 +43,6 @@ import org.openscience.cdk.interfaces.IChemObject;
 import org.openscience.cdk.interfaces.IChemObjectBuilder;
 import org.openscience.cdk.interfaces.IIsotope;
 import org.openscience.cdk.interfaces.IPseudoAtom;
-import org.openscience.cdk.interfaces.IStereoElement;
 import org.openscience.cdk.io.DefaultChemObjectReader;
 import org.openscience.cdk.io.MDLV2000Reader;
 import org.openscience.cdk.io.MDLV3000Reader;
@@ -56,10 +55,6 @@ import org.openscience.cdk.isomorphism.matchers.RGroupQuery;
 import org.openscience.cdk.silent.AtomContainer;
 import org.openscience.cdk.silent.SilentChemObjectBuilder;
 import org.openscience.cdk.smiles.SmilesParser;
-import org.openscience.cdk.stereo.DoubleBondStereochemistry;
-import org.openscience.cdk.stereo.ExtendedCisTrans;
-import org.openscience.cdk.stereo.ExtendedTetrahedral;
-import org.openscience.cdk.stereo.TetrahedralChirality;
 import org.openscience.cdk.tools.CDKHydrogenAdder;
 import org.openscience.cdk.tools.manipulator.AtomTypeManipulator;
 import cz.iocb.sachem.molecule.InChITautomerGenerator.InChITautomerException;
@@ -160,18 +155,7 @@ public class MoleculeCreator
                         atom.setMassNumber(null);
 
                 if(stereoMode == StereoMode.STRICT)
-                {
-                    boolean hasQueryBond = false;
-
-                    for(IBond bond : molecule.bonds())
-                        if(bond instanceof IQueryBond || bond.getOrder() == Order.UNSET)
-                            hasQueryBond = true;
-
-                    if(!hasQueryBond)
-                        setStereo(molecule, new InChITools(molecule, INCHI_QUERY_MODE, false));
-                    else
-                        setStereo(molecule);
-                }
+                    setStereo(molecule, new InChITools(molecule, INCHI_QUERY_MODE, false));
 
                 queries.add(molecule);
             }
@@ -265,8 +249,6 @@ public class MoleculeCreator
 
         if(inchiStereo)
             setStereo(molecule, new InChITools(molecule, INCHI_DB_MODE, false));
-        else
-            setStereo(molecule);
 
         for(IBond bond : otherBonds)
             molecule.addBond(bond);
@@ -459,22 +441,5 @@ public class MoleculeCreator
         for(IBond bond : inchi.getStereoBonds())
             if(!bond.isAromatic())
                 bond.setProperty(STEREO_FLAG, Boolean.TRUE);
-    }
-
-
-    private static void setStereo(IAtomContainer molecule)
-    {
-        for(@SuppressWarnings("rawtypes")
-        IStereoElement element : molecule.stereoElements())
-        {
-            if(element instanceof TetrahedralChirality)
-                ((TetrahedralChirality) element).getChiralAtom().setProperty(STEREO_FLAG, Boolean.TRUE);
-            else if(element instanceof ExtendedTetrahedral)
-                ((ExtendedTetrahedral) element).focus().setProperty(STEREO_FLAG, Boolean.TRUE);
-            else if(element instanceof DoubleBondStereochemistry)
-                ((DoubleBondStereochemistry) element).getStereoBond().setProperty(STEREO_FLAG, Boolean.TRUE);
-            else if(element instanceof ExtendedCisTrans)
-                ((ExtendedCisTrans) element).getFocus().setProperty(STEREO_FLAG, Boolean.TRUE);
-        }
     }
 }

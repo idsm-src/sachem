@@ -113,7 +113,7 @@ public class InChITools
         }
 
         if(process(moleculeAsBytes(molecule), is0D ? stereoAsBytes(molecule) : null, mode, tautomers) < 0)
-            throw new InChIException("generation fails");
+            throw new InChIException("inchi generation failed");
     }
 
 
@@ -414,7 +414,7 @@ public class InChITools
 
     private static final byte[] moleculeAsBytes(IAtomContainer molecule) throws CDKException
     {
-        if(molecule.getAtomCount() > Short.MAX_VALUE)
+        if(molecule.getAtomCount() >= Short.MAX_VALUE)
             throw new InChIException("too many atoms");
 
         int pseudoAtomId = Byte.MIN_VALUE;
@@ -431,14 +431,25 @@ public class InChITools
             int multiplicity = molecule.getConnectedSingleElectronsCount(atom);
 
             int valence = 0;
+            boolean hasKnownBonds = true;
 
-            for(IBond bond : bonds)
-                valence += getBondType(bond);
+            for(Iterator<IBond> it = bonds.iterator(); it.hasNext();)
+            {
+                IBond b = it.next();
+                valence += getBondType(b);
+
+                if(b.getOrder() != Order.SINGLE && b.getOrder() != Order.DOUBLE && b.getOrder() != Order.TRIPLE)
+                {
+                    it.remove();
+                    hasKnownBonds = false;
+                }
+            }
+
 
             if(atom.getImplicitHydrogenCount() + bonds.size() > MAXVAL)
                 throw new InChIException("too large number of bonds");
 
-            buffer.put(offset + Field.el_number, (byte) (int) atom.getAtomicNumber());
+
             buffer.putShort(offset + Field.orig_at_number, (short) (index + 1));
             buffer.put(offset + Field.valence, (byte) bonds.size());
             buffer.put(offset + Field.chem_bonds_valence, (byte) valence);
@@ -446,7 +457,7 @@ public class InChITools
             buffer.put(offset + Field.charge, (byte) (int) atom.getFormalCharge());
             buffer.put(offset + Field.radical, (byte) (multiplicity > 0 ? multiplicity + 1 : 0));
 
-            if(!(atom instanceof IPseudoAtom))
+            if(!(atom instanceof IPseudoAtom) && hasKnownBonds)
             {
                 byte[] name = atom.getSymbol().getBytes();
 
@@ -455,6 +466,7 @@ public class InChITools
 
                 int iso = getMassDiff(atom);
                 buffer.put(offset + Field.iso_atw_diff, (byte) (iso == ZERO_ATW_DIFF ? 1 : iso > 0 ? iso + 1 : iso));
+                buffer.put(offset + Field.el_number, (byte) (int) atom.getAtomicNumber());
             }
             else if(pseudoAtomId < Byte.MAX_VALUE)
             {
@@ -462,7 +474,7 @@ public class InChITools
             }
             else
             {
-                throw new InChIException("too many pseudo atoms");
+                throw new InChIException("too many pseudo atoms or query bonds");
             }
 
             if(atom.getPoint3d() != null)
@@ -517,7 +529,7 @@ public class InChITools
         else if(bond.getOrder() == Order.TRIPLE)
             return 3;
         else
-            throw new InChIException("unsupported bond type");
+            return 0;
     }
 
 

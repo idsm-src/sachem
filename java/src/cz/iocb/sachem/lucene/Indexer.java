@@ -186,7 +186,7 @@ public class Indexer
                 IAtomContainer container = MoleculeCreator.translateMolecule(new String(molfile), false);
                 moleculeQueue.put(new IndexItem(id, BinaryMoleculeBuilder.asBytes(container, true)));
 
-                return "warning: inchi cannot be generated: " + e.getMessage();
+                return "warning: stereo cannot be determined: " + e.getMessage();
             }
         }
         catch(Exception e)

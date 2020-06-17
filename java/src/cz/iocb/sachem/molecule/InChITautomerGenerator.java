@@ -400,7 +400,7 @@ public class InChITautomerGenerator
         }
 
         //if(tautomers.size() == 1024 * 1)
-        //    throw new CDKInChIException("too many tautomers");
+        //    throw new InChITautomerException("too many tautomers");
 
         tautomers.add(tautomer);
     }

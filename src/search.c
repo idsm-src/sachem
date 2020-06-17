@@ -41,7 +41,9 @@ static EnumValue tautomerModeTable[2];
 static EnumValue queryFormatTable[4];
 
 static jclass searcherClass;
+static jclass cdkExceptionClass;
 static jclass inchiExceptionClass;
+static jclass tautomerExceptionClass;
 static jmethodID getMessageMethod;
 static jmethodID getMethod;
 static jmethodID indexSizeMethod;
@@ -256,10 +258,16 @@ static void lucene_search_init(void)
     searcherClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/lucene/Searcher"));
     java_check_exception(__func__);
 
-    inchiExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/molecule/InChITautomerGenerator$InChITautomerException"));
+    cdkExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "org/openscience/cdk/exception/CDKException"));
     java_check_exception(__func__);
 
-    getMessageMethod = (*env)->GetMethodID(env, inchiExceptionClass, "getMessage", "()Ljava/lang/String;");
+    inchiExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/molecule/InChITools$InChIException"));
+    java_check_exception(__func__);
+
+    tautomerExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/molecule/InChITautomerGenerator$InChITautomerException"));
+    java_check_exception(__func__);
+
+    getMessageMethod = (*env)->GetMethodID(env, cdkExceptionClass, "getMessage", "()Ljava/lang/String;");
     java_check_exception(__func__);
 
     getMethod = (*env)->GetStaticMethodID(env, searcherClass, "get", "(Ljava/lang/String;Ljava/lang/String;I)Lcz/iocb/sachem/lucene/Searcher;");
@@ -432,35 +440,60 @@ static LuceneResult *lucene_subsearch(jobject lucene, VarChar *index, VarChar *q
                 ConvertEnumValue(tautomerModeTable,  tautomers),
                 matchingLimit);
 
-        if((*env)->ExceptionOccurred(env) != NULL && tautomers == tautomerModeTable[1].oid)
+        jthrowable exception = (*env)->ExceptionOccurred(env);
+
+        if(exception != NULL && (*env)->IsInstanceOf(env, exception, tautomerExceptionClass) && tautomers == tautomerModeTable[1].oid)
         {
-            jthrowable exception = (*env)->ExceptionOccurred(env);
+            jstring message = (jstring)(*env)->CallObjectMethod(env, exception, getMessageMethod);
+            const char *mstr = message != NULL ? (*env)->GetStringUTFChars(env, message, NULL) : NULL;
 
-            if((*env)->IsInstanceOf(env, exception, inchiExceptionClass))
-            {
-                jstring message = (jstring)(*env)->CallObjectMethod(env, exception, getMessageMethod);
-                const char *mstr = message != NULL ? (*env)->GetStringUTFChars(env, message, NULL) : NULL;
+            elog(WARNING, "tautomers cannot be generated: %s", mstr != NULL ? mstr : "unknown jvm error");
 
-                elog(WARNING, "%s", mstr != NULL ? mstr : "unknown jvm error");
+            if(mstr != NULL)
+                (*env)->ReleaseStringUTFChars(env, message, mstr);
 
-                if(mstr != NULL)
-                    (*env)->ReleaseStringUTFChars(env, message, mstr);
+            (*env)->ExceptionClear(env);
+            JavaDeleteRef(message);
+            JavaDeleteRef(exception);
 
-                (*env)->ExceptionClear(env);
-                JavaDeleteRef(message);
-                JavaDeleteRef(exception);
+            handler = (*env)->CallObjectMethod(env, lucene, subsearchMethod, queryArray,
+                    ConvertEnumValue(queryFormatTable, format), topn, sort,
+                    ConvertEnumValue(searchModeTable, search),
+                    ConvertEnumValue(chargeModeTable, charge),
+                    ConvertEnumValue(isotopeModeTable, isotope),
+                    ConvertEnumValue(radicalModeTable, radical),
+                    ConvertEnumValue(stereoModeTable, stereo),
+                    ConvertEnumValue(aromaticityModeTable,  aromaticity),
+                    tautomerModeTable[0].object,
+                    matchingLimit);
 
-                handler = (*env)->CallObjectMethod(env, lucene, subsearchMethod, queryArray,
-                        ConvertEnumValue(queryFormatTable, format), topn, sort,
-                        ConvertEnumValue(searchModeTable, search),
-                        ConvertEnumValue(chargeModeTable, charge),
-                        ConvertEnumValue(isotopeModeTable, isotope),
-                        ConvertEnumValue(radicalModeTable, radical),
-                        ConvertEnumValue(stereoModeTable, stereo),
-                        ConvertEnumValue(aromaticityModeTable,  aromaticity),
-                        tautomerModeTable[0].object,
-                        matchingLimit);
-            }
+            exception = (*env)->ExceptionOccurred(env);
+        }
+
+        if(exception != NULL && (*env)->IsInstanceOf(env, exception, inchiExceptionClass) && stereo == stereoModeTable[1].oid)
+        {
+            jstring message = (jstring)(*env)->CallObjectMethod(env, exception, getMessageMethod);
+            const char *mstr = message != NULL ? (*env)->GetStringUTFChars(env, message, NULL) : NULL;
+
+            elog(WARNING, "stereo cannot be determined: %s", mstr != NULL ? mstr : "unknown jvm error");
+
+            if(mstr != NULL)
+                (*env)->ReleaseStringUTFChars(env, message, mstr);
+
+            (*env)->ExceptionClear(env);
+            JavaDeleteRef(message);
+            JavaDeleteRef(exception);
+
+            handler = (*env)->CallObjectMethod(env, lucene, subsearchMethod, queryArray,
+                    ConvertEnumValue(queryFormatTable, format), topn, sort,
+                    ConvertEnumValue(searchModeTable, search),
+                    ConvertEnumValue(chargeModeTable, charge),
+                    ConvertEnumValue(isotopeModeTable, isotope),
+                    ConvertEnumValue(radicalModeTable, radical),
+                    stereoModeTable[0].object,
+                    ConvertEnumValue(aromaticityModeTable,  aromaticity),
+                    tautomerModeTable[0].object,
+                    matchingLimit);
         }
 
         java_check_exception(__func__);
@@ -520,29 +553,26 @@ static LuceneResult *lucene_simsearch(jobject lucene, VarChar *index, VarChar *q
                 ConvertEnumValue(aromaticityModeTable, aromaticity),
                 ConvertEnumValue(tautomerModeTable, tautomers));
 
-        if((*env)->ExceptionOccurred(env) != NULL && tautomers == tautomerModeTable[1].oid)
+        jthrowable exception = (*env)->ExceptionOccurred(env);
+
+        if(exception != NULL && (*env)->IsInstanceOf(env, exception, tautomerExceptionClass) && tautomers == tautomerModeTable[1].oid)
         {
-            jthrowable exception = (*env)->ExceptionOccurred(env);
+            jstring message = (jstring)(*env)->CallObjectMethod(env, exception, getMessageMethod);
+            const char *mstr = message != NULL ? (*env)->GetStringUTFChars(env, message, NULL) : NULL;
 
-            if((*env)->IsInstanceOf(env, exception, inchiExceptionClass))
-            {
-                jstring message = (jstring)(*env)->CallObjectMethod(env, exception, getMessageMethod);
-                const char *mstr = message != NULL ? (*env)->GetStringUTFChars(env, message, NULL) : NULL;
+            elog(WARNING, "tautomers cannot be generated: %s", mstr != NULL ? mstr : "unknown jvm error");
 
-                elog(WARNING, "%s", mstr != NULL ? mstr : "unknown jvm error");
+            if(mstr != NULL)
+                (*env)->ReleaseStringUTFChars(env, message, mstr);
 
-                if(mstr != NULL)
-                    (*env)->ReleaseStringUTFChars(env, message, mstr);
+            (*env)->ExceptionClear(env);
+            JavaDeleteRef(message);
+            JavaDeleteRef(exception);
 
-                (*env)->ExceptionClear(env);
-                JavaDeleteRef(message);
-                JavaDeleteRef(exception);
-
-                handler = (*env)->CallObjectMethod(env, lucene, simsearchMethod, queryArray,
-                        ConvertEnumValue(queryFormatTable, format), topn, sort, threshold, radius,
-                        ConvertEnumValue(aromaticityModeTable, aromaticity),
-                        tautomerModeTable[0].object);
-            }
+            handler = (*env)->CallObjectMethod(env, lucene, simsearchMethod, queryArray,
+                    ConvertEnumValue(queryFormatTable, format), topn, sort, threshold, radius,
+                    ConvertEnumValue(aromaticityModeTable, aromaticity),
+                    tautomerModeTable[0].object);
         }
 
         java_check_exception(__func__);
