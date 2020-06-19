@@ -97,7 +97,7 @@ public class TopResultCollectorManager implements CollectorManager<Collector, Se
 
                         synchronized(TopResultCollectorManager.this)
                         {
-                            if(score == Float.NEGATIVE_INFINITY)
+                            if(score == 0.0f)
                             {
                                 timeouted.add(id);
                             }
@@ -181,7 +181,7 @@ public class TopResultCollectorManager implements CollectorManager<Collector, Se
         for(int i = 0; i < timeouted.size(); i++)
         {
             ids[hits + i] = timeouted.get(i);
-            scores[hits + i] = Float.NEGATIVE_INFINITY;
+            scores[hits + i] = 0.0f;
         }
 
         return new SearchResult(name, hits + timeouted.size(), ids, scores);
