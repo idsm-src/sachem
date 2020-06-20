@@ -1138,4 +1138,7 @@ static inline bool vf2state_match(VF2State *restrict vf2state, const Molecule *r
     return vf2state_match_core(vf2state);
 }
 
+
+void isomorphism_init();
+
 #endif /* ISOMORPHISM_H__ */

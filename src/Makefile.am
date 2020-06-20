@@ -27,8 +27,8 @@ libsachem_la_SOURCES = \
         inchi/util.c \
         inchi.c \
         info.c \
+        isomorphism.c \
         java.c \
-        native.c \
         sachem.c \
         search.c \
         sync.c
@@ -67,5 +67,4 @@ EXTRA_DIST = \
         java.h \
         memory.h \
         molecule.h \
-        native.h \
         sachem.h

@@ -157,7 +157,7 @@ static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobjec
 }
 
 
-void native_init()
+void isomorphism_init()
 {
     outOfMemoryErrorClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "java/lang/OutOfMemoryError"));
     java_check_exception(__func__);

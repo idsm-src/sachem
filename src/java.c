@@ -4,7 +4,7 @@
 #include <tcop/tcopprot.h>
 #include "java.h"
 #include "inchi.h"
-#include "native.h"
+#include "isomorphism.h"
 
 
 JavaVM* jvm = NULL;
@@ -94,7 +94,7 @@ void java_init(void)
     toStringMethod = (*env)->GetMethodID(env, exceptionClass, "toString", "()Ljava/lang/String;");
     java_check_exception(__func__);
 
-    native_init();
+    isomorphism_init();
     inchi_init();
 
     initialised = true;
