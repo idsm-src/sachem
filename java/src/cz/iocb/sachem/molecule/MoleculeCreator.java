@@ -17,9 +17,6 @@ package cz.iocb.sachem.molecule;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringReader;
-import java.security.AccessController;
-import java.security.PrivilegedActionException;
-import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -340,31 +337,23 @@ public class MoleculeCreator
 
     private static IAtomContainer getMoleculeFromSmiles(String smiles) throws CDKException
     {
+        SmilesParser sp = new SmilesParser(SilentChemObjectBuilder.getInstance());
+        IAtomContainer molecule;
+
         try
         {
-            IAtomContainer molecule = AccessController.doPrivileged((PrivilegedExceptionAction<IAtomContainer>) () -> {
-                SmilesParser sp = new SmilesParser(SilentChemObjectBuilder.getInstance());
-
-                try
-                {
-                    return sp.parseSmiles(smiles);
-                }
-                catch(InvalidSmilesException e)
-                {
-                    sp.kekulise(false);
-                    return sp.parseSmiles(smiles);
-                }
-            });
-
-            molecule.setAtoms(BinaryMoleculeSort.atomsByFrequency(molecule));
-            molecule.setTitle(smiles);
-
-            return molecule;
+            molecule = sp.parseSmiles(smiles);
         }
-        catch(PrivilegedActionException e)
+        catch(InvalidSmilesException e)
         {
-            throw(CDKException) e.getException();
+            sp.kekulise(false);
+            molecule = sp.parseSmiles(smiles);
         }
+
+        molecule.setAtoms(BinaryMoleculeSort.atomsByFrequency(molecule));
+        molecule.setTitle(smiles);
+
+        return molecule;
     }
 
 
