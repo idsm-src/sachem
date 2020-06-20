@@ -259,9 +259,14 @@ public class MoleculeCreator
         DefaultChemObjectReader mdlReader;
 
         if(mol.contains("M  V30 BEGIN CTAB"))
+        {
             mdlReader = new MDLV3000Reader();
+        }
         else
+        {
             mdlReader = new MDLV2000Reader();
+            mdlReader.getSetting("AddStereoElements").setSetting("false");
+        }
 
         mdlReader.setReader(new StringReader(mol));
         IAtomContainer molecule;
