@@ -322,6 +322,9 @@ static jobject lucene_get(VarChar *index)
 
     SPI_finish();
 
+    if(version == 0)
+        elog(ERROR, "index has not been synced yet");
+
 
     jstring name = NULL;
     jstring folder = NULL;
