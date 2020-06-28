@@ -94,6 +94,27 @@ index ef7960ff86..c841b3cc37 100644
  
          private AllUpToLength(int length) {
              this.predefinedLength = length;
+diff --git a/base/standard/src/main/java/org/openscience/cdk/aromaticity/DaylightModel.java b/base/standard/src/main/java/org/openscience/cdk/aromaticity/DaylightModel.java
+index e0cf8f0de9..2833f41b15 100644
+--- a/base/standard/src/main/java/org/openscience/cdk/aromaticity/DaylightModel.java
++++ b/base/standard/src/main/java/org/openscience/cdk/aromaticity/DaylightModel.java
+@@ -99,6 +99,7 @@ final class DaylightModel extends ElectronDonation {
+             atomIndex.put(a, i);
+             degree[i] = checkNotNull(a.getImplicitHydrogenCount(),
+                     "Aromaticity model requires implicit hydrogen count is set.");
++            bondOrderSum[i] = degree[i];
+         }
+ 
+         // for each bond we increase the degree count and check for cyclic and
+@@ -141,7 +142,7 @@ final class DaylightModel extends ElectronDonation {
+ 
+             // abnormal valence, usually indicated a radical. these cause problems
+             // with kekulisations
+-            int bondedValence = bondOrderSum[i] + container.getAtom(i).getImplicitHydrogenCount();
++            int bondedValence = bondOrderSum[i];
+             if (!normal(element, charge, bondedValence)) {
+                 electrons[i] = -1;
+             }
 diff --git a/base/standard/src/main/java/org/openscience/cdk/graph/invariant/Canon.java b/base/standard/src/main/java/org/openscience/cdk/graph/invariant/Canon.java
 index 07f8ee2137..73d426d4b0 100644
 --- a/base/standard/src/main/java/org/openscience/cdk/graph/invariant/Canon.java
