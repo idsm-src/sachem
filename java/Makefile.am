@@ -12,10 +12,12 @@ jar_DATA = \
     lib/cdk-standard-2.3.jar \
     lib/cdk-valencycheck-2.3.jar \
     lib/commons-net-3.6.jar \
-    lib/guava-28.1-jre.jar \
-    lib/jdbc-postgresql.jar \
-    lib/log4j-1.2.17.jar \
-    lib/lucene-core-8.4.1.jar \
+    lib/guava-29.0-jre.jar \
+    lib/log4j-1.2-api-2.13.3.jar \
+    lib/log4j-api-2.13.3.jar \
+    lib/log4j-core-2.13.3.jar \
+    lib/lucene-core-8.5.2.jar \
+    lib/postgresql-42.2.14.jar \
     lib/vecmath-1.5.2.jar
 
 jardir = $(datadir)/$(PACKAGE)/jar
@@ -43,10 +45,12 @@ EXTRA_DIST = \
     lib/cdk-standard-2.3.jar \
     lib/cdk-valencycheck-2.3.jar \
     lib/commons-net-3.6.jar \
-    lib/guava-28.1-jre.jar \
-    lib/jdbc-postgresql.jar \
-    lib/log4j-1.2.17.jar \
-    lib/lucene-core-8.4.1.jar \
+    lib/guava-29.0-jre.jar \
+    lib/log4j-1.2-api-2.13.3.jar \
+    lib/log4j-api-2.13.3.jar \
+    lib/log4j-core-2.13.3.jar \
+    lib/lucene-core-8.5.2.jar \
+    lib/postgresql-42.2.14.jar \
     lib/vecmath-1.5.2.jar \
     src/cz/iocb/sachem/fingerprint/AtomFingerprint.java \
     src/cz/iocb/sachem/fingerprint/CRNGFingerprint.java \

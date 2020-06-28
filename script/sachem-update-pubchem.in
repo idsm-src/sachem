@@ -12,4 +12,4 @@ if [ ! -f "$1" ]; then
     exit 1
 fi
 
-java -classpath $CLASSPATH/commons-net-3.6.jar:$CLASSPATH/jdbc-postgresql.jar:$CLASSPATH/sachem.jar cz.iocb.sachem.load.PubChemCompoundUpdater "$1"
+java -classpath $CLASSPATH/commons-net-3.6.jar:$CLASSPATH/postgresql-42.2.14.jar:$CLASSPATH/sachem.jar cz.iocb.sachem.load.PubChemCompoundUpdater "$1"
