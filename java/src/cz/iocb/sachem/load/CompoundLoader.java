@@ -84,7 +84,7 @@ public class CompoundLoader
                 StringBuilder sdfBuilder = new StringBuilder();
 
                 if(rename)
-                    reader.readLine();
+                    line = reader.readLine();
 
                 while(!line.startsWith(">") && !line.equals("$$$$") && line != null)
                 {
