@@ -378,11 +378,11 @@ static HeapTuple lucene_result_get_item(LuceneResult *result)
         const char *name = (*env)->GetStringUTFChars(env, result->name, NULL);
 
         if(name == NULL)
-            elog(WARNING, "<unknown>: isomorphism: iteration limit exceeded for target %i in index '%s'", result->ids[result->possition++], idx);
+            elog(NOTICE, "<unknown>: isomorphism: iteration limit exceeded for target %i in index '%s'", result->ids[result->possition++], idx);
         else if(name[0] == '\0')
-            elog(WARNING, "<unnamed>: isomorphism: iteration limit exceeded for target %i in index '%s'", result->ids[result->possition++], idx);
+            elog(NOTICE, "<unnamed>: isomorphism: iteration limit exceeded for target %i in index '%s'", result->ids[result->possition++], idx);
         else
-            elog(WARNING, "'%s': isomorphism: iteration limit exceeded for target %i in index '%s'", name, result->ids[result->possition++], idx);
+            elog(NOTICE, "'%s': isomorphism: iteration limit exceeded for target %i in index '%s'", name, result->ids[result->possition++], idx);
 
         pfree(idx);
 
