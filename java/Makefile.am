@@ -16,7 +16,7 @@ jar_DATA = \
     lib/log4j-1.2-api-2.13.3.jar \
     lib/log4j-api-2.13.3.jar \
     lib/log4j-core-2.13.3.jar \
-    lib/lucene-core-8.5.2.jar \
+    lib/lucene-core-8.7.0.jar \
     lib/postgresql-42.2.14.jar \
     lib/vecmath-1.5.2.jar
 
@@ -49,7 +49,7 @@ EXTRA_DIST = \
     lib/log4j-1.2-api-2.13.3.jar \
     lib/log4j-api-2.13.3.jar \
     lib/log4j-core-2.13.3.jar \
-    lib/lucene-core-8.5.2.jar \
+    lib/lucene-core-8.7.0.jar \
     lib/postgresql-42.2.14.jar \
     lib/vecmath-1.5.2.jar \
     src/cz/iocb/sachem/fingerprint/AtomFingerprint.java \
