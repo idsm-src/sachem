@@ -71,6 +71,8 @@ public class DrugbankCompoundUpdater
 
             URL infoUrl = new URL(httpServer + "/releases/latest#structures");
             HttpURLConnection infoConnection = (HttpURLConnection) infoUrl.openConnection();
+            infoConnection.addRequestProperty("User-Agent", "Java HttpURLConnection");
+            infoConnection.addRequestProperty("Accept", "*/*");
 
             String versionTag = null;
 
