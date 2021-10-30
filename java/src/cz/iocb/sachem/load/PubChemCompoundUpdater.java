@@ -93,6 +93,7 @@ public class PubChemCompoundUpdater
 
 
             LinkedList<String> updateList = new LinkedList<String>();
+            LinkedList<String> downloadList = new LinkedList<String>();
             String finalVersion = null;
             FTPClient ftpClient = new FTPClient();
 
@@ -184,18 +185,12 @@ public class PubChemCompoundUpdater
 
                 for(String update : updateList)
                 {
-                    System.out.println("download " + update);
-
                     String basePath = workdir + update;
                     String sdfPath = basePath + "/" + "SDF";
                     File directory = new File(sdfPath);
                     directory.mkdirs();
 
-                    try(FileOutputStream output = new FileOutputStream(basePath + "/killed-CIDs"))
-                    {
-                        ftpClient.retrieveFile(ftpPath + update + "/killed-CIDs", output);
-                    }
-
+                    downloadList.add(update + "/killed-CIDs");
 
                     FTPFile[] sdfUpdates = ftpClient.listFiles(ftpPath + update + "/SDF");
 
@@ -204,15 +199,7 @@ public class PubChemCompoundUpdater
                         String name = sdfUpdate.getName();
 
                         if(name.matches(filePattern))
-                        {
-                            try(FileOutputStream output = new FileOutputStream(sdfPath + "/" + name))
-                            {
-                                System.out.println("  " + name);
-
-                                if(!ftpClient.retrieveFile(ftpPath + update + "/SDF/" + name, output))
-                                    throw new Exception("cannot download: " + ftpPath + update + "/SDF/" + name);
-                            }
-                        }
+                            downloadList.add(update + "/SDF/" + name);
                     }
                 }
             }
@@ -220,6 +207,38 @@ public class PubChemCompoundUpdater
             {
                 ftpClient.logout();
                 ftpClient.disconnect();
+            }
+
+
+            for(String name : downloadList)
+            {
+                FTPClient ftpDownloadClient = new FTPClient();
+
+                try
+                {
+                    ftpDownloadClient.connect(ftpServer, ftpPort);
+                    ftpDownloadClient.login(ftpUserName, ftpPassword);
+                    ftpDownloadClient.setFileType(FTP.BINARY_FILE_TYPE);
+                    ftpDownloadClient.enterLocalPassiveMode();
+
+                    try(FileOutputStream output = new FileOutputStream(workdir + "/" + name))
+                    {
+                        System.out.println("  " + name);
+
+                        if(!ftpDownloadClient.retrieveFile(ftpPath + name, output))
+                        {
+                            if(ftpDownloadClient.getReplyCode() == 550)
+                                System.out.println("    skiped");
+                            else
+                                throw new Exception("cannot download: " + ftpPath + name);
+                        }
+                    }
+                }
+                finally
+                {
+                    ftpDownloadClient.logout();
+                    ftpDownloadClient.disconnect();
+                }
             }
 
 
