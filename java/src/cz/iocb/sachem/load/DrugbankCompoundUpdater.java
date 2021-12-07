@@ -14,7 +14,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
-import java.util.Base64;
 import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -46,8 +45,6 @@ public class DrugbankCompoundUpdater
         boolean rename = properties.getBooleanProperty("sachem.rename");
 
         String httpServer = properties.getProperty("http.server");
-        String httpUserName = properties.getProperty("http.username");
-        String httpPassword = properties.getProperty("http.password");
 
         String workdir = properties.getProperty("sdf.directory");
         String fileName = properties.getProperty("sdf.file");
@@ -69,7 +66,7 @@ public class DrugbankCompoundUpdater
             }
 
 
-            URL infoUrl = new URL(httpServer + "/releases/latest#structures");
+            URL infoUrl = new URL(httpServer + "/releases/latest#open-data");
             HttpURLConnection infoConnection = (HttpURLConnection) infoUrl.openConnection();
             infoConnection.addRequestProperty("User-Agent", "Java HttpURLConnection");
             infoConnection.addRequestProperty("Accept", "*/*");
@@ -78,7 +75,7 @@ public class DrugbankCompoundUpdater
 
             try(BufferedReader buffer = new BufferedReader(new InputStreamReader(infoConnection.getInputStream())))
             {
-                Pattern pattern = Pattern.compile("href=\"/releases/([^/]+)/downloads/all-structures\"");
+                Pattern pattern = Pattern.compile("href=\"/releases/([^/]+)/downloads/all-open-structures\"");
                 String line;
 
                 while((line = buffer.readLine()) != null)
@@ -128,15 +125,10 @@ public class DrugbankCompoundUpdater
             directory.mkdirs();
 
 
-            String authStringEnc = Base64.getEncoder().encodeToString((httpUserName + ":" + httpPassword).getBytes());
-            URL authUrl = new URL(httpServer + "/releases/" + versionTag + "/downloads/all-structures");
-            HttpURLConnection authConnection = (HttpURLConnection) authUrl.openConnection();
-            authConnection.setInstanceFollowRedirects(false);
-            authConnection.setRequestProperty("Authorization", "Basic " + authStringEnc);
-            String location = authConnection.getHeaderField("Location");
-
-            URL downloadUrl = new URL(location);
+            URL downloadUrl = new URL(httpServer + "/releases/" + versionTag + "/downloads/all-open-structures");
             HttpURLConnection downloadConnection = (HttpURLConnection) downloadUrl.openConnection();
+            downloadConnection.addRequestProperty("User-Agent", "Java HttpURLConnection");
+            downloadConnection.addRequestProperty("Accept", "*/*");
 
             InputStream is = downloadConnection.getInputStream();
             int fileSize = 0;
