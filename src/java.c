@@ -67,9 +67,9 @@ void java_init(void)
                                                      JARDIR "/cdk-standard-2.3.jar:"
                                                      JARDIR "/cdk-valencycheck-2.3.jar:"
                                                      JARDIR "/guava-29.0-jre.jar:"
-                                                     JARDIR "/log4j-1.2-api-2.13.3.jar:"
-                                                     JARDIR "/log4j-api-2.13.3.jar:"
-                                                     JARDIR "/log4j-core-2.13.3.jar:"
+                                                     JARDIR "/log4j-1.2-api-2.16.0.jar:"
+                                                     JARDIR "/log4j-api-2.16.0.jar:"
+                                                     JARDIR "/log4j-core-2.16.0.jar:"
                                                      JARDIR "/lucene-core-8.7.0.jar:"
                                                      JARDIR "/vecmath-1.5.2.jar" }},
             .ignoreUnrecognized = JNI_FALSE
