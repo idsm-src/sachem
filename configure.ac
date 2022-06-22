@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(sachem, 2.5.4)
+AC_INIT(sachem, 2.5.5)
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([build])
 : ${CFLAGS=""}

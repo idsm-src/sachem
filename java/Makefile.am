@@ -13,9 +13,9 @@ jar_DATA = \
     lib/cdk-valencycheck-2.3.jar \
     lib/commons-net-3.6.jar \
     lib/guava-29.0-jre.jar \
-    lib/log4j-1.2-api-2.16.0.jar \
-    lib/log4j-api-2.16.0.jar \
-    lib/log4j-core-2.16.0.jar \
+    lib/log4j-1.2-api-2.17.1.jar \
+    lib/log4j-api-2.17.1.jar \
+    lib/log4j-core-2.17.1.jar \
     lib/lucene-core-8.7.0.jar \
     lib/postgresql-42.2.14.jar \
     lib/vecmath-1.5.2.jar
@@ -46,9 +46,9 @@ EXTRA_DIST = \
     lib/cdk-valencycheck-2.3.jar \
     lib/commons-net-3.6.jar \
     lib/guava-29.0-jre.jar \
-    lib/log4j-1.2-api-2.16.0.jar \
-    lib/log4j-api-2.16.0.jar \
-    lib/log4j-core-2.16.0.jar \
+    lib/log4j-1.2-api-2.17.1.jar \
+    lib/log4j-api-2.17.1.jar \
+    lib/log4j-core-2.17.1.jar \
     lib/lucene-core-8.7.0.jar \
     lib/postgresql-42.2.14.jar \
     lib/vecmath-1.5.2.jar \
