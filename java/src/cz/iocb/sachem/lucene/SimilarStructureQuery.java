@@ -23,6 +23,7 @@ import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.Explanation;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.QueryVisitor;
 import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.Scorer;
 import org.apache.lucene.search.TermQuery;
@@ -245,14 +246,6 @@ public class SimilarStructureQuery extends Query
             }
 
 
-            @Deprecated
-            @Override
-            public void extractTerms(Set<Term> set)
-            {
-                innerWeight.extractTerms(set);
-            }
-
-
             private Set<Integer> selectFingerprintBits(IndexSearcher searcher) throws IOException
             {
                 int limit = (int) Math.ceil(fpSize * (1 - threshold));
@@ -433,5 +426,18 @@ public class SimilarStructureQuery extends Query
                 }
             }
         }
+
+
+        @Override
+        public void visit(QueryVisitor visitor)
+        {
+        }
+    }
+
+
+    @Override
+    public void visit(QueryVisitor visitor)
+    {
+        subquery.visit(visitor);
     }
 }

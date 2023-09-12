@@ -1,6 +1,5 @@
 package cz.iocb.sachem.molecule;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -8,14 +7,12 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import org.openscience.cdk.config.Isotopes;
 import org.openscience.cdk.exception.CDKException;
 import org.openscience.cdk.interfaces.IAtom;
 import org.openscience.cdk.interfaces.IAtomContainer;
 import org.openscience.cdk.interfaces.IBond;
 import org.openscience.cdk.interfaces.IBond.Order;
 import org.openscience.cdk.interfaces.IDoubleBondStereochemistry.Conformation;
-import org.openscience.cdk.interfaces.IIsotope;
 import org.openscience.cdk.interfaces.IPseudoAtom;
 import org.openscience.cdk.interfaces.IStereoElement;
 import org.openscience.cdk.interfaces.ITetrahedralChirality;
@@ -73,7 +70,14 @@ public class InChITools
     private static final int RECORD_SIZE = 176;
     private static final int STEREO_RECORD_SIZE = 12;
     private static final short NO_ATOM = -1;
-    private static Isotopes isotopes;
+
+    private static final int[] isotopes = { 0, 1, 4, 7, 9, 11, 12, 14, 16, 19, 20, 23, 24, 27, 28, 31, 32, 35, 40, 39,
+            40, 45, 48, 51, 52, 55, 56, 59, 58, 63, 64, 69, 74, 75, 80, 79, 84, 85, 88, 89, 90, 93, 98, 98, 102, 103,
+            106, 107, 114, 115, 120, 121, 130, 127, 132, 133, 138, 139, 140, 141, 142, 145, 152, 153, 158, 159, 164,
+            165, 166, 169, 174, 175, 180, 181, 184, 187, 192, 193, 195, 197, 202, 205, 208, 209, 209, 210, 222, 223,
+            226, 227, 232, 231, 238, 237, 244, 243, 247, 247, 251, 252, 257, 258, 259, 260, 261, 270, 269, 270, 270,
+            278, 281, 281, 285, 278, 289, 289, 293, 297, 294 };
+
 
     private final IAtomContainer molecule;
 
@@ -83,18 +87,6 @@ public class InChITools
 
     private final List<TautomericGroup> tautomericGroups = new ArrayList<TautomericGroup>();
     private final List<Integer> tautomericBonds = new ArrayList<Integer>();
-
-
-    static
-    {
-        try
-        {
-            isotopes = Isotopes.getInstance();
-        }
-        catch(IOException e)
-        {
-        }
-    }
 
 
     public InChITools(IAtomContainer molecule, int mode, boolean tautomers) throws CDKException
@@ -508,15 +500,10 @@ public class InChITools
         if(atom.getMassNumber() == null || atom.getMassNumber() == -1)
             return 0;
 
-        if(atom.getAtomicNumber() == 0)
+        if(atom.getAtomicNumber() == 0 || atom.getAtomicNumber() >= isotopes.length)
             return 0;
 
-        IIsotope majorIsotope = isotopes.getMajorIsotope(atom.getAtomicNumber());
-
-        if(majorIsotope == null)
-            return 0;
-
-        return atom.getMassNumber() - majorIsotope.getMassNumber();
+        return isotopes[atom.getMassNumber()];
     }
 
 

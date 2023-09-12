@@ -20,10 +20,11 @@ import org.apache.lucene.search.BooleanQuery.Builder;
 import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.DisjunctionMaxQuery;
 import org.apache.lucene.search.DocIdSetIterator;
-import org.apache.lucene.search.DocValuesFieldExistsQuery;
 import org.apache.lucene.search.Explanation;
+import org.apache.lucene.search.FieldExistsQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.QueryVisitor;
 import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.Scorer;
 import org.apache.lucene.search.TermQuery;
@@ -265,8 +266,8 @@ public class SubstructureQuery extends Query
                 }
                 else
                 {
-                    this.innerWeight = new DocValuesFieldExistsQuery(field).createWeight(searcher,
-                            ScoreMode.COMPLETE_NO_SCORES, boost);
+                    this.innerWeight = new FieldExistsQuery(field).createWeight(searcher, ScoreMode.COMPLETE_NO_SCORES,
+                            boost);
                 }
             }
 
@@ -299,14 +300,6 @@ public class SubstructureQuery extends Query
                     return Explanation.match(scorer.score(), "match");
 
                 return Explanation.noMatch("no match");
-            }
-
-
-            @Deprecated
-            @Override
-            public void extractTerms(Set<Term> set)
-            {
-                innerWeight.extractTerms(set);
             }
 
 
@@ -466,5 +459,18 @@ public class SubstructureQuery extends Query
                 }
             }
         }
+
+
+        @Override
+        public void visit(QueryVisitor visitor)
+        {
+        }
+    }
+
+
+    @Override
+    public void visit(QueryVisitor visitor)
+    {
+        subquery.visit(visitor);
     }
 }

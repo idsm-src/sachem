@@ -39,7 +39,7 @@ public class BinaryMoleculeSort
             Integer count = elementCounts.get(atom.getAtomicNumber());
 
             if(count == null)
-                elementCounts.put(atom.getAtomicNumber(), new Integer(1));
+                elementCounts.put(atom.getAtomicNumber(), Integer.valueOf(1));
             else
                 elementCounts.put(atom.getAtomicNumber(), ++count);
         }

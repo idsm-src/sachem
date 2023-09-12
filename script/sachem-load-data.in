@@ -17,4 +17,4 @@ if [ ! -d "$2" ]; then
     exit 1
 fi
 
-java -classpath $CLASSPATH/commons-net-3.6.jar:$CLASSPATH/postgresql-42.2.14.jar:$CLASSPATH/sachem.jar cz.iocb.sachem.load.GeneralCompoundLoader "$1" "$2"
+java -classpath $CLASSPATH/commons-net-3.9.0.jar:$CLASSPATH/postgresql-42.6.0.jar:$CLASSPATH/sachem.jar cz.iocb.sachem.load.GeneralCompoundLoader "$1" "$2"

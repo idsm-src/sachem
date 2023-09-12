@@ -9,7 +9,7 @@
 
   <target name="build">
     <mkdir dir="${build.dir}/classes"/>
-  	<javac destdir="${build.dir}/classes" includeantruntime="false" source="1.8" target="1.8">
+  	<javac destdir="${build.dir}/classes" includeantruntime="false" source="11" target="11">
       <src path="${src.dir}/src"/>
       <classpath refid="master-classpath"/>
     </javac>
