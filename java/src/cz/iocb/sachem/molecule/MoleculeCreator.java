@@ -256,25 +256,17 @@ public class MoleculeCreator
 
     private static IAtomContainer getMoleculeFromMolfile(String mol) throws CDKException, IOException
     {
-        DefaultChemObjectReader mdlReader;
+        final String v30 = "M  V30 BEGIN CTAB";
 
-        if(mol.contains("M  V30 BEGIN CTAB"))
-        {
-            mdlReader = new MDLV3000Reader();
-        }
-        else
-        {
-            mdlReader = new MDLV2000Reader();
-            mdlReader.getSetting("AddStereoElements").setSetting("false");
-        }
-
+        DefaultChemObjectReader mdlReader = mol.contains(v30) ? new MDLV3000Reader() : new MDLV2000Reader();
+        mdlReader.getSetting("AddStereoElements").setSetting("false");
         mdlReader.setReader(new StringReader(mol));
-        IAtomContainer molecule;
-
 
         try
         {
-            molecule = mdlReader.read(new AtomContainer());
+            IAtomContainer molecule = mdlReader.read(new AtomContainer());
+            sanitizeMolecule(molecule);
+            return molecule;
         }
         catch(Exception e)
         {
@@ -284,10 +276,6 @@ public class MoleculeCreator
         {
             mdlReader.close();
         }
-
-        sanitizeMolecule(molecule);
-
-        return molecule;
     }
 
 
