@@ -75,7 +75,7 @@ public class DrugbankCompoundUpdater
 
             try(BufferedReader buffer = new BufferedReader(new InputStreamReader(infoConnection.getInputStream())))
             {
-                Pattern pattern = Pattern.compile("href=\"/releases/([^/]+)/downloads/all-open-structures\"");
+                Pattern pattern = Pattern.compile(httpServer + "/releases/([^/]+)/downloads/all-open-structures");
                 String line;
 
                 while((line = buffer.readLine()) != null)
