@@ -72,7 +72,7 @@ static int process_component(JNIEnv *env, jobject object, inp_ATOM *inp_at, int 
     /* set stereo parities to at[] */
     int bPointedEdgeStereo = /* PES_BIT_POINT_EDGE_STEREO | */ STEREO_WEDGE_ONLY | PES_BIT_PHOSPHINE_STEREO | PES_BIT_ARSINE_STEREO | PES_BIT_FIX_SP3_BUG;
 
-    ret = set_stereo_parity(&CG, inp_at, at, num_atoms, group_info.tni.nNumRemovedExplicitH, &s.nMaxNumStereoAtoms, &s.nMaxNumStereoBonds, mode, bPointedEdgeStereo, AB_PARITY_UNDF /*AB_PARITY_UNKN*/);
+    ret = set_stereo_parity(&CG, inp_at, at, num_atoms, group_info.tni.nNumRemovedExplicitH, &s.nMaxNumStereoAtoms, &s.nMaxNumStereoBonds, mode, bPointedEdgeStereo, AB_PARITY_UNDF /*AB_PARITY_UNKN*/, 1, 1);
 
     if(RETURNED_ERROR(ret))
         goto exit_function; /* stereo bond error */

@@ -43,9 +43,6 @@ EXTRA_DIST = \
         inchi/ichidrp.h \
         inchi/ichierr.h \
         inchi/ichi.h \
-        inchi/ichi_io.h \
-        inchi/ichimain.h \
-        inchi/ichimake.h \
         inchi/ichinorm.h \
         inchi/ichiring.h \
         inchi/ichisize.h \
@@ -55,9 +52,7 @@ EXTRA_DIST = \
         inchi/incomdef.h \
         inchi/inchi_api.h \
         inchi/inpdef.h \
-        inchi/ixa.h \
         inchi/mode.h \
-        inchi/mol_fmt.h \
         inchi/readinch.h \
         inchi/strutil.h \
         inchi/util.h \
