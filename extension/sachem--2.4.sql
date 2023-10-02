@@ -46,34 +46,7 @@ CREATE TABLE compound_errors (
 );
 
 
-CREATE TABLE compound_sources (
-    id                    SERIAL NOT NULL,
-    index                 INT NOT NULL REFERENCES configuration(id),
-    name                  TEXT NOT NULL,
-    size                  BIGINT NOT NULL,
-    timestamp             TIMESTAMPTZ,
-    PRIMARY KEY (id)
-);
-
-
-CREATE TABLE compound_stats (
-    index                 INT NOT NULL REFERENCES configuration(id),
-    version               TEXT,
-    checkdate             TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (index)
-);
-
-
-GRANT USAGE ON SEQUENCE compound_sources_id_seq TO PUBLIC;
-
 GRANT SELECT ON TABLE configuration TO PUBLIC;
-GRANT SELECT ON TABLE compound_sources TO PUBLIC;
-GRANT INSERT ON TABLE compound_sources TO PUBLIC;
-GRANT UPDATE ON TABLE compound_sources TO PUBLIC;
-GRANT DELETE ON TABLE compound_sources TO PUBLIC;
-GRANT SELECT ON TABLE compound_stats TO PUBLIC;
-GRANT INSERT ON TABLE compound_stats TO PUBLIC;
-GRANT UPDATE ON TABLE compound_stats TO PUBLIC;
 GRANT SELECT ON TABLE compound_errors TO PUBLIC;
 
 
@@ -146,8 +119,6 @@ BEGIN
 	
 	DELETE FROM sachem.compound_audit WHERE index = idx;
 	DELETE FROM sachem.compound_errors WHERE index = idx;
-	DELETE FROM sachem.compound_sources WHERE index = idx;
-	DELETE FROM sachem.compound_stats WHERE index = idx;
 	DELETE FROM sachem.configuration AS tbl WHERE tbl.id = idx;
 	
 	EXECUTE 'DROP TRIGGER "' || index_name || '_sachem_compound_audit" ON ' || schema_name || '.' || table_name;

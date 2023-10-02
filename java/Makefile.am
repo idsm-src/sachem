@@ -11,13 +11,11 @@ jar_DATA = \
     lib/cdk-smiles-2.9.jar \
     lib/cdk-standard-2.9.jar \
     lib/cdk-valencycheck-2.9.jar \
-    lib/commons-net-3.9.0.jar \
     lib/guava-32.1.2-jre.jar \
     lib/log4j-1.2-api-2.20.0.jar \
     lib/log4j-api-2.20.0.jar \
     lib/log4j-core-2.20.0.jar \
     lib/lucene-core-9.7.0.jar \
-    lib/postgresql-42.6.0.jar \
     lib/vecmath-1.5.2.jar
 
 jardir = $(datadir)/$(PACKAGE)/jar
@@ -44,13 +42,11 @@ EXTRA_DIST = \
     lib/cdk-smiles-2.9.jar \
     lib/cdk-standard-2.9.jar \
     lib/cdk-valencycheck-2.9.jar \
-    lib/commons-net-3.9.0.jar \
     lib/guava-32.1.2-jre.jar \
     lib/log4j-1.2-api-2.20.0.jar \
     lib/log4j-api-2.20.0.jar \
     lib/log4j-core-2.20.0.jar \
     lib/lucene-core-9.7.0.jar \
-    lib/postgresql-42.6.0.jar \
     lib/vecmath-1.5.2.jar \
     src/cz/iocb/sachem/fingerprint/AtomFingerprint.java \
     src/cz/iocb/sachem/fingerprint/CRNGFingerprint.java \
@@ -58,12 +54,6 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/fingerprint/IOCBFingerprint.java \
     src/cz/iocb/sachem/fingerprint/RCFingerprint.java \
     src/cz/iocb/sachem/fingerprint/SGFingerprint.java \
-    src/cz/iocb/sachem/load/CompoundLoader.java \
-    src/cz/iocb/sachem/load/CompoundUpdater.java \
-    src/cz/iocb/sachem/load/ConfigurationProperties.java \
-    src/cz/iocb/sachem/load/DrugbankCompoundUpdater.java \
-    src/cz/iocb/sachem/load/GeneralCompoundLoader.java \
-    src/cz/iocb/sachem/load/PubChemCompoundUpdater.java \
     src/cz/iocb/sachem/lucene/BalancedMergePolicy.java \
     src/cz/iocb/sachem/lucene/FingerprintBitMapping.java \
     src/cz/iocb/sachem/lucene/FingerprintTokenStream.java \
