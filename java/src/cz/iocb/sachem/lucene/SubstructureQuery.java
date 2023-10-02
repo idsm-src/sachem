@@ -44,7 +44,6 @@ import cz.iocb.sachem.molecule.MoleculeCreator;
 import cz.iocb.sachem.molecule.MoleculeCreator.QueryMolecule;
 import cz.iocb.sachem.molecule.NativeIsomorphism;
 import cz.iocb.sachem.molecule.NativeIsomorphism.IterationLimitExceededException;
-import cz.iocb.sachem.molecule.QueryFormat;
 import cz.iocb.sachem.molecule.RadicalMode;
 import cz.iocb.sachem.molecule.SearchMode;
 import cz.iocb.sachem.molecule.StereoMode;
@@ -56,7 +55,6 @@ public class SubstructureQuery extends Query
 {
     private final String field;
     private final String query;
-    private final QueryFormat queryFormat;
     private final SearchMode searchMode;
     private final ChargeMode chargeMode;
     private final IsotopeMode isotopeMode;
@@ -69,14 +67,12 @@ public class SubstructureQuery extends Query
     final String name;
 
 
-    public SubstructureQuery(String field, String query, QueryFormat queryFormat, SearchMode searchMode,
-            ChargeMode chargeMode, IsotopeMode isotopeMode, RadicalMode radicalMode, StereoMode stereoMode,
-            AromaticityMode aromaticityMode, TautomerMode tautomerMode, long iterationLimit)
-            throws CDKException, IOException, TimeoutException
+    public SubstructureQuery(String field, String query, SearchMode searchMode, ChargeMode chargeMode,
+            IsotopeMode isotopeMode, RadicalMode radicalMode, StereoMode stereoMode, AromaticityMode aromaticityMode,
+            TautomerMode tautomerMode, long iterationLimit) throws CDKException, IOException, TimeoutException
     {
         this.field = field;
         this.query = query;
-        this.queryFormat = queryFormat;
         this.searchMode = searchMode;
         this.chargeMode = chargeMode;
         this.isotopeMode = isotopeMode;
@@ -86,8 +82,8 @@ public class SubstructureQuery extends Query
         this.tautomerMode = tautomerMode;
         this.iterationLimit = iterationLimit;
 
-        QueryMolecule queryMolecules = MoleculeCreator.translateQuery(query, queryFormat, chargeMode, isotopeMode,
-                radicalMode, stereoMode, aromaticityMode, tautomerMode);
+        QueryMolecule queryMolecules = MoleculeCreator.translateQuery(query, chargeMode, isotopeMode, radicalMode,
+                stereoMode, aromaticityMode, tautomerMode);
 
         this.name = queryMolecules.name;
 
@@ -123,11 +119,11 @@ public class SubstructureQuery extends Query
 
     private boolean equalsTo(SubstructureQuery other)
     {
-        return field.equals(other.field) && query.equals(other.query) && queryFormat.equals(other.queryFormat)
-                && searchMode.equals(other.searchMode) && chargeMode.equals(other.chargeMode)
-                && isotopeMode.equals(other.isotopeMode) && radicalMode.equals(other.radicalMode)
-                && stereoMode.equals(other.stereoMode) && aromaticityMode.equals(other.aromaticityMode)
-                && tautomerMode.equals(other.tautomerMode) && iterationLimit == other.iterationLimit;
+        return field.equals(other.field) && query.equals(other.query) && searchMode.equals(other.searchMode)
+                && chargeMode.equals(other.chargeMode) && isotopeMode.equals(other.isotopeMode)
+                && radicalMode.equals(other.radicalMode) && stereoMode.equals(other.stereoMode)
+                && aromaticityMode.equals(other.aromaticityMode) && tautomerMode.equals(other.tautomerMode)
+                && iterationLimit == other.iterationLimit;
     }
 
 

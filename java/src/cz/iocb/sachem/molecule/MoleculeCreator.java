@@ -90,39 +90,20 @@ public class MoleculeCreator
     };
 
 
-    public static QueryMolecule translateQuery(String query, QueryFormat format, ChargeMode chargeMode,
-            IsotopeMode isotopeMode, RadicalMode radicalMode, StereoMode stereoMode, AromaticityMode aromaticityMode,
-            TautomerMode tautomerMode) throws CDKException, IOException, TimeoutException
+    public static QueryMolecule translateQuery(String query, ChargeMode chargeMode, IsotopeMode isotopeMode,
+            RadicalMode radicalMode, StereoMode stereoMode, AromaticityMode aromaticityMode, TautomerMode tautomerMode)
+            throws CDKException, IOException, TimeoutException
     {
         List<IAtomContainer> molecules = null;
 
-        switch(format)
-        {
-            case MOLFILE:
-                molecules = Arrays.asList(MoleculeCreator.getMoleculeFromMolfile(query));
-                break;
+        List<String> lines = Arrays.asList(query.split("\\n"));
 
-            case SMILES:
-                molecules = Arrays.asList(MoleculeCreator.getMoleculeFromSmiles(query));
-                break;
-
-            case RGROUP:
-                molecules = getMoleculesFromRGroupQuery(query);
-                break;
-
-            case UNSPECIFIED:
-                List<String> lines = Arrays.asList(query.split("\\n"));
-
-                if(((RGroupQueryFormat) RGroupQueryFormat.getInstance()).matches(lines).matched())
-                    molecules = getMoleculesFromRGroupQuery(query);
-                else if(lines.size() > 1)
-                    molecules = Arrays.asList(MoleculeCreator.getMoleculeFromMolfile(query));
-                else
-                    molecules = Arrays.asList(MoleculeCreator.getMoleculeFromSmiles(query));
-
-                break;
-        }
-
+        if(((RGroupQueryFormat) RGroupQueryFormat.getInstance()).matches(lines).matched())
+            molecules = getMoleculesFromRGroupQuery(query);
+        else if(lines.size() > 1)
+            molecules = Arrays.asList(MoleculeCreator.getMoleculeFromMolfile(query));
+        else
+            molecules = Arrays.asList(MoleculeCreator.getMoleculeFromSmiles(query));
 
         for(IAtomContainer molecule : molecules)
             configureAromaticity(molecule, aromaticityMode);

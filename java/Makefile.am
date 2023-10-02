@@ -79,7 +79,6 @@ EXTRA_DIST = \
     src/cz/iocb/sachem/molecule/MoleculeCreator.java \
     src/cz/iocb/sachem/molecule/Molecule.java \
     src/cz/iocb/sachem/molecule/NativeIsomorphism.java \
-    src/cz/iocb/sachem/molecule/QueryFormat.java \
     src/cz/iocb/sachem/molecule/RadicalMode.java \
     src/cz/iocb/sachem/molecule/SearchMode.java \
     src/cz/iocb/sachem/molecule/StereoMode.java \

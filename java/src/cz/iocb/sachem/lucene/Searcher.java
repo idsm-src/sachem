@@ -23,7 +23,6 @@ import org.openscience.cdk.exception.CDKException;
 import cz.iocb.sachem.molecule.AromaticityMode;
 import cz.iocb.sachem.molecule.ChargeMode;
 import cz.iocb.sachem.molecule.IsotopeMode;
-import cz.iocb.sachem.molecule.QueryFormat;
 import cz.iocb.sachem.molecule.RadicalMode;
 import cz.iocb.sachem.molecule.SearchMode;
 import cz.iocb.sachem.molecule.StereoMode;
@@ -146,12 +145,11 @@ public class Searcher
     }
 
 
-    public SearchResult subsearch(byte[] molecule, QueryFormat format, int n, boolean sort, SearchMode searchMode,
-            ChargeMode chargeMode, IsotopeMode isotopeMode, RadicalMode radicalMode, StereoMode stereoMode,
-            AromaticityMode aromaticityMode, TautomerMode tautomerMode, long matchingLimit)
-            throws IOException, CDKException, TimeoutException
+    public SearchResult subsearch(byte[] molecule, int n, boolean sort, SearchMode searchMode, ChargeMode chargeMode,
+            IsotopeMode isotopeMode, RadicalMode radicalMode, StereoMode stereoMode, AromaticityMode aromaticityMode,
+            TautomerMode tautomerMode, long matchingLimit) throws IOException, CDKException, TimeoutException
     {
-        SubstructureQuery query = new SubstructureQuery(Settings.substructureFieldName, new String(molecule), format,
+        SubstructureQuery query = new SubstructureQuery(Settings.substructureFieldName, new String(molecule),
                 searchMode, chargeMode, isotopeMode, radicalMode, stereoMode, aromaticityMode, tautomerMode,
                 matchingLimit);
 
@@ -166,12 +164,12 @@ public class Searcher
     }
 
 
-    public SearchResult simsearch(byte[] molecule, QueryFormat format, int n, boolean sort, float threshold, int depth,
+    public SearchResult simsearch(byte[] molecule, int n, boolean sort, float threshold, int depth,
             AromaticityMode aromaticityMode, TautomerMode tautomerMode)
             throws IOException, CDKException, TimeoutException
     {
         SimilarStructureQuery query = new SimilarStructureQuery(Settings.similarityFieldName, new String(molecule),
-                format, threshold, depth, aromaticityMode, tautomerMode);
+                threshold, depth, aromaticityMode, tautomerMode);
 
 
         if(n == 0)

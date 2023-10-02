@@ -39,7 +39,6 @@ import cz.iocb.sachem.molecule.ChargeMode;
 import cz.iocb.sachem.molecule.IsotopeMode;
 import cz.iocb.sachem.molecule.MoleculeCreator;
 import cz.iocb.sachem.molecule.MoleculeCreator.QueryMolecule;
-import cz.iocb.sachem.molecule.QueryFormat;
 import cz.iocb.sachem.molecule.RadicalMode;
 import cz.iocb.sachem.molecule.StereoMode;
 import cz.iocb.sachem.molecule.TautomerMode;
@@ -52,7 +51,6 @@ public class SimilarStructureQuery extends Query
 
     private final String field;
     private final String query;
-    private final QueryFormat queryFormat;
     private final AromaticityMode aromaticityMode;
     private final TautomerMode tautomerMode;
     private final float threshold;
@@ -61,21 +59,20 @@ public class SimilarStructureQuery extends Query
     final String name;
 
 
-    public SimilarStructureQuery(String field, String query, QueryFormat queryFormat, float threshold,
-            int similarityRadius, AromaticityMode aromaticityMode, TautomerMode tautomerMode)
+    public SimilarStructureQuery(String field, String query, float threshold, int similarityRadius,
+            AromaticityMode aromaticityMode, TautomerMode tautomerMode)
             throws CDKException, IOException, TimeoutException
     {
         this.field = field;
         this.query = query;
-        this.queryFormat = queryFormat;
         this.threshold = threshold;
         this.similarityRadius = similarityRadius;
         this.aromaticityMode = aromaticityMode;
         this.tautomerMode = tautomerMode;
 
-        QueryMolecule queryMolecule = MoleculeCreator.translateQuery(query, queryFormat,
-                ChargeMode.DEFAULT_AS_UNCHARGED, IsotopeMode.DEFAULT_AS_STANDARD, RadicalMode.DEFAULT_AS_STANDARD,
-                StereoMode.IGNORE, aromaticityMode, tautomerMode);
+        QueryMolecule queryMolecule = MoleculeCreator.translateQuery(query, ChargeMode.DEFAULT_AS_UNCHARGED,
+                IsotopeMode.DEFAULT_AS_STANDARD, RadicalMode.DEFAULT_AS_STANDARD, StereoMode.IGNORE, aromaticityMode,
+                tautomerMode);
 
         this.name = queryMolecule.name;
 
@@ -104,9 +101,9 @@ public class SimilarStructureQuery extends Query
 
     private boolean equalsTo(SimilarStructureQuery other)
     {
-        return field.equals(other.field) && query.equals(other.query) && queryFormat.equals(other.queryFormat)
-                && aromaticityMode.equals(other.aromaticityMode) && tautomerMode.equals(other.tautomerMode)
-                && threshold == other.threshold && similarityRadius == other.similarityRadius;
+        return field.equals(other.field) && query.equals(other.query) && aromaticityMode.equals(other.aromaticityMode)
+                && tautomerMode.equals(other.tautomerMode) && threshold == other.threshold
+                && similarityRadius == other.similarityRadius;
     }
 
 

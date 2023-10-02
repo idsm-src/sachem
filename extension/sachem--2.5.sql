@@ -9,7 +9,6 @@ CREATE TYPE radical_mode AS ENUM ('IGNORE', 'DEFAULT_AS_STANDARD', 'DEFAULT_AS_A
 CREATE TYPE stereo_mode AS ENUM ('IGNORE', 'STRICT');
 CREATE TYPE aromaticity_mode AS ENUM ('PRESERVE', 'DETECT', 'AUTO');
 CREATE TYPE tautomer_mode AS ENUM ('IGNORE', 'INCHI');
-CREATE TYPE query_format AS ENUM ('UNSPECIFIED', 'SMILES', 'MOLFILE', 'RGROUP');
 
 
 CREATE TABLE configuration (
@@ -51,8 +50,8 @@ GRANT SELECT ON TABLE compound_errors TO PUBLIC;
 
 
 CREATE FUNCTION "index_size"(varchar) RETURNS int AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE;
-CREATE FUNCTION "substructure_search"(varchar, varchar, search_mode = 'SUBSTRUCTURE', charge_mode = 'DEFAULT_AS_ANY', isotope_mode = 'IGNORE', radical_mode = 'IGNORE', stereo_mode = 'IGNORE', aromaticity_mode = 'AUTO', tautomer_mode = 'IGNORE', query_format = 'UNSPECIFIED', int = -1, boolean = false, bigint = 0) RETURNS TABLE (compound int, score float4) AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
-CREATE FUNCTION "similarity_search"(varchar, varchar, float4 = 0.85, int = 1, aromaticity_mode = 'AUTO', tautomer_mode = 'IGNORE', query_format = 'UNSPECIFIED', int = -1, boolean = false) RETURNS TABLE (compound int, score float4) AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION "substructure_search"(varchar, varchar, search_mode = 'SUBSTRUCTURE', charge_mode = 'DEFAULT_AS_ANY', isotope_mode = 'IGNORE', radical_mode = 'IGNORE', stereo_mode = 'IGNORE', aromaticity_mode = 'AUTO', tautomer_mode = 'IGNORE', int = -1, boolean = false, bigint = 0) RETURNS TABLE (compound int, score float4) AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION "similarity_search"(varchar, varchar, float4 = 0.85, int = 1, aromaticity_mode = 'AUTO', tautomer_mode = 'IGNORE', int = -1, boolean = false) RETURNS TABLE (compound int, score float4) AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "sync_data"(varchar, boolean = false, boolean = true) RETURNS void AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT SECURITY DEFINER;
 CREATE FUNCTION "cleanup"(varchar) RETURNS void AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION "segments"(varchar) RETURNS TABLE (name varchar, molecules int, deletes int, size bigint) AS 'MODULE_PATHNAME' LANGUAGE C IMMUTABLE STRICT;
