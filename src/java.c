@@ -70,7 +70,7 @@ void java_init(void)
                                                      JARDIR "/log4j-1.2-api-2.20.0.jar:"
                                                      JARDIR "/log4j-api-2.20.0.jar:"
                                                      JARDIR "/log4j-core-2.20.0.jar:"
-                                                     JARDIR "/lucene-core-9.7.0.jar:"
+                                                     JARDIR "/lucene-core-9.8.0.jar:"
                                                      JARDIR "/vecmath-1.5.2.jar" }},
             .ignoreUnrecognized = JNI_FALSE
         };
