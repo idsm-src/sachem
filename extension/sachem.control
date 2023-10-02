@@ -1,5 +1,5 @@
 # sachem extension
 comment = 'Sachem chemical cartridge'
-default_version = '2.4'
+default_version = '2.5'
 module_pathname = '$libdir/libsachem'
 schema = sachem
