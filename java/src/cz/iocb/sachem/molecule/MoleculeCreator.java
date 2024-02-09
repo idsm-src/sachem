@@ -212,6 +212,13 @@ public class MoleculeCreator
 
     public static IAtomContainer translateMolecule(String mol, boolean inchiStereo) throws CDKException, IOException
     {
+        return translateMolecule(mol, AromaticityMode.AUTO, inchiStereo);
+    }
+
+
+    public static IAtomContainer translateMolecule(String mol, AromaticityMode aromaticityMode, boolean inchiStereo)
+            throws CDKException, IOException
+    {
         IAtomContainer molecule = mol.contains("\n") ? getMoleculeFromMolfile(mol) : getMoleculeFromSmiles(mol);
 
         List<IBond> otherBonds = new LinkedList<IBond>();
@@ -223,7 +230,7 @@ public class MoleculeCreator
         for(IBond bond : otherBonds)
             molecule.removeBond(bond);
 
-        configureAromaticity(molecule, AromaticityMode.AUTO);
+        configureAromaticity(molecule, aromaticityMode);
 
         if(inchiStereo)
             setStereo(molecule, new InChITools(molecule, INCHI_DB_MODE, false));

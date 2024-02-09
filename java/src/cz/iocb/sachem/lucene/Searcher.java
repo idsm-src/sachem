@@ -10,6 +10,7 @@ import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -20,9 +21,14 @@ import org.apache.lucene.search.similarities.BooleanSimilarity;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.openscience.cdk.exception.CDKException;
+import org.openscience.cdk.interfaces.IAtomContainer;
+import cz.iocb.sachem.fingerprint.IOCBFingerprint;
 import cz.iocb.sachem.molecule.AromaticityMode;
+import cz.iocb.sachem.molecule.BinaryMolecule;
+import cz.iocb.sachem.molecule.BinaryMoleculeBuilder;
 import cz.iocb.sachem.molecule.ChargeMode;
 import cz.iocb.sachem.molecule.IsotopeMode;
+import cz.iocb.sachem.molecule.MoleculeCreator;
 import cz.iocb.sachem.molecule.RadicalMode;
 import cz.iocb.sachem.molecule.SearchMode;
 import cz.iocb.sachem.molecule.StereoMode;
@@ -180,6 +186,40 @@ public class Searcher
             return searcher.search(query, new SortedResultCollectorManager(query.name));
         else
             return searcher.search(query, new ResultCollectorManager(query.name));
+    }
+
+
+    public static float similarity(byte[] mol1, byte[] mol2, int depth, AromaticityMode aromaticityMode)
+            throws CDKException, IOException
+    {
+        IAtomContainer molecule1 = MoleculeCreator.translateMolecule(new String(mol1), aromaticityMode, false);
+        IAtomContainer molecule2 = MoleculeCreator.translateMolecule(new String(mol2), aromaticityMode, false);
+
+        BinaryMolecule bin1 = new BinaryMolecule(BinaryMoleculeBuilder.asBytes(molecule1, false));
+        BinaryMolecule bin2 = new BinaryMolecule(BinaryMoleculeBuilder.asBytes(molecule2, false));
+
+        List<List<Integer>> fp1 = IOCBFingerprint.getSimilarityFingerprint(bin1, depth);
+        List<List<Integer>> fp2 = IOCBFingerprint.getSimilarityFingerprint(bin2, depth);
+
+        int shared = 0;
+        int size = 0;
+
+        for(int d = 0; d < depth; d++)
+        {
+            List<Integer> it1 = fp1.get(d);
+            List<Integer> it2 = fp2.get(d);
+
+            int size1 = it1.size();
+            int size2 = it2.size();
+
+            for(Integer i : it2)
+                it1.remove(i);
+
+            size += size1 + size2;
+            shared += size1 - it1.size();
+        }
+
+        return shared / (float) (size - shared);
     }
 
 

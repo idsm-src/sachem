@@ -48,6 +48,7 @@ static jmethodID getMethod;
 static jmethodID indexSizeMethod;
 static jmethodID subsearchMethod;
 static jmethodID simsearchMethod;
+static jmethodID similarityMethod;
 static jfieldID nameField;
 static jfieldID lengthField;
 static jfieldID idsField;
@@ -264,6 +265,8 @@ static void lucene_search_init(void)
     simsearchMethod = (*env)->GetMethodID(env, searcherClass, "simsearch", "([BIZFILcz/iocb/sachem/molecule/AromaticityMode;Lcz/iocb/sachem/molecule/TautomerMode;)Lcz/iocb/sachem/lucene/SearchResult;");
     java_check_exception(__func__);
 
+    similarityMethod = (*env)->GetStaticMethodID(env, searcherClass, "similarity", "([B[BILcz/iocb/sachem/molecule/AromaticityMode;)F");
+    java_check_exception(__func__);
 
     jclass resultClass = (*env)->FindClass(env, "cz/iocb/sachem/lucene/SearchResult");
     java_check_exception(__func__);
@@ -733,4 +736,59 @@ Datum similarity_search(PG_FUNCTION_ARGS)
 
     lucene_result_free(result);
     SRF_RETURN_DONE(funcctx);
+}
+
+
+PG_FUNCTION_INFO_V1(similarity);
+Datum similarity(PG_FUNCTION_ARGS)
+{
+    VarChar *mol1 = PG_GETARG_VARCHAR_P(0);
+    VarChar *mol2 = PG_GETARG_VARCHAR_P(1);
+    int32 radius = PG_GETARG_INT32(2);
+    Oid aromaticity = PG_GETARG_OID(3);
+
+    jbyteArray mol1Array = NULL;
+    jbyteArray mol2Array = NULL;
+    float4 similarity;
+
+    lucene_search_init();
+
+    PG_TRY();
+    {
+        size_t length1 = VARSIZE(mol1) - VARHDRSZ;
+
+        mol1Array = (jbyteArray) (*env)->NewByteArray(env, length1);
+        java_check_exception(__func__);
+
+        (*env)->SetByteArrayRegion(env, mol1Array, 0, length1, (jbyte *) VARDATA(mol1));
+        java_check_exception(__func__);
+
+
+        size_t length2 = VARSIZE(mol2) - VARHDRSZ;
+
+        mol2Array = (jbyteArray) (*env)->NewByteArray(env, length2);
+        java_check_exception(__func__);
+
+        (*env)->SetByteArrayRegion(env, mol2Array, 0, length2, (jbyte *) VARDATA(mol2));
+        java_check_exception(__func__);
+
+
+        similarity = (*env)->CallStaticFloatMethod(env, searcherClass, similarityMethod, mol1Array, mol2Array, radius,
+                ConvertEnumValue(aromaticityModeTable, aromaticity));
+
+        java_check_exception(__func__);
+
+        JavaDeleteRef(mol2Array);
+        JavaDeleteRef(mol1Array);
+    }
+    PG_CATCH();
+    {
+        JavaDeleteRef(mol2Array);
+        JavaDeleteRef(mol1Array);
+
+        PG_RE_THROW();
+    }
+    PG_END_TRY();
+
+    PG_RETURN_FLOAT4(similarity);
 }
