@@ -503,7 +503,7 @@ public class InChITools
         if(atom.getAtomicNumber() == 0 || atom.getAtomicNumber() >= isotopes.length)
             return 0;
 
-        return isotopes[atom.getMassNumber()];
+        return atom.getMassNumber() - isotopes[atom.getAtomicNumber()];
     }
 
 
