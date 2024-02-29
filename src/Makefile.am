@@ -1,8 +1,8 @@
 pglibdir = $(POSTGRESQL_LIBDIR)
 pglib_LTLIBRARIES = libsachem.la
 
-libsachem_la_CFLAGS = -std=gnu99 -O3 -flto -minline-stringops-dynamically -Wall -Wno-parentheses -g
-libsachem_la_CXXFLAGS = -std=c++11 -O3 -flto -minline-stringops-dynamically -Wall -g
+libsachem_la_CFLAGS = -std=gnu99 -O3 -flto -Wall -Wno-parentheses -g
+libsachem_la_CXXFLAGS = -std=c++11 -O3 -flto -Wall -g
 libsachem_la_CPPFLAGS = $(POSTGRESQL_CPPFLAGS) $(JDK8_CPPFLAGS) -I$(srcdir)/inchi -DTARGET_API_LIB -DBINDIR=\"$(bindir)\" -DJARDIR=\"$(datadir)/$(PACKAGE)/jar\"
 libsachem_la_LDFLAGS = $(JDK8_LDFLAGS) -Wl,-rpath,$(POSTGRESQL_LIBDIR)
 
