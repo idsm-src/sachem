@@ -367,8 +367,8 @@ Datum sync_data(PG_FUNCTION_ARGS)
 
         /* convert new data */
         char *query = (char *) palloc(110 + 2 * strlen(idColumn) + strlen(molfileColumn) + strlen(schemaName) + strlen(tableName));
-        sprintf(query, "select cmp.%s, cmp.%s from %s.%s cmp, sachem.compound_audit aud where cmp.%s = aud.id and aud.index = $1",
-                idColumn, molfileColumn, schemaName, tableName, idColumn);
+        sprintf(query, "select cmp.%s, cmp.%s from %s.%s cmp, sachem.compound_audit aud where cmp.%s = aud.id and cmp.%s is not null and aud.index = $1",
+                idColumn, molfileColumn, schemaName, tableName, idColumn, molfileColumn);
 
         Portal compoundCursor = SPI_cursor_open_with_args(NULL, query, 1, (Oid[]) { INT4OID }, (Datum[]) { indexId },
                 NULL, false, CURSOR_OPT_BINARY | CURSOR_OPT_NO_SCROLL);

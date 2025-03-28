@@ -75,22 +75,32 @@ BEGIN
 	$body$
 	BEGIN
 	  IF (TG_OP = ''INSERT'') THEN
-	    INSERT INTO sachem.compound_audit (index, id, delete) VALUES (' || idx || ', NEW.' || id_column || ', false)
-	        ON CONFLICT DO NOTHING;
+        IF (NEW.' || molfile_column || ' IS NOT NULL) THEN
+	        INSERT INTO sachem.compound_audit (index, id, delete) VALUES (' || idx || ', NEW.' || id_column || ', false)
+	            ON CONFLICT (index, id) DO NOTHING;
+        END IF;
 	    RETURN NEW;
 	  ELSIF (TG_OP = ''UPDATE'') THEN
-	    IF (OLD.' || molfile_column || ' != NEW.' || molfile_column || ') THEN
+        IF (OLD.' || molfile_column || ' IS NULL AND NEW.' || molfile_column || ' IS NOT NULL) THEN
+	       INSERT INTO sachem.compound_audit (index, id, delete) VALUES (' || idx || ', NEW.' || id_column || ', false)
+                ON CONFLICT (index, id) DO NOTHING;
+        ELSIF (OLD.' || molfile_column || ' IS NOT NULL AND NEW.' || molfile_column || ' IS NULL) THEN
+            INSERT INTO sachem.compound_audit (index, id, delete) VALUES (' || idx || ', NEW.' || id_column || ', true)
+                ON CONFLICT (index, id) DO UPDATE SET delete=true;
+	    ELSIF (OLD.' || molfile_column || ' != NEW.' || molfile_column || ') THEN
 	        INSERT INTO sachem.compound_audit (index, id, delete) VALUES (' || idx || ', NEW.' || id_column || ', true)
-	            ON CONFLICT (index, id) DO UPDATE SET index=EXCLUDED.index, id=EXCLUDED.id, delete=true;
+	            ON CONFLICT (index, id) DO UPDATE SET delete=true;
 	    END IF;
 	    RETURN NEW;
 	  ELSIF (TG_OP = ''DELETE'') THEN
-	    INSERT INTO sachem.compound_audit (index, id, delete) VALUES (' || idx || ', OLD.' || id_column || ', true)
-	        ON CONFLICT (index, id) DO UPDATE SET index=EXCLUDED.index, id=EXCLUDED.id, delete=true;
+        IF (OLD.' || molfile_column || ' IS NOT NULL) THEN
+	        INSERT INTO sachem.compound_audit (index, id, delete) VALUES (' || idx || ', OLD.' || id_column || ', true)
+	            ON CONFLICT (index, id) DO UPDATE SET delete=true;
+        END IF;
 	    RETURN OLD;
 	  ELSIF (TG_OP = ''TRUNCATE'') THEN
-	    INSERT INTO sachem.compound_audit SELECT ' || idx || ', ' || id_column || ', true FROM ' || schema_name || '.' || table_name || '
-	        ON CONFLICT (index, id) DO UPDATE SET index=EXCLUDED.index, id=EXCLUDED.id, delete=true;
+	    INSERT INTO sachem.compound_audit SELECT ' || idx || ', ' || id_column || ', true FROM ' || schema_name || '.' || table_name || ' WHERE ' || molfile_column || ' IS NOT NULL
+	        ON CONFLICT (index, id) DO UPDATE SET delete=true;
 	    RETURN NULL;
 	  END IF;
 	END;

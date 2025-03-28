@@ -1,14 +1,14 @@
 dnl Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT(sachem, 2.5.5)
+AC_INIT(sachem, 2.6.0)
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([build])
 : ${CFLAGS=""}
 : ${CXXFLAGS=""}
 AC_PROG_CC
 
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 
 AC_CONFIG_MACRO_DIR([m4])
 
