@@ -11,7 +11,6 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeoutException;
 import org.apache.lucene.index.BinaryDocValues;
 import org.apache.lucene.index.DocValues;
-import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause;
@@ -27,6 +26,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.QueryVisitor;
 import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.Scorer;
+import org.apache.lucene.search.ScorerSupplier;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.util.BytesRef;
@@ -93,13 +93,6 @@ public class SubstructureQuery extends Query
             subqueries.add(new SingleSubstructureQuery(molecule));
 
         this.subquery = new DisjunctionMaxQuery(subqueries, 0);
-    }
-
-
-    @Override
-    public Query rewrite(IndexReader reader)
-    {
-        return subquery;
     }
 
 
@@ -269,14 +262,14 @@ public class SubstructureQuery extends Query
 
 
             @Override
-            public Scorer scorer(LeafReaderContext context) throws IOException
+            public ScorerSupplier scorerSupplier(LeafReaderContext context) throws IOException
             {
                 Scorer scorer = innerWeight.scorer(context);
 
                 if(scorer == null)
                     return null;
 
-                return new SingleSubstructureScorer(context, scorer);
+                return new DefaultScorerSupplier(new SingleSubstructureScorer(context, scorer));
             }
 
 
@@ -352,7 +345,6 @@ public class SubstructureQuery extends Query
 
                 protected SingleSubstructureScorer(LeafReaderContext context, Scorer scorer) throws IOException
                 {
-                    super(SingleSubstructureWeight.this);
                     this.innerScorer = scorer;
                     this.molDocValue = DocValues.getBinary(context.reader(), field);
 

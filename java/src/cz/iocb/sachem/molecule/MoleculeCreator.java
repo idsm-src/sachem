@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.openscience.cdk.CDKConstants;
 import org.openscience.cdk.aromaticity.Aromaticity;
-import org.openscience.cdk.aromaticity.ElectronDonation;
 import org.openscience.cdk.aromaticity.Kekulization;
 import org.openscience.cdk.atomtype.CDKAtomTypeMatcher;
 import org.openscience.cdk.exception.CDKException;
@@ -85,7 +84,7 @@ public class MoleculeCreator
         @Override
         protected Aromaticity initialValue()
         {
-            return new Aromaticity(ElectronDonation.daylight(), Cycles.or(Cycles.all(), Cycles.cdkAromaticSet()));
+            return new Aromaticity(Aromaticity.Model.Daylight, Cycles.or(Cycles.all(), Cycles.cdkAromaticSet()));
         }
     };
 
@@ -377,7 +376,7 @@ public class MoleculeCreator
                 return;
 
             case AUTO:
-                if(molecule.getFlag(CDKConstants.ISAROMATIC))
+                if(molecule.getFlag(IChemObject.AROMATIC))
                     return;
 
                 for(IBond bond : molecule.bonds())

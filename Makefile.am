@@ -1,2 +1,2 @@
-SUBDIRS=src java extension
+SUBDIRS=lib src java extension
 ACLOCAL_AMFLAGS=-I m4

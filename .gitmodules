@@ -1,0 +1,4 @@
+[submodule "lib/inchi"]
+	path = lib/inchi
+	url = https://github.com/idsm-src/inchi.git
+	branch = sachem

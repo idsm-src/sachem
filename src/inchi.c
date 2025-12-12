@@ -14,9 +14,6 @@
 int inp2spATOM(inp_ATOM *inp_at, int num_inp_at, sp_ATOM *at);
 
 
-int (*ConsoleQuit)(void) = NULL;
-int (*UserAction)(void)  = NULL;
-
 static jmethodID  setStereoAtomsMethod;
 static jmethodID  setStereoBondsMethod;
 static jmethodID  setAlternatingBondsMethod;
@@ -131,7 +128,7 @@ static int process_component(JNIEnv *env, jobject object, inp_ATOM *inp_at, int 
     if((ret = GetBaseCanonRanking(&ic, num_atoms, num_at_tg, (sp_ATOM* []) { tautomer ? NULL : at, tautomer ? at : NULL }, group_info_p, &s - (tautomer != 0), &Bcn, NULL /*&ulMaxTime*/, &CG, 1 /* FIX_ISO_FIXEDH_BUG */, num_atoms <= MAX_ATOMS)) < 0)
         goto exit_function; /*  program error */
 
-    if(ret = AllocateCS(&CS, num_atoms, num_at_tg, s.nLenCT, s.nLenCTAtOnly, s.nLenLinearCTStereoDble, s.nMaxNumStereoBonds, s.nLenLinearCTStereoCarb, s.nMaxNumStereoAtoms, s.nLenLinearCTTautomer, s.nLenLinearCTIsotopicTautomer, s.nLenIsotopic, nMode, &Bcn))
+    if((ret = AllocateCS(&CS, num_atoms, num_at_tg, s.nLenCT, s.nLenCTAtOnly, s.nLenLinearCTStereoDble, s.nMaxNumStereoBonds, s.nLenLinearCTStereoCarb, s.nMaxNumStereoAtoms, s.nLenLinearCTTautomer, s.nLenLinearCTIsotopicTautomer, s.nLenIsotopic, nMode, &Bcn)))
         goto exit_function;
 
     /*  settings */
@@ -176,7 +173,7 @@ static int process_component(JNIEnv *env, jobject object, inp_ATOM *inp_at, int 
     jshort *altern_bond_buffer = bond_count ? (jshort *) inchi_malloc(2 * bond_count * sizeof(jshort)) : NULL;
     jshort *t_group_buffer = group_info.num_t_groups ? (jshort *) inchi_malloc((2 + max_num_endpoints) * sizeof(jshort)) : NULL;
 
-    if(!stereo_carb_buffer || !stereo_dble_buffer || bond_count && !altern_bond_buffer || group_info.num_t_groups && !t_group_buffer)
+    if(!stereo_carb_buffer || !stereo_dble_buffer || (bond_count && !altern_bond_buffer) || (group_info.num_t_groups && !t_group_buffer))
     {
         ret = -1;
         goto java_exception;

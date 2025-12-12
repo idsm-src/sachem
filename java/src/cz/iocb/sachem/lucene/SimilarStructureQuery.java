@@ -26,6 +26,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.QueryVisitor;
 import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.Scorer;
+import org.apache.lucene.search.ScorerSupplier;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.util.BytesRef;
@@ -213,14 +214,14 @@ public class SimilarStructureQuery extends Query
 
 
             @Override
-            public Scorer scorer(LeafReaderContext context) throws IOException
+            public ScorerSupplier scorerSupplier(LeafReaderContext context) throws IOException
             {
                 Scorer scorer = innerWeight.scorer(context);
 
                 if(scorer == null)
                     return null;
 
-                return new SingleSimilarityScorer(context, scorer);
+                return new DefaultScorerSupplier(new SingleSimilarityScorer(context, scorer));
             }
 
 
@@ -297,7 +298,6 @@ public class SimilarStructureQuery extends Query
 
                 protected SingleSimilarityScorer(LeafReaderContext context, Scorer scorer) throws IOException
                 {
-                    super(SingleSimilarityWeight.this);
                     this.innerScorer = scorer;
                     this.molDocValue = DocValues.getBinary(context.reader(), field);
                 }
