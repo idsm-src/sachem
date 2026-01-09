@@ -143,14 +143,19 @@ static int process_component(JNIEnv *env, jobject object, inp_ATOM *inp_at, int 
     CS.pBCN       = &Bcn;
 
     CANON_STAT CS2 = CS;
-    ret = Canon_INChI(&ic, num_atoms, num_at_tg, at, &CS, &CG, nMode, tautomer);
+    if((ret = Canon_INChI(&ic, num_atoms, num_at_tg, at, &CS, &CG, nMode, tautomer)) <= 0)
+        goto exit_function;
 
     /* export atom stereo */
     AT_RANK *nCanonOrdStereo = bHasIsotopicAtoms ? CS.nCanonOrdIsotopicStereo : CS.nCanonOrdStereo;
     AT_STEREO_CARB *LinearCTStereoCarb = bHasIsotopicAtoms ? CS.LinearCTIsotopicStereoCarb : CS.LinearCTStereoCarb;
     AT_STEREO_DBLE *LinearCTStereoDble = bHasIsotopicAtoms ? CS.LinearCTIsotopicStereoDble : CS.LinearCTStereoDble;
+    int nLenCanonOrdStereo = bHasIsotopicAtoms ? CS.nLenCanonOrdIsotopicStereo : CS.nLenCanonOrdStereo;
     int nLenLinearCTStereoCarb = bHasIsotopicAtoms ? CS.nLenLinearCTIsotopicStereoCarb : CS.nLenLinearCTStereoCarb;
     int nLenLinearCTStereoDble = bHasIsotopicAtoms ? CS.nLenLinearCTIsotopicStereoDble : CS.nLenLinearCTStereoDble;
+
+    if(nLenCanonOrdStereo <= 0 || (nLenLinearCTStereoCarb <= 0 && nLenLinearCTStereoDble <= 0))
+        goto exit_function;
 
     int stereo_carb_len = 0;
     int stereo_dble_len = 0;
