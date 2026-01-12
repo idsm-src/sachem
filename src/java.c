@@ -51,27 +51,30 @@ void java_init(void)
     if(jvm == NULL || env == NULL)
     {
         JavaVMInitArgs args = (JavaVMInitArgs) {
-            .version = JNI_VERSION_1_8,
-            .nOptions = 1,
-            .options = (JavaVMOption []) { (JavaVMOption) {
-                .optionString = "-Djava.class.path=" JARDIR "/sachem.jar:"
-                                                     JARDIR "/beam-core-1.3.10.jar:"
-                                                     JARDIR "/cdk-atomtype-2.11.jar:"
-                                                     JARDIR "/cdk-core-2.11.jar:"
-                                                     JARDIR "/cdk-ctab-2.11.jar:"
-                                                     JARDIR "/cdk-interfaces-2.11.jar:"
-                                                     JARDIR "/cdk-ioformats-2.11.jar:"
-                                                     JARDIR "/cdk-isomorphism-2.11.jar:"
-                                                     JARDIR "/cdk-silent-2.11.jar:"
-                                                     JARDIR "/cdk-smiles-2.11.jar:"
-                                                     JARDIR "/cdk-standard-2.11.jar:"
-                                                     JARDIR "/cdk-valencycheck-2.11.jar:"
-                                                     JARDIR "/guava-33.5.0-jre.jar:"
-                                                     JARDIR "/log4j-1.2-api-2.25.2.jar:"
-                                                     JARDIR "/log4j-api-2.25.2.jar:"
-                                                     JARDIR "/log4j-core-2.25.2.jar:"
-                                                     JARDIR "/lucene-core-10.3.2.jar:"
-                                                     JARDIR "/vecmath-1.5.2.jar" }},
+            .version = JNI_VERSION_10,
+            .nOptions = 3,
+            .options = (JavaVMOption []) {
+                (JavaVMOption) { .optionString = "--enable-native-access=ALL-UNNAMED" },
+                (JavaVMOption) { .optionString = "--add-modules=jdk.incubator.vector" },
+                (JavaVMOption) { .optionString = "-Djava.class.path="
+                        JARDIR "/sachem.jar:"
+                        JARDIR "/beam-core-1.3.10.jar:"
+                        JARDIR "/cdk-atomtype-2.11.jar:"
+                        JARDIR "/cdk-core-2.11.jar:"
+                        JARDIR "/cdk-ctab-2.11.jar:"
+                        JARDIR "/cdk-interfaces-2.11.jar:"
+                        JARDIR "/cdk-ioformats-2.11.jar:"
+                        JARDIR "/cdk-isomorphism-2.11.jar:"
+                        JARDIR "/cdk-silent-2.11.jar:"
+                        JARDIR "/cdk-smiles-2.11.jar:"
+                        JARDIR "/cdk-standard-2.11.jar:"
+                        JARDIR "/cdk-valencycheck-2.11.jar:"
+                        JARDIR "/guava-33.5.0-jre.jar:"
+                        JARDIR "/log4j-1.2-api-2.25.2.jar:"
+                        JARDIR "/log4j-api-2.25.2.jar:"
+                        JARDIR "/log4j-core-2.25.2.jar:"
+                        JARDIR "/lucene-core-10.3.2.jar:"
+                        JARDIR "/vecmath-1.5.2.jar" }},
             .ignoreUnrecognized = JNI_FALSE
         };
 

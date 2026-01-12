@@ -30,8 +30,8 @@ fi
 dnl check for PostgreSQL
 AX_LIB_POSTGRESQL(9.6.0)
 
-dnl check for JDK8
-AX_JDK8
+dnl check for JDK
+AX_JDK
 
 
 AC_CONFIG_FILES(Makefile lib/Makefile src/Makefile java/Makefile extension/Makefile)

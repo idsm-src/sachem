@@ -23,10 +23,10 @@ jardir = $(datadir)/$(PACKAGE)/jar
 sachem.jar: force-build
 
 force-build:
-		$(ANT) -f $(srcdir)/build.xml -Dbasedir=$(builddir) -Dbuild.dir=$(builddir) -Dsrc.dir=$(srcdir) build-jar
+		JAVA_HOME=$(JDK_HOME) ANT_RESPECT_JAVA_HOME=y $(ANT) -f $(srcdir)/build.xml -Dbasedir=$(builddir) -Dbuild.dir=$(builddir) -Dsrc.dir=$(srcdir) build-jar
 
 clean-local:
-		$(ANT) -f $(srcdir)/build.xml -Dbasedir=$(builddir) -Dbuild.dir=$(builddir) -Dsrc.dir=$(srcdir) clean
+		JAVA_HOME=$(JDK_HOME) ANT_RESPECT_JAVA_HOME=y $(ANT) -f $(srcdir)/build.xml -Dbasedir=$(builddir) -Dbuild.dir=$(builddir) -Dsrc.dir=$(srcdir) clean
 
 EXTRA_DIST = \
     build.xml \
