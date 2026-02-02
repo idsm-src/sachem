@@ -10,7 +10,6 @@ import org.apache.lucene.document.BinaryDocValuesField;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.IntPoint;
 import org.apache.lucene.document.NumericDocValuesField;
-import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -261,9 +260,7 @@ public class Indexer
     private static Document createDocument(int id, byte[] binary)
     {
         Document document = new Document();
-        document.add(new IntPoint(Settings.idFieldName, id));
         document.add(new NumericDocValuesField(Settings.idFieldName, id));
-        document.add(new StoredField(Settings.idFieldName, id));
 
         BinaryMolecule molecule = new BinaryMolecule(binary);
 
@@ -271,7 +268,6 @@ public class Indexer
         /* substructure index */
         Set<Integer> subFp = IOCBFingerprint.getSubstructureFingerprint(molecule);
 
-        document.add(new StoredField(Settings.substructureFieldName, binary));
         document.add(new BinaryDocValuesField(Settings.substructureFieldName, new BytesRef(binary)));
         document.add(new IntPoint(Settings.substructureFieldName, subFp.size()));
         document.add(new TextField(Settings.substructureFieldName, new FingerprintTokenStream(subFp)));
@@ -300,7 +296,6 @@ public class Indexer
 
 
         document.add(new TextField(Settings.similarityFieldName, new FingerprintTokenStream(bits)));
-        document.add(new StoredField(Settings.similarityFieldName, array));
         document.add(new BinaryDocValuesField(Settings.similarityFieldName, new BytesRef(array)));
 
         for(int size = 0, i = 0; i < simFp.size(); i++)
