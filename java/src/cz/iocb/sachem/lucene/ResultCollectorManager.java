@@ -22,7 +22,7 @@ public class ResultCollectorManager implements CollectorManager<ResultCollector,
 
     private final String name;
 
-    
+
     private static class ResultBuffer
     {
         int[] ids = new int[bufferSize];

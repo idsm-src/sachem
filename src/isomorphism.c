@@ -1,5 +1,6 @@
+#include <stdlib.h>
 #include <math.h>
-#include "java.h"
+#include <jni.h>
 #include "molecule.h"
 #include "isomorphism.h"
 
@@ -14,8 +15,7 @@ static jmethodID iterationLimitExceededExceptionConstructor;
 static jmethodID queryCancelExceptionConstructor;
 
 
-static jobject JNICALL native_isomorphism_create(JNIEnv *env, jclass clazz, jbyteArray queryArray,
-        jbooleanArray restHArray, jint searchMode, jint chargeMode, jint isotopeMode, jint radicalMode, jint stereoMode)
+static jobject JNICALL native_isomorphism_create(JNIEnv *env, jclass clazz, jbyteArray queryArray, jbooleanArray restHArray, jint searchMode, jint chargeMode, jint isotopeMode, jint radicalMode, jint stereoMode)
 {
     uint8_t *query = (uint8_t *) (*env)->GetByteArrayElements(env, queryArray, NULL);
 
@@ -142,7 +142,7 @@ static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobjec
 
         score = -INFINITY;
     }
-    else if(unlikely(InterruptPending && QueryCancelPending))
+    else if(INTERRUPTS_PENDING_CONDITION())
     {
         jobject exception = (*env)->NewObject(env, queryCancelExceptionClass, queryCancelExceptionConstructor);
 
@@ -157,54 +157,68 @@ static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobjec
 }
 
 
-void isomorphism_init()
+void native_isomorphism_init(JNIEnv *env)
 {
-    outOfMemoryErrorClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "java/lang/OutOfMemoryError"));
-    java_check_exception(__func__);
+    if((outOfMemoryErrorClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "java/lang/OutOfMemoryError"))) == NULL)
+        goto error;
 
-    outOfMemoryErrorConstructor = (*env)->GetMethodID(env, outOfMemoryErrorClass, "<init>", "()V");
-    java_check_exception(__func__);
+    if((outOfMemoryErrorConstructor = (*env)->GetMethodID(env, outOfMemoryErrorClass, "<init>", "()V")) == NULL)
+        goto error;
 
+    if((iterationLimitExceededExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/molecule/NativeIsomorphism$IterationLimitExceededException"))) == NULL)
+        goto error;
 
-    iterationLimitExceededExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/molecule/NativeIsomorphism$IterationLimitExceededException"));
-    java_check_exception(__func__);
+    if((iterationLimitExceededExceptionConstructor = (*env)->GetMethodID(env, iterationLimitExceededExceptionClass, "<init>", "()V")) == NULL)
+        goto error;
 
-    iterationLimitExceededExceptionConstructor = (*env)->GetMethodID(env, iterationLimitExceededExceptionClass, "<init>", "()V");
-    java_check_exception(__func__);
+    if((queryCancelExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/molecule/NativeIsomorphism$QueryCancelException"))) == NULL)
+        goto error;
 
+    if((queryCancelExceptionConstructor = (*env)->GetMethodID(env, queryCancelExceptionClass, "<init>", "()V")) == NULL)
+        goto error;
 
-    queryCancelExceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "cz/iocb/sachem/molecule/NativeIsomorphism$QueryCancelException"));
-    java_check_exception(__func__);
+    if((byteBufferClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "java/nio/ByteBuffer"))) == NULL)
+        goto error;
 
-    queryCancelExceptionConstructor = (*env)->GetMethodID(env, queryCancelExceptionClass, "<init>", "()V");
-    java_check_exception(__func__);
-
-
-    byteBufferClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "java/nio/ByteBuffer"));
-    java_check_exception(__func__);
-
-    allocateDirectMethod = (*env)->GetStaticMethodID(env, byteBufferClass, "allocateDirect", "(I)Ljava/nio/ByteBuffer;");
-    java_check_exception(__func__);
+    if((allocateDirectMethod = (*env)->GetStaticMethodID(env, byteBufferClass, "allocateDirect", "(I)Ljava/nio/ByteBuffer;")) == NULL)
+        goto error;
 
 
     jclass nativeIsomorphismClass = (*env)->FindClass(env, "cz/iocb/sachem/molecule/NativeIsomorphism");
-    java_check_exception(__func__);
 
+    if(nativeIsomorphismClass == NULL)
+        goto error;
 
     JNINativeMethod methods[] =
     {
-        {
-            "create",
-            "([B[ZIIIII)Ljava/nio/ByteBuffer;",
-            native_isomorphism_create
-        },
-        {
-            "match",
-            "(Ljava/nio/ByteBuffer;[BJ)F",
-            native_isomorphism_match
-        }
+        { "create", "([B[ZIIIII)Ljava/nio/ByteBuffer;", native_isomorphism_create },
+        { "match", "(Ljava/nio/ByteBuffer;[BJ)F", native_isomorphism_match }
     };
 
     if((*env)->RegisterNatives(env, nativeIsomorphismClass, methods, 2) != 0)
-        elog(ERROR, "cannot register native methods");
+        goto error;
+
+    return;
+
+error:
+
+    (*env)->DeleteGlobalRef(env, byteBufferClass);
+    byteBufferClass = NULL;
+
+    (*env)->DeleteGlobalRef(env, outOfMemoryErrorClass);
+    outOfMemoryErrorClass = NULL;
+
+    (*env)->DeleteGlobalRef(env, iterationLimitExceededExceptionClass);
+    iterationLimitExceededExceptionClass = NULL;
+
+    (*env)->DeleteGlobalRef(env, queryCancelExceptionClass);
+    queryCancelExceptionClass = NULL;
+
+    if(!(*env)->ExceptionCheck(env))
+    {
+        jclass runtimeExceptionClass = (*env)->FindClass(env, "java/lang/RuntimeException");
+
+        if(runtimeExceptionClass)
+            (*env)->ThrowNew(env, runtimeExceptionClass, "initialization failed");
+    }
 }

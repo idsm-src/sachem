@@ -81,7 +81,8 @@ public class InChITools
 
     private final IAtomContainer molecule;
 
-    @SuppressWarnings("rawtypes") private final List<IStereoElement> stereo = new ArrayList<IStereoElement>();
+    @SuppressWarnings("rawtypes")
+    private final List<IStereoElement> stereo = new ArrayList<IStereoElement>();
     private final Set<IAtom> stereoAtoms = new HashSet<IAtom>();
     private final Set<IBond> stereoBonds = new HashSet<IBond>();
 

@@ -99,8 +99,11 @@ void java_init(void)
     toStringMethod = (*env)->GetMethodID(env, exceptionClass, "toString", "()Ljava/lang/String;");
     java_check_exception(__func__);
 
-    isomorphism_init();
-    inchi_init();
+    native_isomorphism_init(env);
+    java_check_exception(__func__);
+
+    inchi_init(env);
+    java_check_exception(__func__);
 
     initialised = true;
 }

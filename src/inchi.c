@@ -1,7 +1,6 @@
-#include <postgres.h>
+#include <stdbool.h>
 #include <string.h>
 #include <jni.h>
-#include "java.h"
 #include "inchi.h"
 #include "ichitime.h"
 #include "ichister.h"
@@ -446,34 +445,42 @@ static jint JNICALL inchi_tools_process(JNIEnv *env, jobject object, jbyteArray 
 }
 
 
-void inchi_init()
+void inchi_init(JNIEnv *env)
 {
     jclass inchiToolsClass = (*env)->FindClass(env, "cz/iocb/sachem/molecule/InChITools");
-    java_check_exception(__func__);
 
-    setStereoAtomsMethod = (*env)->GetMethodID(env, inchiToolsClass, "setStereoAtoms", "([S)V");
-    java_check_exception(__func__);
+    if(inchiToolsClass == NULL)
+        goto error;
 
-    setStereoBondsMethod = (*env)->GetMethodID(env, inchiToolsClass, "setStereoBonds", "([S)V");
-    java_check_exception(__func__);
+    if((setStereoAtomsMethod = (*env)->GetMethodID(env, inchiToolsClass, "setStereoAtoms", "([S)V")) == NULL)
+        goto error;
 
-    setAlternatingBondsMethod = (*env)->GetMethodID(env, inchiToolsClass, "setAlternatingBonds", "([S)V");
-    java_check_exception(__func__);
+    if((setStereoBondsMethod = (*env)->GetMethodID(env, inchiToolsClass, "setStereoBonds", "([S)V")) == NULL)
+        goto error;
 
-    setTautomericGroupMethod = (*env)->GetMethodID(env, inchiToolsClass, "setTautomericGroup", "([S)V");
-    java_check_exception(__func__);
+    if((setAlternatingBondsMethod = (*env)->GetMethodID(env, inchiToolsClass, "setAlternatingBonds", "([S)V")) == NULL)
+        goto error;
 
+    if((setTautomericGroupMethod = (*env)->GetMethodID(env, inchiToolsClass, "setTautomericGroup", "([S)V")) == NULL)
+        goto error;
 
     JNINativeMethod methods[] =
     {
-        {
-            "process",
-            "([B[BIZ)I",
-            inchi_tools_process
-        }
+        { "process", "([B[BIZ)I", inchi_tools_process }
     };
 
     if((*env)->RegisterNatives(env, inchiToolsClass, methods, 1) != 0)
-        elog(ERROR, "cannot register native methods");
-}
+        goto error;
 
+    return;
+
+error:
+
+    if(!(*env)->ExceptionCheck(env))
+    {
+        jclass runtimeExceptionClass = (*env)->FindClass(env, "java/lang/RuntimeException");
+
+        if(runtimeExceptionClass)
+            (*env)->ThrowNew(env, runtimeExceptionClass, "initialization failed");
+    }
+}

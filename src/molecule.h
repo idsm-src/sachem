@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <limits.h>
+#include "enviroment.h"
 #include "memory.h"
-#include "sachem.h"
 
 
 #define UNKNOWN_ATOM_NUMBER     ((int8_t) -'?')

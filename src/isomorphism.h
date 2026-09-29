@@ -30,12 +30,11 @@
 #ifndef ISOMORPHISM_H__
 #define ISOMORPHISM_H__
 
-#include <postgres.h>
-#include <utils/timeout.h>
 #include <stdbool.h>
+#include <jni.h>
+#include "enviroment.h"
 #include "memory.h"
 #include "molecule.h"
-#include "sachem.h"
 
 
 #define UNDEFINED_CORE              -1
@@ -249,22 +248,15 @@ static inline VF2State *vf2state_create(void *memory, const Molecule *restrict q
     for(int idx = 0; idx < queryAtomCount; idx++)
     {
         AtomIdx selected = -1;
-        AtomIdx fallback = -1;
 
         for(AtomIdx i = 0; i < queryAtomCount; i++)
         {
-            if(selected == -1 && queryFlags[i] == 1)
-            {
+            if(selected == -1 && queryFlags[i] != 2)
                 selected = i;
+
+            if(queryFlags[i] == 1)
                 break;
-            }
-
-            if(fallback == -1 && queryFlags[i] == 0)
-                fallback = i;
         }
-
-        if(selected == -1)
-            selected = fallback;
 
 
         AtomIdx *restrict queryBondedAtomList = molecule_get_bonded_atom_list(query, selected);
@@ -1061,7 +1053,7 @@ static inline bool vf2state_match_core(VF2State *restrict vf2state)
 
         while(vf2state_next_target(vf2state))
         {
-            if(unlikely(--vf2state->counter == 0 || (InterruptPending && QueryCancelPending)))
+            if(unlikely(--vf2state->counter == 0 || INTERRUPTS_PENDING_CONDITION()))
                 return false;
 
             if(vf2state_is_feasible_pair(vf2state))
@@ -1139,6 +1131,6 @@ static inline bool vf2state_match(VF2State *restrict vf2state, const Molecule *r
 }
 
 
-void isomorphism_init();
+void native_isomorphism_init(JNIEnv *env);
 
 #endif /* ISOMORPHISM_H__ */
