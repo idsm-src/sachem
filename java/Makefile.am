@@ -1,21 +1,21 @@
 jar_DATA = \
     sachem.jar \
     lib/beam-core-1.3.10.jar \
-    lib/cdk-atomtype-2.11.jar \
-    lib/cdk-core-2.11.jar \
-    lib/cdk-ctab-2.11.jar \
-    lib/cdk-interfaces-2.11.jar \
-    lib/cdk-ioformats-2.11.jar \
-    lib/cdk-isomorphism-2.11.jar \
-    lib/cdk-silent-2.11.jar \
-    lib/cdk-smiles-2.11.jar \
-    lib/cdk-standard-2.11.jar \
-    lib/cdk-valencycheck-2.11.jar \
-    lib/guava-33.5.0-jre.jar \
-    lib/log4j-1.2-api-2.25.2.jar \
-    lib/log4j-api-2.25.2.jar \
-    lib/log4j-core-2.25.2.jar \
-    lib/lucene-core-10.3.2.jar \
+    lib/cdk-atomtype-2.13.jar \
+    lib/cdk-core-2.13.jar \
+    lib/cdk-ctab-2.13.jar \
+    lib/cdk-interfaces-2.13.jar \
+    lib/cdk-ioformats-2.13.jar \
+    lib/cdk-isomorphism-2.13.jar \
+    lib/cdk-silent-2.13.jar \
+    lib/cdk-smiles-2.13.jar \
+    lib/cdk-standard-2.13.jar \
+    lib/cdk-valencycheck-2.13.jar \
+    lib/guava-33.7.1-jre.jar \
+    lib/log4j-1.2-api-2.26.1.jar \
+    lib/log4j-api-2.26.1.jar \
+    lib/log4j-core-2.26.1.jar \
+    lib/lucene-core-10.5.1.jar \
     lib/vecmath-1.5.2.jar
 
 jardir = $(datadir)/$(PACKAGE)/jar
@@ -32,21 +32,21 @@ EXTRA_DIST = \
     build.xml \
     patterns.bin \
     lib/beam-core-1.3.10.jar \
-    lib/cdk-atomtype-2.11.jar \
-    lib/cdk-core-2.11.jar \
-    lib/cdk-ctab-2.11.jar \
-    lib/cdk-interfaces-2.11.jar \
-    lib/cdk-ioformats-2.11.jar \
-    lib/cdk-isomorphism-2.11.jar \
-    lib/cdk-silent-2.11.jar \
-    lib/cdk-smiles-2.11.jar \
-    lib/cdk-standard-2.11.jar \
-    lib/cdk-valencycheck-2.11.jar \
-    lib/guava-33.5.0-jre.jar \
-    lib/log4j-1.2-api-2.25.2.jar \
-    lib/log4j-api-2.25.2.jar \
-    lib/log4j-core-2.25.2.jar \
-    lib/lucene-core-10.3.2.jar \
+    lib/cdk-atomtype-2.13.jar \
+    lib/cdk-core-2.13.jar \
+    lib/cdk-ctab-2.13.jar \
+    lib/cdk-interfaces-2.13.jar \
+    lib/cdk-ioformats-2.13.jar \
+    lib/cdk-isomorphism-2.13.jar \
+    lib/cdk-silent-2.13.jar \
+    lib/cdk-smiles-2.13.jar \
+    lib/cdk-standard-2.13.jar \
+    lib/cdk-valencycheck-2.13.jar \
+    lib/guava-33.7.1-jre.jar \
+    lib/log4j-1.2-api-2.26.1.jar \
+    lib/log4j-api-2.26.1.jar \
+    lib/log4j-core-2.26.1.jar \
+    lib/lucene-core-10.5.1.jar \
     lib/vecmath-1.5.2.jar \
     src/cz/iocb/sachem/fingerprint/AtomFingerprint.java \
     src/cz/iocb/sachem/fingerprint/CRNGFingerprint.java \

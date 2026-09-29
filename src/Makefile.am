@@ -17,6 +17,7 @@ libsachem_la_SOURCES = \
 
 EXTRA_DIST = \
         enum.h \
+        enviroment.h \
         inchi.h \
         isomorphism.h \
         java.h \

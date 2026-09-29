@@ -525,28 +525,25 @@ public class InChITools
     {
         int multiplier = bond.getAtom(0) == atom ? 1 : -1;
 
-        switch(bond.getStereo())
+        switch(bond.getDisplay())
         {
-            case UP:
+            case WedgeBegin:
                 return multiplier * 1;
 
-            case UP_INVERTED:
+            case WedgeEnd:
                 return multiplier * -1;
 
-            case UP_OR_DOWN:
-                return multiplier * 4;
+            //case Wavy:
+            //    return multiplier * 4;
 
-            case UP_OR_DOWN_INVERTED:
-                return multiplier * -4;
-
-            case DOWN:
+            case WedgedHashBegin:
                 return multiplier * 6;
 
-            case DOWN_INVERTED:
+            case WedgedHashEnd:
                 return multiplier * -6;
 
-            case E_OR_Z:
-                return 3;
+            //case Crossed:
+            //    return 3;
 
             default:
                 return 0;
