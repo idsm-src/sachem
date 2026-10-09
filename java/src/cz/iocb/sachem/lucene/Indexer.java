@@ -260,6 +260,7 @@ public class Indexer
     private static Document createDocument(int id, byte[] binary)
     {
         Document document = new Document();
+        document.add(new IntPoint(Settings.idFieldName, id));
         document.add(new NumericDocValuesField(Settings.idFieldName, id));
 
         BinaryMolecule molecule = new BinaryMolecule(binary);
