@@ -1,6 +1,5 @@
 #include <postgres.h>
 #include <pthread.h>
-#include <signal.h>
 #include <miscadmin.h>
 #include <libpq/pqsignal.h>
 #include <tcop/tcopprot.h>
@@ -54,8 +53,9 @@ void java_init(void)
     {
         JavaVMInitArgs args = (JavaVMInitArgs) {
             .version = JNI_VERSION_10,
-            .nOptions = 3,
+            .nOptions = 4,
             .options = (JavaVMOption []) {
+                (JavaVMOption) { .optionString = "-Xrs" },
                 (JavaVMOption) { .optionString = "--enable-native-access=ALL-UNNAMED" },
                 (JavaVMOption) { .optionString = "--add-modules=jdk.incubator.vector" },
                 (JavaVMOption) { .optionString = "-Djava.class.path="
@@ -81,39 +81,17 @@ void java_init(void)
         };
 
         /*
-         * The signals are ignored while the JVM starts, so that it does not install its own handlers for them, and
-         * blocked, so that a cancel or termination request arriving meanwhile is not lost: Linux keeps a blocked signal
-         * pending even if it is ignored. Ignoring discards a signal that is already pending, so such a signal is raised
-         * again afterwards.
+         * With -Xrs, the JVM neither installs handlers for SIGHUP, SIGINT, SIGTERM and SIGQUIT nor changes their masks,
+         * so the handlers of PostgreSQL stay in place; otherwise the JVM would exit the backend on SIGHUP, i.e. on every
+         * reload of the configuration. The handlers forwarding a signal received by a JVM thread to the main thread are
+         * installed before the JVM starts, so that no request is lost meanwhile.
          */
-        sigset_t signals;
-        sigset_t pending;
-        sigset_t mask;
-
-        sigemptyset(&signals);
-        sigaddset(&signals, SIGINT);
-        sigaddset(&signals, SIGTERM);
-        sigaddset(&signals, SIGQUIT);
-
-        pthread_sigmask(SIG_BLOCK, &signals, &mask);
-        sigpending(&pending);
-
-        pqsignal(SIGINT, SIG_IGN);
-        pqsignal(SIGTERM, SIG_IGN);
-        pqsignal(SIGQUIT, SIG_IGN);
-
-        JNI_CreateJavaVM(&(jvm), (void **) &(env), &args);
-
         mainThread = pthread_self();
         pqsignal(SIGINT,  java_statement_cancel_handler);
         pqsignal(SIGTERM, java_die_handler);
         pqsignal(SIGQUIT, java_quick_die_handler);
 
-        for(int signum = 1; signum < NSIG; signum++)
-            if(sigismember(&signals, signum) == 1 && sigismember(&pending, signum) == 1)
-                raise(signum);
-
-        pthread_sigmask(SIG_SETMASK, &mask, NULL);
+        JNI_CreateJavaVM(&(jvm), (void **) &(env), &args);
 
         if(jvm == NULL || env == NULL)
             elog(ERROR, "cannot initialize JVM");
