@@ -123,7 +123,10 @@ void java_check_exception(const char *str)
     if(exception == NULL)
         return;
 
-    (*env)->ExceptionDescribe(env);
+    /* the abort of a search by a request to cancel the query or to end the backend is not worth a stack trace */
+    if(!QUERY_CANCEL_PENDING())
+        (*env)->ExceptionDescribe(env);
+
     (*env)->ExceptionClear(env);
     char *error = NULL;
 
@@ -148,6 +151,9 @@ void java_check_exception(const char *str)
     }
 
     JavaDeleteRef(exception);
+
+    /* a request to cancel the query or to end the backend, which aborts a search, is reported by PostgreSQL itself */
+    CHECK_FOR_INTERRUPTS();
 
     elog(ERROR, "%s: java error: %s", str, error);
 }
