@@ -1,5 +1,7 @@
 #include <postgres.h>
 #include <pthread.h>
+#include <signal.h>
+#include <miscadmin.h>
 #include <libpq/pqsignal.h>
 #include <tcop/tcopprot.h>
 #include "java.h"
@@ -78,6 +80,24 @@ void java_init(void)
             .ignoreUnrecognized = JNI_FALSE
         };
 
+        /*
+         * The signals are ignored while the JVM starts, so that it does not install its own handlers for them, and
+         * blocked, so that a cancel or termination request arriving meanwhile is not lost: Linux keeps a blocked signal
+         * pending even if it is ignored. Ignoring discards a signal that is already pending, so such a signal is raised
+         * again afterwards.
+         */
+        sigset_t signals;
+        sigset_t pending;
+        sigset_t mask;
+
+        sigemptyset(&signals);
+        sigaddset(&signals, SIGINT);
+        sigaddset(&signals, SIGTERM);
+        sigaddset(&signals, SIGQUIT);
+
+        pthread_sigmask(SIG_BLOCK, &signals, &mask);
+        sigpending(&pending);
+
         pqsignal(SIGINT, SIG_IGN);
         pqsignal(SIGTERM, SIG_IGN);
         pqsignal(SIGQUIT, SIG_IGN);
@@ -89,8 +109,17 @@ void java_init(void)
         pqsignal(SIGTERM, java_die_handler);
         pqsignal(SIGQUIT, java_quick_die_handler);
 
+        for(int signum = 1; signum < NSIG; signum++)
+            if(sigismember(&signals, signum) == 1 && sigismember(&pending, signum) == 1)
+                raise(signum);
+
+        pthread_sigmask(SIG_SETMASK, &mask, NULL);
+
         if(jvm == NULL || env == NULL)
             elog(ERROR, "cannot initialize JVM");
+
+        /* the query is cancelled now if it was cancelled while the JVM started */
+        CHECK_FOR_INTERRUPTS();
     }
 
     exceptionClass = (jclass) (*env)->NewGlobalRef(env, (*env)->FindClass(env, "java/lang/Throwable"));
