@@ -142,7 +142,7 @@ static jfloat JNICALL native_isomorphism_match(JNIEnv *env, jclass clazz, jobjec
 
         score = -INFINITY;
     }
-    else if(INTERRUPTS_PENDING_CONDITION())
+    else if(QUERY_CANCEL_PENDING())
     {
         jobject exception = (*env)->NewObject(env, queryCancelExceptionClass, queryCancelExceptionConstructor);
 

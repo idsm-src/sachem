@@ -1053,7 +1053,7 @@ static inline bool vf2state_match_core(VF2State *restrict vf2state)
 
         while(vf2state_next_target(vf2state))
         {
-            if(unlikely(--vf2state->counter == 0 || INTERRUPTS_PENDING_CONDITION()))
+            if(unlikely(--vf2state->counter == 0) || QUERY_CANCEL_PENDING())
                 return false;
 
             if(vf2state_is_feasible_pair(vf2state))
